@@ -213,7 +213,7 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
       </div>
 
       {/* 訂單列表 */}
-      <div className="p-4 space-y-3.5 flex-1">
+      <div className="p-4 space-y-3.5 flex-1 bg-gray-50/30">
         {filteredOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 space-y-2 text-gray-400">
             <span className="text-4xl">📦</span>
@@ -232,37 +232,37 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
             
             // 決定左側邊條與右上角狀態 Badge 顏色
             let sideBarColor = 'bg-slate-200';
-            let statusBadgeClass = 'bg-slate-100 text-slate-700';
+            let statusBadgeClass = 'bg-slate-50 text-slate-700 border-slate-200';
 
             if (isHandedOver) {
               sideBarColor = 'bg-blue-500';
-              statusBadgeClass = 'bg-blue-100 text-blue-700';
+              statusBadgeClass = 'bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-200';
             } else if (isOverdue) {
               if (isCriticalOverdue) {
                 sideBarColor = 'bg-red-600';
-                statusBadgeClass = 'bg-red-100 text-red-700 font-black animate-pulse-subtle';
+                statusBadgeClass = 'bg-gradient-to-r from-red-50 to-red-100 text-red-700 font-black border-red-200 animate-pulse-subtle';
               } else {
                 sideBarColor = 'bg-orange-500';
-                statusBadgeClass = 'bg-orange-100 text-orange-700';
+                statusBadgeClass = 'bg-gradient-to-r from-orange-50 to-orange-100 text-orange-700 border-orange-200';
               }
             } else if (isWarning) {
               sideBarColor = 'bg-yellow-400';
-              statusBadgeClass = 'bg-yellow-100 text-yellow-800';
+              statusBadgeClass = 'bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-800 border-yellow-200';
             } else if (order.status === '已到貨') {
               sideBarColor = 'bg-green-500';
-              statusBadgeClass = 'bg-green-100 text-green-700';
+              statusBadgeClass = 'bg-gradient-to-r from-green-50 to-green-100 text-green-700 border-green-200';
             } else if (order.status === '已下訂') {
               sideBarColor = 'bg-indigo-400';
-              statusBadgeClass = 'bg-indigo-100 text-indigo-700';
+              statusBadgeClass = 'bg-gradient-to-r from-indigo-50 to-indigo-100 text-indigo-700 border-indigo-200';
             } else {
               sideBarColor = 'bg-slate-300';
-              statusBadgeClass = 'bg-slate-100 text-slate-700';
+              statusBadgeClass = 'bg-gradient-to-r from-slate-50 to-slate-100 text-slate-700 border-slate-200';
             }
 
             return (
               <div
                 key={order.id}
-                className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex relative hover:shadow-md transition-all duration-200"
+                className="bg-[#FAFAFA] rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] border border-gray-200/60 overflow-hidden flex relative hover:shadow-[0_4px_14px_-3px_rgba(0,0,0,0.1),0_4px_6px_-2px_rgba(0,0,0,0.05)] transition-all duration-200"
               >
                 {/* 左側狀態邊條 */}
                 <div className={`w-1.5 shrink-0 ${sideBarColor}`}></div>
@@ -272,33 +272,33 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
                   {/* 第一行：姓名電話與狀態標籤 */}
                   <div className="flex justify-between items-start">
                     <div className="flex items-baseline space-x-2">
-                      <span className="text-base font-bold text-gray-800">{order.customerName}</span>
+                      <span className="text-[17px] font-black text-gray-900 tracking-tight">{order.customerName}</span>
                       <span className="text-xs text-gray-500 font-medium font-mono">{order.customerPhone}</span>
                     </div>
                     <div className="flex items-center space-x-1.5">
-                      <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full ${statusBadgeClass}`}>
+                      <span className={`text-[10px] font-extrabold px-3 py-1.5 rounded border shadow-sm ${statusBadgeClass}`}>
                         {order.status}
                       </span>
                     </div>
                   </div>
 
                   {/* 第二行：商品名稱 */}
-                  <div className="text-sm font-extrabold text-gray-900 leading-tight">
+                  <div className="text-[15px] font-bold text-gray-800 leading-tight">
                     {order.productName}
                   </div>
 
                   {/* 第三行：標籤雲 */}
                   {order.tags && order.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
                       {order.tags.map((tag, idx) => {
                         const isAwardTag = tag.includes('標') || tag.includes('績');
                         return (
                           <span
                             key={idx}
-                            className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${
+                            className={`text-[10px] font-bold px-2.5 py-1 rounded-md border flex items-center ${
                               isAwardTag
-                                ? 'bg-amber-100 text-amber-800 border border-amber-200/50 flex items-center'
-                                : 'bg-gray-100 text-gray-600'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
                             }`}
                           >
                             {!isAwardTag && '+ '}
@@ -310,41 +310,45 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
                   )}
 
                   {/* 分割線 */}
-                  <div className="border-t border-gray-100 my-1"></div>
+                  <div className="border-t border-gray-200/60 my-2"></div>
 
                   {/* 第四行：分店、提單人、建單日期、時效提示 */}
-                  <div className="flex flex-col space-y-1.5 text-[10px] text-gray-400 font-medium">
+                  <div className="flex flex-col space-y-2 text-[11px] text-gray-500 font-medium">
                     <div className="flex justify-between items-center">
                       <span>
                         {order.store} · 提單: {order.creator} · {order.type}
                       </span>
-                      <span className="flex items-center space-x-0.5">
-                        <Calendar size={10} />
+                      <span className="flex items-center space-x-1">
+                        <Calendar size={12} className="text-gray-400" />
                         <span>建單 {order.createdAt.substring(5).replace('-', '/')}</span>
                       </span>
                     </div>
 
                     {/* 時效警示提示 */}
                     {!isHandedOver && (
-                      <div className="pt-0.5">
+                      <div className={`p-2 flex items-center rounded-lg ${
+                        isCriticalOverdue ? 'bg-red-50' : 
+                        isOverdue ? 'bg-orange-50' : 
+                        isWarning ? 'bg-yellow-50' : 'bg-slate-50'
+                      }`}>
                         {isCriticalOverdue ? (
-                          <div className="flex items-center space-x-1 text-red-600 font-extrabold text-[11px] animate-pulse-subtle">
-                            <AlertTriangle size={12} />
+                          <div className="flex items-center space-x-1.5 text-red-700 font-black text-[11px] animate-pulse-subtle">
+                            <AlertTriangle size={14} />
                             <span>🚨 嚴重逾期 {overdueDays} 天 (交期：{order.promiseDate})</span>
                           </div>
                         ) : isOverdue ? (
-                          <div className="flex items-center space-x-1 text-orange-600 font-bold text-[11px]">
-                            <AlertTriangle size={12} />
+                          <div className="flex items-center space-x-1.5 text-orange-700 font-bold text-[11px]">
+                            <AlertTriangle size={14} />
                             <span>⚠️ 逾期 {overdueDays} 天 (交期：{order.promiseDate})</span>
                           </div>
                         ) : isWarning ? (
-                          <div className="flex items-center space-x-1 text-yellow-600 font-bold text-[11px]">
-                            <Clock size={12} />
+                          <div className="flex items-center space-x-1.5 text-yellow-700 font-bold text-[11px]">
+                            <Clock size={14} />
                             <span>⏰ 即將到期 (剩 {remainingDays === 0 ? '今' : remainingDays} 天交貨)</span>
                           </div>
                         ) : (
-                          <div className="flex items-center space-x-1 text-green-600 font-semibold text-[10px]">
-                            <Clock size={11} />
+                          <div className="flex items-center space-x-1.5 text-green-700 font-semibold text-[11px]">
+                            <Clock size={14} />
                             <span>⏱️ 時效正常 (剩 {remainingDays} 天交貨)</span>
                           </div>
                         )}
@@ -353,16 +357,18 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
                     
                     {/* 已交單/交機時效 */}
                     {isHandedOver && (
-                      <div className="flex items-center space-x-1 text-blue-600 font-bold text-[10px]">
-                        <Check size={11} strokeWidth={3} />
-                        <span>⏱️ 本單已順利交易完成並交機</span>
+                      <div className="p-2 rounded-lg flex items-center bg-blue-50">
+                        <div className="flex items-center space-x-1.5 text-blue-700 font-bold text-[11px]">
+                          <Check size={14} strokeWidth={3} />
+                          <span>⏱️ 本單已順利交易完成並交機</span>
+                        </div>
                       </div>
                     )}
                   </div>
 
                   {/* 狀態更新快捷操作 (權限區分控制) */}
                   {canUpdateStatus(order) && !isHandedOver && (
-                    <div className="pt-2 flex justify-end">
+                    <div className="pt-3 flex justify-end">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -370,7 +376,7 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
                           e.stopPropagation();
                           setStatusUpdatingOrder(order);
                         }}
-                        className="flex items-center space-x-1 border border-blue-200 text-blue-600 bg-blue-50/20 px-2.5 py-1 rounded-xl text-[10px] font-extrabold hover:bg-blue-50 active:scale-95 transition-all"
+                        className="flex items-center space-x-1 border border-blue-500 text-blue-600 bg-white px-4 py-2 rounded-full text-xs font-extrabold hover:bg-blue-50 hover:shadow-sm active:scale-95 transition-all"
                       >
                         <span>🔄 變更訂單狀態</span>
                       </button>
@@ -382,6 +388,7 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
           })
         )}
       </div>
+
 
       {/* 浮動新增按鈕 */}
       <button
