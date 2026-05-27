@@ -72,13 +72,21 @@ export default function App() {
     let parsedUsers = USERS;
     if (cached) {
       try {
-        parsedUsers = JSON.parse(cached);
+        const cachedList = JSON.parse(cached);
+        const cachedUsernames = cachedList.map(u => u.username);
+        // 防呆偵測：如果 mockData 中有任何一個帳號不在舊有的本地快取中，強制以最新的 mockData.USERS 載入
+        const hasNewUsers = USERS.some(u => !cachedUsernames.includes(u.username));
+        if (hasNewUsers) {
+          parsedUsers = USERS;
+        } else {
+          parsedUsers = cachedList;
+        }
       } catch (e) {
         parsedUsers = USERS;
       }
     }
     
-    // 防呆機制！確保舊有的本地快取也一定能拿到功能權限陣列
+    // 防呆機制！確保所有使用者皆能拿到功能權限陣列
     const defaultPerms = {
       SUPER_ADMIN: ['view_all_stores', 'manage_orders', 'complete_tasks', 'cancel_tasks_directly', 'manage_accounts'],
       STORE_MANAGER: ['manage_orders', 'complete_tasks', 'cancel_tasks_directly'],
@@ -97,8 +105,11 @@ export default function App() {
       return u;
     });
 
-    if (needsUpdate || !cached) {
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(upgradedUsers));
+    // 如果是新匯入的使用者、快取有變動或無快取，皆寫回本地儲存
+    const cachedStr = localStorage.getItem(USERS_STORAGE_KEY);
+    const upgradedStr = JSON.stringify(upgradedUsers);
+    if (needsUpdate || !cached || cachedStr !== upgradedStr) {
+      localStorage.setItem(USERS_STORAGE_KEY, upgradedStr);
     }
     return upgradedUsers;
   });

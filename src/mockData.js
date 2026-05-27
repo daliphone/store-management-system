@@ -14,48 +14,436 @@ export const STORES = [
 // 預設的使用者與角色資料 (包含帳密與功能權限，用於權限勾選設定)
 export const USERS = [
   {
-    id: 'user_1',
-    name: '文和',
-    username: 'wenhe',
-    password: '',
-    role: 'SUPER_ADMIN',
-    roleLabel: '超級管理員',
-    store: '全分店',
-    avatar: '👨‍💼',
-    permissions: ['view_all_stores', 'manage_orders', 'complete_tasks', 'cancel_tasks_directly', 'manage_accounts']
+    "id": "user_1001",
+    "name": "士賢",
+    "username": "1001",
+    "password": "1029",
+    "role": "SUPER_ADMIN",
+    "roleLabel": "超級管理員",
+    "store": "全分店",
+    "avatar": "👨‍💼",
+    "permissions": [
+      "view_all_stores",
+      "manage_orders",
+      "complete_tasks",
+      "cancel_tasks_directly",
+      "manage_accounts"
+    ]
   },
   {
-    id: 'user_admin',
-    name: '總管理處',
-    username: 'admin',
-    password: '8888',
-    role: 'AUDITOR',
-    roleLabel: '總管理處稽核員',
-    store: '全分店',
-    avatar: '🕵️‍♂️',
-    permissions: ['view_all_stores', 'complete_tasks', 'manage_accounts']
+    "id": "user_1002",
+    "name": "哈蜜",
+    "username": "1002",
+    "password": "1024",
+    "role": "SUPER_ADMIN",
+    "roleLabel": "超級管理員",
+    "store": "全分店",
+    "avatar": "👨‍💼",
+    "permissions": [
+      "view_all_stores",
+      "manage_orders",
+      "complete_tasks",
+      "cancel_tasks_directly",
+      "manage_accounts"
+    ]
   },
   {
-    id: 'user_2',
-    name: '何易俞',
-    username: 'yiyu',
-    password: '',
-    role: 'STORE_MANAGER',
-    roleLabel: '分店店長',
-    store: '東門店',
-    avatar: '👨‍⚕️',
-    permissions: ['manage_orders', 'complete_tasks', 'cancel_tasks_directly']
+    "id": "user_1003",
+    "name": "慧婷",
+    "username": "1003",
+    "password": "677128",
+    "role": "STORE_MANAGER",
+    "roleLabel": "分店店長",
+    "store": "文賢店",
+    "avatar": "👨‍⚕️",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks",
+      "cancel_tasks_directly"
+    ]
   },
   {
-    id: 'user_3',
-    name: '揭怡庭',
-    username: 'yiting',
-    password: '',
-    role: 'STAFF',
-    roleLabel: '一般店員',
-    store: '東門店',
-    avatar: '👩‍💼',
-    permissions: ['manage_orders', 'complete_tasks']
+    "id": "user_1006",
+    "name": "姵汎",
+    "username": "1006",
+    "password": "0409",
+    "role": "STORE_MANAGER",
+    "roleLabel": "分店店長",
+    "store": "歸仁店",
+    "avatar": "👨‍⚕️",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks",
+      "cancel_tasks_directly"
+    ]
+  },
+  {
+    "id": "user_1009",
+    "name": "逸婷",
+    "username": "1009",
+    "password": "742807",
+    "role": "STORE_MANAGER",
+    "roleLabel": "分店店長",
+    "store": "東門店",
+    "avatar": "👨‍⚕️",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks",
+      "cancel_tasks_directly"
+    ]
+  },
+  {
+    "id": "user_1011",
+    "name": "雅雯",
+    "username": "1011",
+    "password": "19850307",
+    "role": "STORE_MANAGER",
+    "roleLabel": "分店店長",
+    "store": "小西門店",
+    "avatar": "👨‍⚕️",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks",
+      "cancel_tasks_directly"
+    ]
+  },
+  {
+    "id": "user_1014",
+    "name": "宗憲",
+    "username": "1014",
+    "password": "2649",
+    "role": "STORE_MANAGER",
+    "roleLabel": "分店店長",
+    "store": "永康店",
+    "avatar": "👨‍⚕️",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks",
+      "cancel_tasks_directly"
+    ]
+  },
+  {
+    "id": "user_1015",
+    "name": "黃鐙緯",
+    "username": "1015",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "文賢店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1019",
+    "name": "陳妍家",
+    "username": "1019",
+    "password": "0805",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "小西門店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1020",
+    "name": "筑君",
+    "username": "1020",
+    "password": "686868",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "永康店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1023",
+    "name": "蔡韻涵",
+    "username": "1023",
+    "password": "1996",
+    "role": "AUDITOR",
+    "roleLabel": "總管理處稽核員",
+    "store": "全分店",
+    "avatar": "🕵️‍♂️",
+    "permissions": [
+      "view_all_stores",
+      "complete_tasks",
+      "manage_accounts"
+    ]
+  },
+  {
+    "id": "user_1028",
+    "name": "陳文和",
+    "username": "1028",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "東門店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1040",
+    "name": "林家琪",
+    "username": "1040",
+    "password": "333",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "東門店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1042",
+    "name": "張博瑋",
+    "username": "1042",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "東門店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1057",
+    "name": "林喻潔",
+    "username": "1057",
+    "password": "0530",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "東門店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1065",
+    "name": "李湘婷",
+    "username": "1065",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "東門店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1066",
+    "name": "蔡澤偉",
+    "username": "1066",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "永康店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1074",
+    "name": "呂櫂陽",
+    "username": "1074",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "東門店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1077",
+    "name": "劉凱寧",
+    "username": "1077",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "鹽行店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1080",
+    "name": "邱薪融",
+    "username": "1080",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "鹽行店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1082",
+    "name": "林淑萍",
+    "username": "1082",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "安中店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1092",
+    "name": "向宜安",
+    "username": "1092",
+    "password": "0702",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "東門店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1094",
+    "name": "劉孝澄",
+    "username": "1094",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "永康店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1096",
+    "name": "張育齊",
+    "username": "1096",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "歸仁店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1098",
+    "name": "許俊彥",
+    "username": "1098",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "歸仁店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1099",
+    "name": "翁文玲",
+    "username": "1099",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "東門店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1100",
+    "name": "晏汝",
+    "username": "1100",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "文賢店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1102",
+    "name": "郭芥侖",
+    "username": "1102",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "小西門店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1103",
+    "name": "劉宸菲",
+    "username": "1103",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "永康店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
+  },
+  {
+    "id": "user_1104",
+    "name": "怡蓁",
+    "username": "1104",
+    "password": "123",
+    "role": "STAFF",
+    "roleLabel": "一般店員",
+    "store": "東門店",
+    "avatar": "👩‍💼",
+    "permissions": [
+      "manage_orders",
+      "complete_tasks"
+    ]
   }
 ];
 
