@@ -213,7 +213,7 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
       </div>
 
       {/* 訂單列表 */}
-      <div className="p-4 space-y-3.5 flex-1 bg-gray-50/30">
+      <div className="p-4 space-y-3.5 flex-1 bg-slate-100/50">
         {filteredOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 space-y-2 text-gray-400">
             <span className="text-4xl">📦</span>
@@ -221,7 +221,7 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
           </div>
         ) : (
           filteredOrders.map((order) => {
-            // 動態計算時效
+            // 1. 動態計算時效
             const overdueDays = calculateOverdueDays(order.promiseDate, order.status);
             const remainingDays = calculateRemainingDays(order.promiseDate, order.status);
             
@@ -230,39 +230,36 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
             const isCriticalOverdue = isOverdue && overdueDays >= alertSettings.criticalDays;
             const isWarning = !isHandedOver && remainingDays <= alertSettings.warningDays && remainingDays >= 0;
             
-            // 決定左側邊條與右上角狀態 Badge 顏色
-            let sideBarColor = 'bg-slate-200';
+            // 2. 決定右上角狀態 Badge 顏色 (解耦：僅反映狀態類型，不隨逾期變色，視覺更乾淨)
             let statusBadgeClass = 'bg-slate-50 text-slate-700 border-slate-200';
+            if (isHandedOver) {
+              statusBadgeClass = 'bg-blue-50 text-blue-700 border-blue-100';
+            } else if (order.status === '已到貨') {
+              statusBadgeClass = 'bg-green-50 text-green-700 border-green-150';
+            } else if (order.status === '已下訂') {
+              statusBadgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-150';
+            } else if (order.status === '訂貨需求') {
+              statusBadgeClass = 'bg-slate-50 text-slate-700 border-slate-200';
+            }
 
+            // 3. 決定左側狀態邊條顏色
+            let sideBarColor = 'bg-slate-200';
             if (isHandedOver) {
               sideBarColor = 'bg-blue-500';
-              statusBadgeClass = 'bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-200';
             } else if (isOverdue) {
-              if (isCriticalOverdue) {
-                sideBarColor = 'bg-red-600';
-                statusBadgeClass = 'bg-gradient-to-r from-red-50 to-red-100 text-red-700 font-black border-red-200 animate-pulse-subtle';
-              } else {
-                sideBarColor = 'bg-orange-500';
-                statusBadgeClass = 'bg-gradient-to-r from-orange-50 to-orange-100 text-orange-700 border-orange-200';
-              }
+              sideBarColor = isCriticalOverdue ? 'bg-red-600' : 'bg-orange-500';
             } else if (isWarning) {
               sideBarColor = 'bg-yellow-400';
-              statusBadgeClass = 'bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-800 border-yellow-200';
             } else if (order.status === '已到貨') {
               sideBarColor = 'bg-green-500';
-              statusBadgeClass = 'bg-gradient-to-r from-green-50 to-green-100 text-green-700 border-green-200';
             } else if (order.status === '已下訂') {
               sideBarColor = 'bg-indigo-400';
-              statusBadgeClass = 'bg-gradient-to-r from-indigo-50 to-indigo-100 text-indigo-700 border-indigo-200';
-            } else {
-              sideBarColor = 'bg-slate-300';
-              statusBadgeClass = 'bg-gradient-to-r from-slate-50 to-slate-100 text-slate-700 border-slate-200';
             }
 
             return (
               <div
                 key={order.id}
-                className="bg-[#FAFAFA] rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] border border-gray-200/60 overflow-hidden flex relative hover:shadow-[0_4px_14px_-3px_rgba(0,0,0,0.1),0_4px_6px_-2px_rgba(0,0,0,0.05)] transition-all duration-200"
+                className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] border border-slate-100/80 overflow-hidden flex relative hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300"
               >
                 {/* 左側狀態邊條 */}
                 <div className={`w-1.5 shrink-0 ${sideBarColor}`}></div>
@@ -276,7 +273,7 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
                       <span className="text-xs text-gray-500 font-medium font-mono">{order.customerPhone}</span>
                     </div>
                     <div className="flex items-center space-x-1.5">
-                      <span className={`text-[10px] font-extrabold px-3 py-1.5 rounded border shadow-sm ${statusBadgeClass}`}>
+                      <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded border shadow-sm ${statusBadgeClass}`}>
                         {order.status}
                       </span>
                     </div>
@@ -298,7 +295,7 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
                             className={`text-[10px] font-bold px-2.5 py-1 rounded-md border flex items-center ${
                               isAwardTag
                                 ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                                : 'bg-slate-50 text-slate-600 border-slate-200'
                             }`}
                           >
                             {!isAwardTag && '+ '}
@@ -310,10 +307,10 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
                   )}
 
                   {/* 分割線 */}
-                  <div className="border-t border-gray-200/60 my-2"></div>
+                  <div className="border-t border-gray-150 my-2"></div>
 
                   {/* 第四行：分店、提單人、建單日期、時效提示 */}
-                  <div className="flex flex-col space-y-2 text-[11px] text-gray-500 font-medium">
+                  <div className="flex flex-col space-y-2.5 text-[11px] text-gray-500 font-medium">
                     <div className="flex justify-between items-center">
                       <span>
                         {order.store} · 提單: {order.creator} · {order.type}
@@ -324,12 +321,13 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
                       </span>
                     </div>
 
-                    {/* 時效警示提示 */}
+                    {/* 時效警示提示 (重構為帶有邊框與背景的精緻 widget 區塊) */}
                     {!isHandedOver && (
-                      <div className={`p-2 flex items-center rounded-lg ${
-                        isCriticalOverdue ? 'bg-red-50' : 
-                        isOverdue ? 'bg-orange-50' : 
-                        isWarning ? 'bg-yellow-50' : 'bg-slate-50'
+                      <div className={`p-2.5 flex items-center rounded-xl border ${
+                        isCriticalOverdue ? 'bg-red-50/80 border-red-100 text-red-700 font-bold' : 
+                        isOverdue ? 'bg-orange-50/80 border-orange-100 text-orange-700 font-bold' : 
+                        isWarning ? 'bg-yellow-50/80 border-yellow-100 text-yellow-800 font-bold' : 
+                        'bg-slate-50 border-slate-100 text-slate-700'
                       }`}>
                         {isCriticalOverdue ? (
                           <div className="flex items-center space-x-1.5 text-red-700 font-black text-[11px] animate-pulse-subtle">
@@ -357,7 +355,7 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
                     
                     {/* 已交單/交機時效 */}
                     {isHandedOver && (
-                      <div className="p-2 rounded-lg flex items-center bg-blue-50">
+                      <div className="p-2.5 rounded-xl flex items-center bg-blue-50/80 border border-blue-100">
                         <div className="flex items-center space-x-1.5 text-blue-700 font-bold text-[11px]">
                           <Check size={14} strokeWidth={3} />
                           <span>⏱️ 本單已順利交易完成並交機</span>
@@ -368,7 +366,7 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
 
                   {/* 狀態更新快捷操作 (權限區分控制) */}
                   {canUpdateStatus(order) && !isHandedOver && (
-                    <div className="pt-3 flex justify-end">
+                    <div className="pt-2 flex justify-end">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -388,7 +386,6 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
           })
         )}
       </div>
-
 
       {/* 浮動新增按鈕 */}
       <button
