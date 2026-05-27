@@ -205,8 +205,8 @@ export const syncLocalToGoogleSheets = async () => {
   }
 };
 
-// 更新單個訂單狀態 (支援簽章更新，透過 syncAll 機制同步至 Google Sheets)
-export const updateOrderStatus = async (orderId, newStatus, signature = null) => {
+// 更新單個訂單狀態 (改為單筆精細更新，並記錄操作人員與變更歷史)
+export const updateOrderStatus = async (orderId, newStatus, signature = null, operator = '') => {
   const apiUrl = getApiUrl();
   const local = loadLocalData();
 
@@ -236,9 +236,11 @@ export const updateOrderStatus = async (orderId, newStatus, signature = null) =>
         'Content-Type': 'text/plain',
       },
       body: JSON.stringify({
-        action: 'syncAll',
-        orders: updatedOrders,
-        tasks: local.tasks
+        action: 'updateOrderStatus',
+        orderId,
+        newStatus,
+        signature,
+        operator
       })
     });
 
@@ -254,8 +256,8 @@ export const updateOrderStatus = async (orderId, newStatus, signature = null) =>
   }
 };
 
-// 儲存編輯修改後的訂單 (透過 syncAll 機制同步至 Google Sheets)
-export const saveEditedOrder = async (updatedOrder) => {
+// 儲存編輯修改後的訂單 (改為單筆精細更新，並記錄操作人員與變更歷史)
+export const saveEditedOrder = async (updatedOrder, operator = '') => {
   const apiUrl = getApiUrl();
   const local = loadLocalData();
 
@@ -281,9 +283,9 @@ export const saveEditedOrder = async (updatedOrder) => {
         'Content-Type': 'text/plain',
       },
       body: JSON.stringify({
-        action: 'syncAll',
-        orders: updatedOrders,
-        tasks: local.tasks
+        action: 'saveEditedOrder',
+        order: updatedOrder,
+        operator
       })
     });
 
@@ -298,4 +300,43 @@ export const saveEditedOrder = async (updatedOrder) => {
     return { success: true, orders: updatedOrders, source: 'LocalStorage (API 寫入失敗)' };
   }
 };
+
+// 批次匯入訂單
+export const addOrdersBatch = async (newOrders) => {
+  const apiUrl = getApiUrl();
+  const local = loadLocalData();
+  const updatedOrders = [...newOrders, ...local.orders];
+  
+  // 先寫入本地
+  saveLocalData(updatedOrders, null);
+
+  if (!apiUrl) {
+    return { success: true, source: 'LocalStorage', orders: updatedOrders };
+  }
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      body: JSON.stringify({
+        action: 'addOrdersBatch',
+        orders: newOrders
+      })
+    });
+
+    const data = await response.json();
+    if (data.status === 'success') {
+      return { success: true, source: 'Google Sheets', orders: updatedOrders };
+    } else {
+      throw new Error(data.message || 'API 批次新增失敗');
+    }
+  } catch (error) {
+    console.error('Google Sheets 批次新增訂單失敗，已保存在本地:', error);
+    return { success: true, source: 'LocalStorage (API 寫入失敗)', orders: updatedOrders };
+  }
+};
+
 

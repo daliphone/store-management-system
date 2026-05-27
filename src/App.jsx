@@ -7,7 +7,7 @@ import TaskList from './components/TaskList';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import CustomerList from './components/CustomerList';
-import { loadData, addOrder, updateTaskStatus, updateOrderStatus, saveEditedOrder } from './services/googleSheetsService';
+import { loadData, addOrder, updateTaskStatus, updateOrderStatus, saveEditedOrder, addOrdersBatch } from './services/googleSheetsService';
 import { USERS } from './mockData';
 import { Loader2, AlertCircle, Database, Check } from 'lucide-react';
 import OrderDetails from './components/OrderDetails';
@@ -85,10 +85,13 @@ export default function App() {
     if (cached) {
       try {
         const cachedList = JSON.parse(cached);
-        const cachedUsernames = cachedList.map(u => u.username);
-        // 防呆偵測：如果 mockData 中有任何一個帳號不在舊有的本地快取中，強制以最新的 mockData.USERS 載入
-        const hasNewUsers = USERS.some(u => !cachedUsernames.includes(u.username));
-        if (hasNewUsers) {
+        // 防呆偵測：如果 mockData 中有任何一個帳號不在快取中，或者其分店(store)或角色(role)有更新，強制以最新的 mockData.USERS 載入
+        const hasNewOrUpdatedUsers = USERS.some(u => {
+          const cachedUser = cachedList.find(c => c.username === u.username);
+          return !cachedUser || cachedUser.store !== u.store || cachedUser.role !== u.role;
+        });
+        
+        if (hasNewOrUpdatedUsers) {
           parsedUsers = USERS;
         } else {
           parsedUsers = cachedList;
@@ -293,11 +296,12 @@ export default function App() {
     }
   };
 
-  // 變更訂單狀態並同步 (透過 syncAll 將變更同步至 GAS)
+  // 變更訂單狀態並同步 (改為單筆精細更新，並記錄操作同仁)
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     setIsLoading(true);
     try {
-      const result = await updateOrderStatus(orderId, newStatus);
+      const operatorName = currentUser ? currentUser.name : '';
+      const result = await updateOrderStatus(orderId, newStatus, null, operatorName);
       if (result.success) {
         setOrders(result.orders);
         setDataSource(result.source);
@@ -310,11 +314,12 @@ export default function App() {
     }
   };
 
-  // 確認交機簽收處理 (將狀態更新為已交單，並寫入手寫簽名圖檔)
+  // 確認交機簽收處理 (將狀態更新為已交單，並寫入手寫簽名圖檔，並記錄操作同仁)
   const handleConfirmHandover = async (orderId, signature) => {
     setIsLoading(true);
     try {
-      const result = await updateOrderStatus(orderId, '已交單', signature);
+      const operatorName = currentUser ? currentUser.name : '';
+      const result = await updateOrderStatus(orderId, '已交單', signature, operatorName);
       if (result.success) {
         setOrders(result.orders);
         setDataSource(result.source);
@@ -329,11 +334,12 @@ export default function App() {
     }
   };
 
-  // 編輯修改訂單存檔
+  // 編輯修改訂單存檔 (帶入操作同仁)
   const handleSaveEditOrder = async (updatedOrder) => {
     setIsLoading(true);
     try {
-      const result = await saveEditedOrder(updatedOrder);
+      const operatorName = currentUser ? currentUser.name : '';
+      const result = await saveEditedOrder(updatedOrder, operatorName);
       if (result.success) {
         setOrders(result.orders);
         setDataSource(result.source);
@@ -343,6 +349,24 @@ export default function App() {
     } catch (error) {
       console.error('儲存編輯訂單錯誤：', error);
       alert('修改儲存失敗：' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 批次儲存新增訂單
+  const handleSaveOrdersBatch = async (newOrders) => {
+    setIsLoading(true);
+    try {
+      const result = await addOrdersBatch(newOrders);
+      if (result.success) {
+        setOrders(result.orders);
+        setDataSource(result.source);
+        setAddOrderOpen(false);
+      }
+    } catch (error) {
+      console.error('批次儲存訂單錯誤：', error);
+      alert('批次儲存失敗：' + error.message);
     } finally {
       setIsLoading(false);
     }
@@ -484,19 +508,24 @@ export default function App() {
     );
   }
 
+  // 判斷是否具備試算表同步顯示與設定之權限 (超級管理員與總管理處稽核員)
+  const canSyncSheets = currentUser && (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR');
+
   return (
     <div className="mobile-container select-none">
-      {/* 頂部儲存庫狀態提示條 */}
-      <div className="bg-slate-950 text-[10px] text-slate-300 px-4 py-1.5 flex justify-between items-center font-mono z-10 shadow-sm tracking-wider font-semibold border-b border-slate-900 select-none">
-        <div className="flex items-center space-x-1.5">
-          <Database size={11} className={dataSource.includes('Google') ? 'text-emerald-400' : 'text-amber-400'} />
-          <span>儲存庫: <strong className={dataSource.includes('Google') ? 'text-emerald-400 font-black' : 'text-amber-400 font-black'}>{dataSource}</strong></span>
+      {/* 頂部儲存庫狀態提示條 (加入權限控管，僅限 SUPER_ADMIN 或 AUDITOR 顯示) */}
+      {canSyncSheets && (
+        <div className="bg-slate-950 text-[10px] text-slate-300 px-4 py-1.5 flex justify-between items-center font-mono z-10 shadow-sm tracking-wider font-semibold border-b border-slate-900 select-none">
+          <div className="flex items-center space-x-1.5">
+            <Database size={11} className={dataSource.includes('Google') ? 'text-emerald-400' : 'text-amber-400'} />
+            <span>儲存庫: <strong className={dataSource.includes('Google') ? 'text-emerald-400 font-black' : 'text-amber-400 font-black'}>{dataSource}</strong></span>
+          </div>
+          <div className="flex items-center space-x-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+            <span className="text-[9px]">連線正常</span>
+          </div>
         </div>
-        <div className="flex items-center space-x-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-          <span className="text-[9px]">連線正常</span>
-        </div>
-      </div>
+      )}
 
       {/* 主要內容區域 */}
       {renderContent()}
@@ -509,6 +538,7 @@ export default function App() {
         <OrderForm
           currentUser={currentUser}
           onSave={handleSaveOrder}
+          onSaveBatch={handleSaveOrdersBatch}
           onClose={() => setAddOrderOpen(false)}
         />
       )}

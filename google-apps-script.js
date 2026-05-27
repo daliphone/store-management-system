@@ -102,26 +102,45 @@ function initializeSystemSheets() {
     }
   }
 
-  // 3. 套用條件式格式設定 (顏色提示連動)
+  // 3. 初始化 OrderStatus (訂單狀態異動歷史紀錄)
+  var statusSheet = ss.getSheetByName("OrderStatus");
+  var cnStatusHeaders = ['紀錄編號', '變更時間', '訂單編號', '客戶姓名', '客戶電話', '商品名稱', '異動前狀態', '異動後狀態', '經辦同仁', '所屬分店', '備註'];
+  
+  if (!statusSheet) {
+    statusSheet = ss.insertSheet("OrderStatus");
+    statusSheet.appendRow(cnStatusHeaders);
+    statusSheet.getRange(1, 1, 1, cnStatusHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    statusSheet.setFrozenRows(1);
+  } else {
+    if (statusSheet.getLastRow() === 0) {
+      statusSheet.appendRow(cnStatusHeaders);
+      statusSheet.getRange(1, 1, 1, cnStatusHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    }
+  }
+
+  // 4. 套用條件式格式設定 (顏色提示連動)
   try {
     applyConditionalFormatting(orderSheet);
   } catch(e) {}
 
-  // 4. 整理版面格式與對齊 (欄寬自適應、文字靠左、標題置中)
+  // 5. 整理版面格式與對齊 (欄寬自適應、文字靠左、標題置中)
   try {
     orderSheet.getRange(1, 1, 1000, cnOrderHeaders.length).setHorizontalAlignment("left");
     orderSheet.getRange(1, 1, 1, cnOrderHeaders.length).setHorizontalAlignment("center");
     taskSheet.getRange(1, 1, 1000, cnTaskHeaders.length).setHorizontalAlignment("left");
     taskSheet.getRange(1, 1, 1, cnTaskHeaders.length).setHorizontalAlignment("center");
+    statusSheet.getRange(1, 1, 1000, cnStatusHeaders.length).setHorizontalAlignment("left");
+    statusSheet.getRange(1, 1, 1, cnStatusHeaders.length).setHorizontalAlignment("center");
     
     // 執行細部排版優化 (設定固定寬度，防止 Base64 簽名與照片撐爆欄位)
     formatOrderSheet(orderSheet);
     formatTaskSheet(taskSheet);
+    formatStatusSheet(statusSheet);
   } catch(e) {}
 
   // 清除預設空白 Sheet1
   var sheet1 = ss.getSheetByName("工作表1") || ss.getSheetByName("Sheet1");
-  if (sheet1 && ss.getSheets().length > 2 && sheet1.getLastRow() === 0) {
+  if (sheet1 && ss.getSheets().length > 3 && sheet1.getLastRow() === 0) {
     try {
       ss.deleteSheet(sheet1);
     } catch(e) {}
@@ -129,11 +148,49 @@ function initializeSystemSheets() {
 
   // 彈出成功提示
   try {
-    SpreadsheetApp.getUi().alert('🎉 馬尼門市系統初始化成功！\n\n1. 已自動建立「Orders」與「Tasks」分頁並填入中文標題。\n2. 已自動防止「客戶簽名」與「現場照片」超長文字欄位撐爆版面。\n3. 已套用「時效警示條件式格式」(嚴重逾期-紅、一般逾期-橘、即將到期-黃、已到貨-綠、已交機-藍)。\n4. 逾期天數已與試算表公式自動連動，換日會自動更新！');
+    SpreadsheetApp.getUi().alert('🎉 馬尼門市系統初始化成功！\n\n1. 已自動建立「Orders」、「Tasks」與「OrderStatus」分頁並填入中文標題。\n2. 已自動防止「客戶簽名」與「現場照片」超長文字欄位撐爆版面。\n3. 已套用「時效警示條件式格式」(嚴重逾期-紅、一般逾期-橘、即將到期-黃、已到貨-綠、已交機-藍)。\n4. 逾期天數已與試算表公式自動連動，換日會自動更新！');
   } catch(e) {}
   
   return { status: 'success', message: '工作表初始化建立成功' };
 }
+
+// 細部排版與寬度設定 (OrderStatus)
+function formatStatusSheet(sheet) {
+  if (!sheet) return;
+  var lastRow = sheet.getLastRow();
+  var maxRows = Math.max(lastRow, 1000);
+  
+  try {
+    sheet.autoResizeColumns(1, 11);
+  } catch(e) {}
+  
+  var minWidths = {
+    1: 130, // 紀錄編號
+    2: 140, // 變更時間
+    3: 110, // 訂單編號
+    4: 80,  // 客戶姓名
+    5: 105, // 客戶電話
+    6: 220, // 商品名稱
+    7: 90,  // 異動前狀態
+    8: 90,  // 異動後狀態
+    9: 80,  // 經辦同仁
+    10: 95, // 所屬分店
+    11: 160 // 備註
+  };
+  
+  for (var col in minWidths) {
+    var colNum = parseInt(col);
+    try {
+      if (sheet.getColumnWidth(colNum) < minWidths[col]) {
+        sheet.setColumnWidth(colNum, minWidths[col]);
+      }
+    } catch(e) {}
+  }
+
+  sheet.getRange(2, 6, maxRows - 1, 1).setWrap(true);
+  sheet.getRange(2, 11, maxRows - 1, 1).setWrap(true);
+}
+
 
 // 細部排版與防止簽名欄撐爆的格式設定 (Orders)
 function formatOrderSheet(sheet) {
@@ -288,7 +345,8 @@ function ensureSheetsExist() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var orderSheet = ss.getSheetByName("Orders");
   var taskSheet = ss.getSheetByName("Tasks");
-  if (!orderSheet || !taskSheet) {
+  var statusSheet = ss.getSheetByName("OrderStatus");
+  if (!orderSheet || !taskSheet || !statusSheet) {
     initializeSystemSheets();
   }
 }
@@ -319,6 +377,12 @@ function doPost(e) {
       result = handleUpdateTask(postData.taskId, postData.completed, postData.completedBy, postData.completedAt, postData.photo, postData.notes);
     } else if (action === 'syncAll') {
       result = handleSyncAll(postData.orders, postData.tasks);
+    } else if (action === 'updateOrderStatus') {
+      result = handleUpdateOrderStatus(postData.orderId, postData.newStatus, postData.signature, postData.operator);
+    } else if (action === 'saveEditedOrder') {
+      result = handleSaveEditedOrder(postData.order, postData.operator);
+    } else if (action === 'addOrdersBatch') {
+      result = handleAddOrdersBatch(postData.orders);
     }
   } catch (err) {
     result = { status: 'error', message: err.toString() };
@@ -390,7 +454,7 @@ function handleReadAll() {
     .setHeader("Access-Control-Allow-Origin", "*");
 }
 
-// 新增訂單 (寫入試算表動態逾期公式)
+// 新增訂單 (寫入試算表動態逾期公式，並記錄到 OrderStatus)
 function handleAddOrder(order) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Orders");
@@ -408,7 +472,7 @@ function handleAddOrder(order) {
     if (engKey === 'tags') {
       newRow.push(JSON.stringify(val || []));
     } else if (engKey === 'overdueDays') {
-      newRow.push('=IF(M' + targetRow + '="已交機", 0, MAX(0, TODAY() - O' + targetRow + '))');
+      newRow.push('=IF(OR(M' + targetRow + '="已交機", M' + targetRow + '="已交單"), 0, MAX(0, TODAY() - O' + targetRow + '))');
     } else {
       newRow.push(val !== undefined ? val : '');
     }
@@ -417,11 +481,210 @@ function handleAddOrder(order) {
   sheet.appendRow(newRow);
   
   try {
+    logStatusChangeInternal(ss, order.id, order, "(新建)", order.status || '訂貨需求', order.creator, "新建訂單");
+  } catch(e) {}
+  
+  try {
     formatOrderSheet(sheet);
     applyConditionalFormatting(sheet);
   } catch(e) {}
   
   return { status: 'success', message: '訂單新增成功', orderId: order.id };
+}
+
+// 內部狀態變更歷程紀錄寫入輔助函數
+function logStatusChangeInternal(ss, orderId, orderData, oldStatus, newStatus, operator, notes) {
+  var statusSheet = ss.getSheetByName("OrderStatus");
+  if (!statusSheet) return;
+  
+  var logId = "log_" + Math.random().toString(36).substr(2, 9) + "_" + new Date().getTime();
+  var timeStr = Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd HH:mm:ss");
+  
+  var cnStatusHeaders = ['紀錄編號', '變更時間', '訂單編號', '客戶姓名', '客戶電話', '商品名稱', '異動前狀態', '異動後狀態', '經辦同仁', '所屬分店', '備註'];
+  var newRow = [];
+  
+  for (var i = 0; i < cnStatusHeaders.length; i++) {
+    var header = cnStatusHeaders[i];
+    switch(header) {
+      case '紀錄編號': newRow.push(logId); break;
+      case '變更時間': newRow.push(timeStr); break;
+      case '訂單編號': newRow.push(orderId); break;
+      case '客戶姓名': newRow.push(orderData.customerName || ''); break;
+      case '客戶電話': newRow.push(orderData.customerPhone || ''); break;
+      case '商品名稱': newRow.push(orderData.productName || ''); break;
+      case '異動前狀態': newRow.push(oldStatus || ''); break;
+      case '異動後狀態': newRow.push(newStatus || ''); break;
+      case '經辦同仁': newRow.push(operator || ''); break;
+      case '所屬分店': newRow.push(orderData.store || ''); break;
+      case '備註': newRow.push(notes || ''); break;
+      default: newRow.push('');
+    }
+  }
+  
+  statusSheet.appendRow(newRow);
+  try {
+    formatStatusSheet(statusSheet);
+  } catch(e) {}
+}
+
+// 更新單筆訂單狀態，並在 OrderStatus 中寫入變更歷史
+function handleUpdateOrderStatus(orderId, newStatus, signature, operator) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Orders");
+  if (!sheet) return { status: 'error', message: '找不到 Orders 工作表' };
+  
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  
+  var idColIndex = headers.indexOf('編號');
+  var statusColIndex = headers.indexOf('到貨狀態');
+  var sigColIndex = headers.indexOf('客戶簽名');
+  
+  if (idColIndex === -1 || statusColIndex === -1) {
+    return { status: 'error', message: 'Orders 工作表欄位格式不正確' };
+  }
+  
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][idColIndex].toString() === orderId.toString()) {
+      var rowNum = i + 1;
+      var oldStatus = data[i][statusColIndex];
+      
+      // 更新到貨狀態
+      sheet.getRange(rowNum, statusColIndex + 1).setValue(newStatus);
+      
+      // 如果有簽名，更新簽名
+      if (signature && sigColIndex !== -1) {
+        sheet.getRange(rowNum, sigColIndex + 1).setValue(signature);
+      }
+      
+      // 讀取該列其他資料以記入變更歷史
+      var orderData = {};
+      for (var j = 0; j < headers.length; j++) {
+        var cnHeader = headers[j];
+        var engKey = REVERSE_ORDER_MAPPING[cnHeader] || cnHeader;
+        orderData[engKey] = data[i][j];
+      }
+      
+      var notes = "狀態更新";
+      if (newStatus === '已交單' && signature) {
+        notes = "客戶簽名交機";
+      }
+      
+      try {
+        logStatusChangeInternal(ss, orderId, orderData, oldStatus, newStatus, operator, notes);
+      } catch(e) {}
+      
+      try {
+        formatOrderSheet(sheet);
+        applyConditionalFormatting(sheet);
+      } catch(e) {}
+      
+      return { status: 'success', message: '訂單狀態更新成功', orderId: orderId };
+    }
+  }
+  
+  return { status: 'error', message: '找不到該訂單 ID' };
+}
+
+// 儲存編輯修改後的訂單，若狀態改變則寫入 OrderStatus
+function handleSaveEditedOrder(order, operator) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Orders");
+  if (!sheet) return { status: 'error', message: '找不到 Orders 工作表' };
+  
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var idColIndex = headers.indexOf('編號');
+  var statusColIndex = headers.indexOf('到貨狀態');
+  
+  if (idColIndex === -1) return { status: 'error', message: 'Orders 工作表格式不正確' };
+  
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][idColIndex].toString() === order.id.toString()) {
+      var rowNum = i + 1;
+      var oldStatus = statusColIndex !== -1 ? data[i][statusColIndex] : '';
+      var newStatus = order.status;
+      
+      // 寫入新資料，需要對齊 Headers
+      for (var colIdx = 0; colIdx < headers.length; colIdx++) {
+        var cnHeader = headers[colIdx];
+        var engKey = REVERSE_ORDER_MAPPING[cnHeader] || cnHeader;
+        
+        if (engKey === 'overdueDays') {
+          // 維持逾期天數公式
+          sheet.getRange(rowNum, colIdx + 1).setValue('=IF(OR(M' + rowNum + '="已交機", M' + rowNum + '="已交單"), 0, MAX(0, TODAY() - O' + rowNum + '))');
+        } else if (engKey === 'tags') {
+          sheet.getRange(rowNum, colIdx + 1).setValue(JSON.stringify(order.tags || []));
+        } else {
+          var val = order[engKey];
+          sheet.getRange(rowNum, colIdx + 1).setValue(val !== undefined ? val : '');
+        }
+      }
+      
+      // 檢查狀態是否有變
+      if (oldStatus !== newStatus) {
+        try {
+          logStatusChangeInternal(ss, order.id, order, oldStatus, newStatus, operator, "編輯訂單並變更狀態");
+        } catch(e) {}
+      }
+      
+      try {
+        formatOrderSheet(sheet);
+        applyConditionalFormatting(sheet);
+      } catch(e) {}
+      
+      return { status: 'success', message: '訂單修改儲存成功', orderId: order.id };
+    }
+  }
+  
+  return { status: 'error', message: '找不到該訂單 ID' };
+}
+
+// 批次匯入訂單，並記錄到 OrderStatus
+function handleAddOrdersBatch(orders) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Orders");
+  if (!sheet) return { status: 'error', message: '找不到 Orders 工作表' };
+  
+  var headers = sheet.getDataRange().getValues()[0];
+  var lastRow = sheet.getLastRow();
+  var newRows = [];
+  
+  for (var k = 0; k < orders.length; k++) {
+    var order = orders[k];
+    var newRow = [];
+    var targetRow = lastRow + 1 + k;
+    
+    for (var i = 0; i < headers.length; i++) {
+      var cnHeader = headers[i];
+      var engKey = REVERSE_ORDER_MAPPING[cnHeader] || cnHeader;
+      var val = order[engKey];
+      
+      if (engKey === 'tags') {
+        newRow.push(JSON.stringify(val || []));
+      } else if (engKey === 'overdueDays') {
+        newRow.push('=IF(OR(M' + targetRow + '="已交機", M' + targetRow + '="已交單"), 0, MAX(0, TODAY() - O' + targetRow + '))');
+      } else {
+        newRow.push(val !== undefined ? val : '');
+      }
+    }
+    newRows.push(newRow);
+    
+    // 寫入變更歷史
+    try {
+      logStatusChangeInternal(ss, order.id, order, "(新建)", order.status || '訂貨需求', order.creator, "批次匯入訂單");
+    } catch(e) {}
+  }
+  
+  // 批次寫入
+  sheet.getRange(lastRow + 1, 1, newRows.length, headers.length).setValues(newRows);
+  
+  try {
+    formatOrderSheet(sheet);
+    applyConditionalFormatting(sheet);
+  } catch(e) {}
+  
+  return { status: 'success', message: '批次訂單新增成功', count: orders.length };
 }
 
 // 更新任務狀態 (支援照片與備註回報)

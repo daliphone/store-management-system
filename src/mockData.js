@@ -8,8 +8,10 @@ export const STORES = [
   '安中店',
   '鹽行店',
   '五甲店',
-  '遠傳延平店'
+  '遠傳延平店',
+  '電商部'
 ];
+
 
 // 預設的使用者與角色資料 (包含帳密與功能權限，用於權限勾選設定)
 export const USERS = [
@@ -270,7 +272,7 @@ export const USERS = [
     "password": "123",
     "role": "STAFF",
     "roleLabel": "一般店員",
-    "store": "東門店",
+    "store": "電商部",
     "avatar": "👩‍💼",
     "permissions": [
       "manage_orders",
@@ -326,7 +328,7 @@ export const USERS = [
     "password": "0702",
     "role": "STAFF",
     "roleLabel": "一般店員",
-    "store": "東門店",
+    "store": "電商部",
     "avatar": "👩‍💼",
     "permissions": [
       "manage_orders",
@@ -382,7 +384,7 @@ export const USERS = [
     "password": "123",
     "role": "STAFF",
     "roleLabel": "一般店員",
-    "store": "東門店",
+    "store": "電商部",
     "avatar": "👩‍💼",
     "permissions": [
       "manage_orders",

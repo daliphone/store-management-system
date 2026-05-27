@@ -645,116 +645,123 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
           </div>
         )}
 
-        {/* Google Sheets 連線設定 */}
-        <div className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100">
-          <div className="flex items-center space-x-2 text-green-600 font-extrabold text-sm mb-4">
-            <Database size={18} />
-            <span>Google 試算表資料同步</span>
-          </div>
-
-          <div className="space-y-4">
-            {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR') && (
-              <div className="mb-1">
-                <a
-                  href="https://docs.google.com/spreadsheets/d/13kUwwjkiPo-C5kBCxpV0JRLtB_dD6zgTwcDLAZAOu90/edit?gid=1293678477#gid=1293678477"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-2.5 rounded-xl text-xs font-extrabold active:scale-98 transition-all shadow-sm"
-                >
-                  <span>📑 開啟 Google 試算表稽核存檔</span>
-                </a>
+        {/* Google Sheets 連線設定與部署教學 (加入權限控管，僅限 SUPER_ADMIN 或 AUDITOR 顯示) */}
+        {currentUser && (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR') && (
+          <>
+            {/* Google Sheets 連線設定 */}
+            <div className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100">
+              <div className="flex items-center space-x-2 text-green-600 font-extrabold text-sm mb-4">
+                <Database size={18} />
+                <span>Google 試算表資料同步</span>
               </div>
-            )}
-            <div>
-              <label className="text-xs text-slate-400 font-bold block mb-1.5">
-                Google Apps Script Web App URL：
-              </label>
-              <div className="relative rounded-xl shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Link size={16} className="text-gray-400" />
+
+              <div className="space-y-4">
+                <div className="mb-1">
+                  <a
+                    href="https://docs.google.com/spreadsheets/d/186q0vSOMCtPtNSK16LiVl0OlevmOkdAmGEC4YRz4jNs/edit?gid=1709500613#gid=1709500613"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-2.5 rounded-xl text-xs font-extrabold active:scale-98 transition-all shadow-sm"
+                  >
+                    <span>📑 開啟 Google 試算表稽核存檔</span>
+                  </a>
                 </div>
-                <input
-                  type="text"
-                  value={apiUrl}
-                  onChange={(e) => setApiUrl(e.target.value)}
-                  placeholder="https://script.google.com/macros/s/.../exec"
-                  className="block w-full pl-9 pr-3 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs text-slate-700 bg-slate-50/50 font-mono"
-                />
-              </div>
-            </div>
+                <div>
+                  <label className="text-xs text-slate-400 font-bold block mb-1.5">
+                    Google Apps Script Web App URL：
+                  </label>
+                  <div className="relative rounded-xl shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Link size={16} className="text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      value={apiUrl}
+                      onChange={(e) => setApiUrl(e.target.value)}
+                      placeholder="https://script.google.com/macros/s/.../exec"
+                      className="block w-full pl-9 pr-3 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs text-slate-700 bg-slate-50/50 font-mono"
+                    />
+                  </div>
+                </div>
 
-            {syncStatus.message && (
-              <div className={`p-3.5 rounded-xl text-xs flex items-start space-x-2 ${
-                syncStatus.type === 'success' 
-                  ? 'bg-green-50 text-green-700 border border-green-200' 
-                  : syncStatus.type === 'error'
-                    ? 'bg-red-50 text-red-700 border border-red-200'
-                    : 'bg-blue-50 text-blue-700 border border-blue-200'
-              }`}>
-                {syncStatus.type === 'error' ? (
-                  <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                ) : (
-                  <RefreshCw size={16} className={`mt-0.5 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+                {syncStatus.message && (
+                  <div className={`p-3.5 rounded-xl text-xs flex items-start space-x-2 ${
+                    syncStatus.type === 'success' 
+                      ? 'bg-green-50 text-green-700 border border-green-200' 
+                      : syncStatus.type === 'error'
+                        ? 'bg-red-50 text-red-700 border border-red-200'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200'
+                  }`}>
+                    {syncStatus.type === 'error' ? (
+                      <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                    ) : (
+                      <RefreshCw size={16} className={`mt-0.5 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+                    )}
+                    <span>{syncStatus.message}</span>
+                  </div>
                 )}
-                <span>{syncStatus.message}</span>
-              </div>
-            )}
 
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <button
-                onClick={handleSaveApi}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-extrabold py-3 px-4 rounded-xl text-xs transition-colors shadow-md active:scale-95"
-              >
-                儲存 API 設定
-              </button>
-              <button
-                onClick={handleSyncData}
-                disabled={isSyncing || !apiUrl}
-                className={`w-full font-extrabold py-3 px-4 rounded-xl text-xs transition-all shadow-md flex items-center justify-center space-x-1.5 ${
-                  isSyncing || !apiUrl
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 shadow-none'
-                    : 'bg-green-500 hover:bg-green-600 text-white active:scale-95'
-                }`}
-              >
-                <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
-                <span>一鍵同步至 Google</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* 部署教學說明 */}
-        <div className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100">
-          <div className="flex items-center space-x-2 text-yellow-600 font-extrabold text-sm mb-3">
-            <User size={18} />
-            <span>Google Sheets 部署指引</span>
-          </div>
-          
-          <div className="text-[11px] text-slate-500 space-y-3.5 leading-relaxed font-semibold">
-            <p>本系統的 Google 試算表同步透過 Google Apps Script (GAS) 實現，請依循以下步驟進行設定：</p>
-            <ol className="list-decimal pl-4 space-y-2">
-              <li>
-                <span className="font-extrabold text-slate-700">建立試算表</span>：
-                在您的 Google 雲端硬碟建立一個試算表，新增兩個工作表分頁並分別命名為：<span className="font-mono bg-slate-100 px-1 rounded text-red-500">Orders</span> 和 <span className="font-mono bg-slate-100 px-1 rounded text-red-500">Tasks</span>。
-              </li>
-              <li>
-                <span className="font-extrabold text-slate-700">設定欄位標題</span> (置於第一列)：
-                <div className="mt-1 bg-slate-100 p-2.5 rounded-lg border border-slate-200 space-y-1 text-[9px] font-mono select-all">
-                  <div><strong className="text-blue-600">Orders:</strong> 編號, 客戶姓名, 客戶電話, 商品與承諾內容, 類型, 分店, 提單人員, 客戶來源, 客戶標籤, 數量, 商品單價, 商品成本, 到貨狀態, 建單日期, 預計交貨日, 逾期天數, 客戶簽名, 備註</div>
-                  <div><strong className="text-blue-600">Tasks:</strong> 任務編號, 時段, 櫃台, 任務內容, 分數, 是否完成, 完成時間, 完成人員</div>
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <button
+                    onClick={handleSaveApi}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white font-extrabold py-3 px-4 rounded-xl text-xs transition-colors shadow-md active:scale-95"
+                  >
+                    儲存 API 設定
+                  </button>
+                  <button
+                    onClick={handleSyncData}
+                    disabled={isSyncing || !apiUrl}
+                    className={`w-full font-extrabold py-3 px-4 rounded-xl text-xs transition-all shadow-md flex items-center justify-center space-x-1.5 ${
+                      isSyncing || !apiUrl
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 shadow-none'
+                        : 'bg-green-500 hover:bg-green-600 text-white active:scale-95'
+                    }`}
+                  >
+                    <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                    <span>一鍵同步至 Google</span>
+                  </button>
                 </div>
-              </li>
-              <li>
-                <span className="font-extrabold text-slate-700">設定 Apps Script</span>：
-                點選試算表選單中的 <span className="bg-slate-100 px-1 rounded font-extrabold text-slate-700">擴充功能 &gt; Apps Script</span>，將本專案根目錄下的 <span className="font-mono bg-slate-100 px-1 rounded text-blue-600">google-apps-script.js</span> 檔案內容完全複製並貼上，然後點選儲存。
-              </li>
-              <li>
-                <span className="font-extrabold text-slate-700">部署為 Web App</span>：
-                點選右上角 <span className="bg-slate-100 px-1 rounded font-extrabold text-slate-700">部署 &gt; 新增部署</span>。類型選擇「網頁應用程式」，將存取權限設為<span className="font-extrabold text-red-500">「任何人 (Anyone)」</span>，然後點擊部署並複製產生的 Web 應用程式網址。
-              </li>
-            </ol>
-          </div>
-        </div>
+              </div>
+            </div>
+
+            {/* 部署教學說明 */}
+            <div className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100">
+              <div className="flex items-center space-x-2 text-yellow-600 font-extrabold text-sm mb-3">
+                <User size={18} />
+                <span>Google Sheets 部署指引</span>
+              </div>
+              
+              <div className="text-[11px] text-slate-500 space-y-3.5 leading-relaxed font-semibold">
+                <p>本系統的 Google 試算表同步透過 Google Apps Script (GAS) 實現，請依循以下步驟進行設定：</p>
+                <ol className="list-decimal pl-4 space-y-2">
+                  <li>
+                    <span className="font-extrabold text-slate-700">建立試算表</span>：
+                    在您的 Google 雲端硬碟建立一個試算表，新增三個工作表分頁並分別命名為：
+                    <span className="font-mono bg-slate-100 px-1 rounded text-red-500">Orders</span>、
+                    <span className="font-mono bg-slate-100 px-1 rounded text-red-500">Tasks</span> 和 
+                    <span className="font-mono bg-slate-100 px-1 rounded text-red-500">OrderStatus</span>。
+                  </li>
+                  <li>
+                    <span className="font-extrabold text-slate-700">設定欄位標題</span> (置於第一列)：
+                    <div className="mt-1 bg-slate-100 p-2.5 rounded-lg border border-slate-200 space-y-1.5 text-[9px] font-mono select-all">
+                      <div><strong className="text-blue-600">Orders:</strong> 編號, 客戶姓名, 客戶電話, 商品與承諾內容, 類型, 分店, 提單人員, 客戶來源, 客戶標籤, 數量, 商品單價, 商品成本, 到貨狀態, 建單日期, 預計交貨日, 逾期天數, 客戶簽名, 備註</div>
+                      <div><strong className="text-blue-600">Tasks:</strong> 任務編號, 分店, 任務內容, 分數, 是否完成, 完成時間, 完成人員, 現場照片, 備註</div>
+                      <div><strong className="text-blue-600">OrderStatus:</strong> 紀錄編號, 變更時間, 訂單編號, 客戶姓名, 客戶電話, 商品名稱, 異動前狀態, 異動後狀態, 經辦同仁, 所屬分店, 備註</div>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="font-extrabold text-slate-700">設定 Apps Script</span>：
+                    點選試算表選單中的 <span className="bg-slate-100 px-1 rounded font-extrabold text-slate-700">擴充功能 &gt; Apps Script</span>，將本專案的 <span className="font-mono bg-slate-100 px-1 rounded text-blue-600">google-apps-script.js</span> 檔案內容完全複製並貼上，然後點選儲存。
+                  </li>
+                  <li>
+                    <span className="font-extrabold text-slate-700">部署為 Web App</span>：
+                    點選右上角 <span className="bg-slate-100 px-1 rounded font-extrabold text-slate-700">部署 &gt; 新增部署</span>。類型選擇「網頁應用程式」，將存取權限設為<span className="font-extrabold text-red-500">「任何人 (Anyone)」</span>，然後點擊部署並複製產生的 Web 應用程式網址。
+                  </li>
+                </ol>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* 登出當前帳號 */}
         <div className="bg-white p-5 rounded-[28px] shadow-sm border border-red-150 bg-red-50/10">

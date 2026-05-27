@@ -150,16 +150,18 @@ export default function Dashboard({
   return (
     <div className="flex-1 flex flex-col pb-20 overflow-y-auto no-scrollbar bg-slate-50 font-['Outfit',_'Inter',_sans-serif]">
       {/* 頂部狀態列 */}
-      <div className="bg-slate-900 text-white px-4 py-1.5 flex justify-between items-center text-[10px] font-medium sticky top-0 z-20 shadow-sm">
-        <div className="flex items-center space-x-1">
-          <Database className="text-emerald-400" size={12} />
-          <span className="text-emerald-400 font-extrabold">SyncAll 同步連線正常</span>
+      {currentUser && (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR') && (
+        <div className="bg-slate-900 text-white px-4 py-1.5 flex justify-between items-center text-[10px] font-medium sticky top-0 z-20 shadow-sm">
+          <div className="flex items-center space-x-1">
+            <Database className="text-emerald-400" size={12} />
+            <span className="text-emerald-400 font-extrabold">SyncAll 同步連線正常</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span>最後更新: 剛剛</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <span>最後更新: 剛剛</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-        </div>
-      </div>
+      )}
 
       {/* 頂部標題 */}
       <div className="bg-white border-b border-gray-200 px-4 py-3.5 flex items-center justify-between z-10 shadow-sm sticky top-[28px]">
