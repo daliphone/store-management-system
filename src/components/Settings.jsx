@@ -460,15 +460,17 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
                             type="button"
                             key={perm.id}
                             onClick={() => handlePermissionToggle(perm.id)}
-                            className="w-full flex items-center space-x-2 text-left text-xs font-bold py-1 hover:bg-slate-50 rounded"
+                            className="w-full flex items-center space-x-2.5 text-left text-xs font-bold py-1.5 px-1 hover:bg-slate-100/55 rounded-lg transition-all"
                           >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              readOnly
-                              className="h-3.5 w-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 pointer-events-none"
-                            />
-                            <span className={isChecked ? 'text-indigo-900 font-extrabold' : 'text-gray-500'}>
+                            {/* 自定義 Checkbox 視覺元件，確保 100% 正確且精美地顯示打勾 */}
+                            <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-all ${
+                              isChecked 
+                                ? 'bg-indigo-600 border-indigo-600 text-white' 
+                                : 'bg-white border-slate-300 text-transparent'
+                            }`}>
+                              <Check size={11} strokeWidth={3.5} />
+                            </div>
+                            <span className={isChecked ? 'text-indigo-900 font-extrabold' : 'text-slate-500'}>
                               {perm.label}
                             </span>
                           </button>

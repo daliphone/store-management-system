@@ -38,11 +38,11 @@ export default function OrderForm({ currentUser, onSave, onClose, editOrder }) {
       return;
     }
     if (!formData.customerPhone.trim()) {
-      alert('請填寫電話號碼');
+      alert('請填寫聯絡電話');
       return;
     }
     if (!formData.productName.trim()) {
-      alert('請填寫商品詳情');
+      alert('請填寫訂購商品與承諾詳情');
       return;
     }
     if (!formData.promiseDate) {
@@ -100,69 +100,69 @@ export default function OrderForm({ currentUser, onSave, onClose, editOrder }) {
   };
 
   return (
-    <div className="absolute inset-0 bg-slate-50 flex flex-col z-50 overflow-y-auto no-scrollbar animate-slide-up pb-10">
-      {/* 頂部導覽列 */}
+    <div className="absolute inset-0 bg-slate-50 flex flex-col z-50 overflow-y-auto no-scrollbar animate-slide-up pb-16 font-['Outfit',_'Inter',_sans-serif]">
+      {/* 頂部導覽列 (全中文) */}
       <div className="sticky top-0 bg-[#E6EEFF] border-b border-blue-100 px-4 py-3 flex items-center justify-between z-10 shadow-sm">
         <button
           type="button"
           onClick={onClose}
-          className="w-10 h-10 border border-dashed border-blue-300 rounded-full flex items-center justify-center text-blue-600 bg-white hover:bg-blue-50 active:scale-90 transition-all focus:outline-none"
+          className="w-10 h-10 border border-dashed border-blue-300 rounded-full flex items-center justify-center text-blue-600 bg-white hover:bg-blue-50 active:scale-90 transition-all focus:outline-none shadow-sm"
         >
           <ArrowLeft size={18} />
         </button>
-        <h2 className="text-base font-black text-blue-900 tracking-wide font-outfit">Store Manager</h2>
-        <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center border border-blue-200 font-mono shadow-sm">
+        <h2 className="text-base font-black text-blue-900 tracking-wide">門市訂貨管理</h2>
+        <div className="w-10 h-10 rounded-full bg-white text-blue-600 font-black text-xs flex items-center justify-center border border-blue-200 font-mono shadow-sm" title="登入人員代碼">
           {getUserInitials()}
         </div>
       </div>
 
-      {/* 表單主內容區 */}
-      <div className="p-5 flex-1 flex flex-col space-y-4">
+      {/* 表單主內容區 (修復留白，隨內容自適應高度) */}
+      <div className="p-4 flex-1 flex flex-col space-y-4 max-w-md mx-auto w-full">
         {/* 標題語區 */}
-        <div className="space-y-1">
-          <h1 className="text-2xl font-black text-gray-900 font-outfit">
-            {editOrder ? '編輯訂單' : '新增訂單'}
+        <div className="space-y-1 pl-1">
+          <h1 className="text-2xl font-black text-slate-800">
+            {editOrder ? '修改訂單資訊' : '新增訂貨承諾'}
           </h1>
-          <p className="text-xs text-gray-400 font-bold">Please fill in the details below.</p>
+          <p className="text-[11px] text-slate-400 font-bold">請在下方填寫訂單的詳細資訊，完成後將自動同步至雲端。</p>
         </div>
 
-        {/* 表單白色主卡片 */}
-        <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80 space-y-4 flex-1 flex flex-col justify-between">
+        {/* 表單白色主卡片 (移除 flex-1 以免把頁面拉得過長) */}
+        <form onSubmit={handleSubmit} className="bg-white rounded-[28px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80 space-y-4.5">
           <div className="space-y-4">
-            {/* 1. Customer Name */}
-            <div>
-              <label className="text-xs text-gray-800 font-extrabold block mb-1">Customer Name *</label>
+            {/* 1. 客戶姓名 */}
+            <div className="space-y-1">
+              <label className="text-xs text-slate-700 font-black block">客戶姓名 *</label>
               <input
                 type="text"
-                placeholder="e.g. Jane Doe"
+                placeholder="請輸入客戶姓名 (例如: 王大同)"
                 value={formData.customerName}
                 onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                className="block w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs font-bold text-gray-800"
+                className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-800"
                 required
               />
             </div>
 
-            {/* 2. Phone Number */}
-            <div>
-              <label className="text-xs text-gray-800 font-extrabold block mb-1">Phone Number *</label>
+            {/* 2. 聯絡電話 */}
+            <div className="space-y-1">
+              <label className="text-xs text-slate-700 font-black block">聯絡電話 *</label>
               <input
                 type="tel"
-                placeholder="09XX-XXX-XXX"
+                placeholder="請輸入手機號碼 (例如: 0912-345-678)"
                 value={formData.customerPhone}
                 onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                className="block w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs font-bold text-gray-800 font-mono"
+                className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-850 font-mono"
                 required
               />
             </div>
 
-            {/* 3. Store Location */}
-            <div>
-              <label className="text-xs text-gray-800 font-extrabold block mb-1">Store Location</label>
+            {/* 3. 分店門市 */}
+            <div className="space-y-1">
+              <label className="text-xs text-slate-700 font-black block">分店門市</label>
               <select
                 value={formData.store}
                 onChange={(e) => setFormData({ ...formData, store: e.target.value })}
                 disabled={!hasAllStoresPerm}
-                className="block w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs font-bold text-gray-700 bg-gray-50/50 cursor-pointer disabled:bg-gray-100 disabled:text-gray-400"
+                className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-700 bg-slate-50/50 cursor-pointer disabled:bg-slate-100 disabled:text-slate-400"
               >
                 {hasAllStoresPerm ? (
                   STORES.map(s => <option key={s} value={s}>{s}</option>)
@@ -172,44 +172,44 @@ export default function OrderForm({ currentUser, onSave, onClose, editOrder }) {
               </select>
             </div>
 
-            {/* 4. Product Details */}
-            <div>
-              <label className="text-xs text-gray-800 font-extrabold block mb-1">Product Details *</label>
+            {/* 4. 訂購商品與承諾詳情 */}
+            <div className="space-y-1">
+              <label className="text-xs text-slate-700 font-black block">訂購商品與承諾詳情 *</label>
               <textarea
-                placeholder="Describe the items being ordered..."
+                placeholder="請詳細描述訂購的商品名稱、規格、贈品或承諾內容（例如: iPhone 16 Pro 256G 黑色，送原廠保護殼，承諾交期前到貨）..."
                 value={formData.productName}
                 onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
-                className="block w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs font-bold text-gray-800 h-24 resize-none leading-relaxed"
+                className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-800 h-24 resize-none leading-relaxed"
                 required
               />
             </div>
 
-            {/* 5. Promise Date */}
-            <div>
-              <label className="text-xs text-gray-800 font-extrabold block mb-1">Promise Date</label>
+            {/* 5. 預計交貨日 */}
+            <div className="space-y-1">
+              <label className="text-xs text-slate-700 font-black block">預計交貨日</label>
               <div className="relative rounded-xl shadow-sm">
                 <input
                   type="date"
                   value={formData.promiseDate}
                   onChange={(e) => setFormData({ ...formData, promiseDate: e.target.value })}
-                  className="block w-full px-4 py-3 pr-10 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs font-bold text-gray-850 font-mono"
+                  className="block w-full px-4 py-3 pr-10 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-850 font-mono"
                   required
                 />
-                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400">
+                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400">
                   <Calendar size={14} />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* 建立訂單按鈕 (獨立於卡片底部) */}
-          <div className="pt-4 mt-auto">
+          {/* 建立/儲存訂單按鈕 (緊隨表單卡片底部，避免過多留白) */}
+          <div className="pt-3 border-t border-slate-100">
             <button
               type="submit"
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3.5 rounded-2xl flex items-center justify-center space-x-1.5 active:scale-95 transition-all shadow-md shadow-blue-200/50 border border-blue-500 focus:outline-none"
             >
-              <Check size={16} strokeWidth={3} />
-              <span>{editOrder ? '儲存修改' : '建立訂單'}</span>
+              <Check size={15} strokeWidth={3} />
+              <span>{editOrder ? '確認修改並儲存' : '確認無誤，建立訂單'}</span>
             </button>
           </div>
         </form>
