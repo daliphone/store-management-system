@@ -4,7 +4,7 @@ import Modal from './Modal';
 import ManieIcon from './ManieIcon';
 import { STORES } from '../mockData';
 
-export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTasks, onOpenSettings }) {
+export default function TaskList({ tasks, currentUser, users, onToggleTask, onUpdateTasks, onOpenSettings }) {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [pendingCancelTaskId, setPendingCancelTaskId] = useState(null);
   
@@ -27,7 +27,49 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
   const [editingTask, setEditingTask] = useState(null);
   const [taskForm, setTaskForm] = useState({
     text: '',
-    score: 10
+    score: 10,
+    tag: '每日執行',
+    assignType: '所有人',
+    assignedTo: ''
+  });
+
+  // 行動端返回鍵優化 (TaskList 彈窗層級控制)
+  const [taskListPopupCount, setTaskListPopupCount] = useState(0);
+
+  React.useEffect(() => {
+    const opened = [isAdding, editingTask !== null].filter(Boolean).length;
+    if (opened > taskListPopupCount) {
+      window.history.pushState({ taskPopup: opened }, '');
+      setTaskListPopupCount(opened);
+    } else if (opened < taskListPopupCount) {
+      if (window.history.state && window.history.state.taskPopup && window.history.state.taskPopup > opened) {
+        window.history.back();
+      }
+      setTaskListPopupCount(opened);
+    }
+  }, [isAdding, editingTask, taskListPopupCount]);
+
+  React.useEffect(() => {
+    const handlePopState = (e) => {
+      if (isAdding) {
+        setIsAdding(false);
+      } else if (editingTask) {
+        setEditingTask(null);
+      }
+      const remaining = [isAdding, editingTask !== null].filter(Boolean).length - 1;
+      setTaskListPopupCount(Math.max(0, remaining));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isAdding, editingTask]);
+
+  // 篩選當前分店可指派的同仁 (排除 SuperAdmin 與 Auditor)
+  const storeUsers = (users || []).filter(u => {
+    if (u.role === 'SUPER_ADMIN' || u.role === 'AUDITOR') return false;
+    if (hasAllStoresPerm) {
+      return u.store === selectedStore;
+    }
+    return u.store === currentUser.store;
   });
 
   // 根據分店篩選任務
@@ -38,8 +80,9 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
     return t.store === currentUser.store;
   });
 
-  // 任務過濾邏輯
+  // 任務過濾與指派對象權限判定
   const displayedTasks = storeFilteredTasks.filter(t => {
+    // 1. 舊有儀容自檢過濾
     if (t.text && t.text.startsWith('開店-儀容自檢 (')) {
       const nameMatch = t.text.match(/開店-儀容自檢 \((.+)\)/);
       if (nameMatch) {
@@ -50,6 +93,15 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
         return currentUser.name === userName;
       }
     }
+    
+    // 2. 指派對象為個人過濾 (一般店員只能看見指派給自己的任務，主管/稽核能檢視全部)
+    if (t.assignType === '個人' && t.assignedTo) {
+      if (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR' || currentUser.role === 'STORE_MANAGER') {
+        return true;
+      }
+      return currentUser.name === t.assignedTo;
+    }
+    
     return true;
   });
 
@@ -67,39 +119,29 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
   // 判斷是否有管理日常任務權限 (店長以上)
   const canManageTasks = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'STORE_MANAGER';
 
-  // 根據任務標題分析徽章與標籤的輔助函數
+  // 根據任務屬性決定標籤與狀態
   const getTaskMeta = (task) => {
     const text = task.text || '';
-    const isPersonal = text.includes('自檢') || text.includes('個人') || text.includes('儀容');
+    const isPersonal = task.assignType === '個人' || text.includes('自檢') || text.includes('個人') || text.includes('儀容');
     
-    // 📸 拍照標記
+    // 📸 拍照標記 (自檢、陳列、環境等需要拍照)
     const needsPhoto = text.includes('拍照') || text.includes('環境') || text.includes('自檢') || text.includes('儀容') || text.includes('陳列') || text.includes('盤點');
     
     // $ 金額標記
     const needsAmount = text.includes('金額') || text.includes('零用金') || text.includes('盤點') || text.includes('現金') || text.includes('盤點現金');
     
-    // 逾期標記 (範例中確認昨日現金為逾期)
-    const isOverdue = text.includes('昨日') || text.includes('確認昨日') || task.overdue;
+    // 逾期標記
+    const isOverdue = task.overdue;
     
     // 時間標記
     let timeStr = '';
     if (text.includes('早班') || text.includes('開店') || text.includes('陳列')) timeStr = '10:00 AM';
     else if (text.includes('晚班') || text.includes('關店') || text.includes('下班')) timeStr = '09:30 PM';
     
-    // 自適應主標題與說明文字
     let title = text;
     let subtitle = '請依門市標準作業流程確實執行並回報。';
     
-    if (text.includes('每日早班店面陳列拍照回報')) {
-      title = '每日早班店面陳列拍照回報';
-      subtitle = '請確保展示機螢幕清潔，並拍攝全景。';
-    } else if (text.includes('確認昨日盤點現金差異')) {
-      title = '確認昨日盤點現金差異';
-      subtitle = '回報零用金實際結餘金額。';
-    } else if (text.includes('確認保全系統設定狀態')) {
-      title = '確認保全系統設定狀態';
-      subtitle = '下班時請確實開啟保全並於系統拍照回報。';
-    } else if (text.startsWith('開店-儀容自檢')) {
+    if (text.startsWith('開店-儀容自檢')) {
       const nameMatch = text.match(/開店-儀容自檢 \((.+)\)/);
       const name = nameMatch ? nameMatch[1] : '';
       title = `開店-儀容自檢 (${name})`;
@@ -132,13 +174,11 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
     if (e.target.closest('.photo-preview-trigger')) return;
 
     if (!task.completed) {
-      // 點擊未完成任務 -> 開啟回報彈窗
       setReportingTask(task);
       setPhoto(null);
       setNotes('');
       setCashAmount('');
     } else {
-      // 點擊已完成任務 -> 嘗試取消勾選
       const perms = currentUser.permissions || [];
       if (perms.includes('cancel_tasks_directly')) {
         onToggleTask(task.id, false, null);
@@ -162,7 +202,6 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
     setPendingCancelTaskId(null);
   };
 
-  // 手動觸發相機 input 點擊
   const triggerCamera = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -172,20 +211,18 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
     }
   };
 
-  // 處理拍照相機檔案選擇
   const handleCameraChange = (e) => {
     if (!e.target || !e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPhoto(reader.result); // Base64
+        setPhoto(reader.result);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // 任務回報提交
   const handleReportSubmit = (e) => {
     e.preventDefault();
     if (!reportingTask) return;
@@ -212,7 +249,6 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
 
     onToggleTask(reportingTask.id, true, currentUser.name, photo, finalNotes);
     
-    // 重置
     setReportingTask(null);
     setPhoto(null);
     setNotes('');
@@ -226,6 +262,10 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
       alert('請填寫任務內容！');
       return;
     }
+    if (taskForm.assignType === '個人' && !taskForm.assignedTo) {
+      alert('請選擇被指派的同仁！');
+      return;
+    }
 
     const newTask = {
       id: `tsk_${Math.random().toString(36).substr(2, 9)}`,
@@ -236,13 +276,16 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
       completedAt: null,
       completedBy: null,
       photo: null,
-      notes: null
+      notes: null,
+      tag: taskForm.tag || '每日執行',
+      assignType: taskForm.assignType || '所有人',
+      assignedTo: taskForm.assignType === '個人' ? taskForm.assignedTo : null
     };
 
     const updatedTasks = [...tasks, newTask];
     onUpdateTasks(updatedTasks);
     setIsAdding(false);
-    setTaskForm({ text: '', score: 10 });
+    setTaskForm({ text: '', score: 10, tag: '每日執行', assignType: '所有人', assignedTo: '' });
   };
 
   // 編輯任務提交
@@ -252,13 +295,20 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
       alert('請填寫任務內容！');
       return;
     }
+    if (taskForm.assignType === '個人' && !taskForm.assignedTo) {
+      alert('請選擇被指派的同仁！');
+      return;
+    }
 
     const updatedTasks = tasks.map(t => {
       if (t.id === editingTask.id) {
         return {
           ...t,
           text: taskForm.text.trim(),
-          score: Number(taskForm.score) || 10
+          score: Number(taskForm.score) || 10,
+          tag: taskForm.tag || '每日執行',
+          assignType: taskForm.assignType || '所有人',
+          assignedTo: taskForm.assignType === '個人' ? taskForm.assignedTo : null
         };
       }
       return t;
@@ -266,7 +316,7 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
 
     onUpdateTasks(updatedTasks);
     setEditingTask(null);
-    setTaskForm({ text: '', score: 10 });
+    setTaskForm({ text: '', score: 10, tag: '每日執行', assignType: '所有人', assignedTo: '' });
   };
 
   // 刪除任務
@@ -281,7 +331,10 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
     setEditingTask(task);
     setTaskForm({
       text: task.text,
-      score: task.score
+      score: task.score,
+      tag: task.tag || '每日執行',
+      assignType: task.assignType || '所有人',
+      assignedTo: task.assignedTo || ''
     });
   };
 
@@ -340,8 +393,8 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
               <textarea
                 value={taskForm.text}
                 onChange={(e) => setTaskForm({ ...taskForm, text: e.target.value })}
-                placeholder="例如: 每日早班店面陳列拍照回報..."
-                className="block w-full px-3 py-2.5 border border-gray-200 rounded-xl text-xs h-24 resize-none focus:ring-1 focus:ring-rose-500 focus:outline-none"
+                placeholder="例如: 清潔櫃台桌面、協助新機配備等作業細節..."
+                className="block w-full px-3 py-2.5 border border-gray-200 rounded-xl text-xs h-20 resize-none focus:ring-1 focus:ring-rose-500 focus:outline-none leading-relaxed"
                 required
               />
             </div>
@@ -358,6 +411,74 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
                 required
               />
             </div>
+
+            {/* 任務分類標籤 */}
+            <div>
+              <label className="text-xs text-gray-500 font-bold block mb-1.5">任務分類標籤</label>
+              <div className="flex space-x-1.5 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                {['每日執行', '交辦事項', '交接事項'].map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTaskForm({ ...taskForm, tag: t })}
+                    className={`flex-1 py-2 text-[11px] font-black rounded-lg transition-all active:scale-95 ${
+                      taskForm.tag === t
+                        ? 'bg-rose-500 text-white shadow-sm font-black'
+                        : 'bg-white text-gray-600 border border-slate-100 hover:border-slate-200'
+                    }`}
+                  >
+                    {t === '每日執行' ? '📅 每日執行' : t === '交辦事項' ? '📌 交辦事項' : '🔄 交接事項'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 指派對象選擇 */}
+            <div>
+              <label className="text-xs text-gray-500 font-bold block mb-1.5">指派對象</label>
+              <div className="flex space-x-1.5 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                {[
+                  { id: '所有人', label: '👥 所有人 (全員可見)' },
+                  { id: '個人', label: '👤 個人 (專屬指派)' }
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      const defaultUser = storeUsers[0] ? storeUsers[0].name : '';
+                      setTaskForm({ ...taskForm, assignType: opt.id, assignedTo: opt.id === '個人' ? defaultUser : '' });
+                    }}
+                    className={`flex-1 py-2 text-[11px] font-black rounded-lg transition-all active:scale-95 ${
+                      taskForm.assignType === opt.id
+                        ? 'bg-rose-500 text-white shadow-sm font-black'
+                        : 'bg-white text-gray-600 border border-slate-100 hover:border-slate-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 指派特定同仁 (當對象為個人時) */}
+            {taskForm.assignType === '個人' && (
+              <div className="animate-fade-in">
+                <label className="text-xs text-gray-500 font-bold block mb-1">指派特定同仁 *</label>
+                <select
+                  value={taskForm.assignedTo}
+                  onChange={(e) => setTaskForm({ ...taskForm, assignedTo: e.target.value })}
+                  className="block w-full px-3 py-2.5 border border-gray-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:ring-1 focus:ring-rose-500 focus:outline-none"
+                  required
+                >
+                  <option value="">-- 請選擇同仁 --</option>
+                  {storeUsers.map(u => (
+                    <option key={u.id} value={u.name}>
+                      {u.name} ({u.roleLabel})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="flex space-x-3 pt-4">
               <button
@@ -471,25 +592,37 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
                           {/* Checkbox 容器 */}
                           <div className="w-5 h-5 border-2 border-pink-200 rounded-lg flex items-center justify-center mr-1 shrink-0 bg-white"></div>
                           
-                          {isPersonal ? (
-                            <span className="px-2 py-0.5 rounded-md bg-[#EFF6FF] text-[#2563EB]">個人</span>
+                          {/* 任務分類標籤 */}
+                          {task.tag === '交辦事項' ? (
+                            <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-600 border border-amber-200/50">📌 交辦事項</span>
+                          ) : task.tag === '交接事項' ? (
+                            <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-600 border border-purple-200/50">🔄 交接事項</span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-md bg-[#F3E8FF] text-[#7C3AED]">共用</span>
+                            <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-200/50">📅 每日執行</span>
+                          )}
+
+                          {/* 對象標籤 */}
+                          {task.assignType === '個人' ? (
+                            <span className="px-2 py-0.5 rounded-md bg-pink-50 text-pink-600 border border-pink-200/50">👤 專屬: {task.assignedTo}</span>
+                          ) : isPersonal ? (
+                            <span className="px-2 py-0.5 rounded-md bg-pink-50 text-pink-600 border border-pink-200/50">👤 個人</span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200/50">👥 全員</span>
                           )}
 
                           {needsPhoto && (
-                            <span className="px-2 py-0.5 rounded-md bg-[#FDF2F8] text-[#DB2777] flex items-center space-x-0.5">
+                            <span className="px-2 py-0.5 rounded-md bg-[#FDF2F8] text-[#DB2777] flex items-center space-x-0.5 border border-pink-100">
                               <Camera size={9} className="mr-0.5" />
                               <span>拍照</span>
                             </span>
                           )}
 
                           {needsAmount && (
-                            <span className="px-2 py-0.5 rounded-md bg-[#FEF3C7] text-[#D97706]">$ 金額</span>
+                            <span className="px-2 py-0.5 rounded-md bg-[#FEF3C7] text-[#D97706] border border-amber-100">$ 金額</span>
                           )}
 
                           {isOverdue && (
-                            <span className="px-2 py-0.5 rounded-md bg-[#FFEDD5] text-[#EA580C]">⚠️ 逾期</span>
+                            <span className="px-2 py-0.5 rounded-md bg-[#FFEDD5] text-[#EA580C] border border-orange-100">⚠️ 逾期</span>
                           )}
 
                           {timeStr && (
@@ -569,10 +702,20 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
                             <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-extrabold">
                               <h3 className="text-xs font-semibold text-slate-400 line-through leading-snug">{title}</h3>
                               
-                              {isPersonal ? (
-                                <span className="px-1.5 py-0.25 rounded bg-gray-100 text-gray-400">個人</span>
+                              {task.tag === '交辦事項' ? (
+                                <span className="px-1.5 py-0.25 rounded bg-gray-100 text-gray-400">📌 交辦</span>
+                              ) : task.tag === '交接事項' ? (
+                                <span className="px-1.5 py-0.25 rounded bg-gray-100 text-gray-400">🔄 交接</span>
                               ) : (
-                                <span className="px-1.5 py-0.25 rounded bg-gray-100 text-gray-400">共用</span>
+                                <span className="px-1.5 py-0.25 rounded bg-gray-100 text-gray-400">📅 每日</span>
+                              )}
+
+                              {task.assignType === '個人' ? (
+                                <span className="px-1.5 py-0.25 rounded bg-gray-100 text-gray-400">👤 指派: {task.assignedTo}</span>
+                              ) : isPersonal ? (
+                                <span className="px-1.5 py-0.25 rounded bg-gray-100 text-gray-400">👤 個人</span>
+                              ) : (
+                                <span className="px-1.5 py-0.25 rounded bg-gray-100 text-gray-400">👥 全員</span>
                               )}
                               
                               {needsPhoto && (
@@ -635,7 +778,7 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
       {canManageTasks && !isAdding && !editingTask && (
         <button
           onClick={() => {
-            setTaskForm({ text: '', score: 10 });
+            setTaskForm({ text: '', score: 10, tag: '每日執行', assignType: '所有人', assignedTo: '' });
             setIsAdding(true);
           }}
           className="fixed bottom-24 right-4 w-14 h-14 bg-[#F43F5E] hover:bg-[#E11D48] text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 active:scale-90 z-40 border border-rose-400"

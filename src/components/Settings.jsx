@@ -308,52 +308,6 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
       </div>
 
       <div className="p-4 space-y-4">
-        {/* 角色切換 (模擬) */}
-        <div className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100 space-y-4">
-          <div className="flex items-center space-x-2 text-blue-600 font-extrabold text-sm">
-            <User size={18} />
-            <span>角色切換 (模擬)</span>
-          </div>
-          
-          <div className="space-y-2">
-            {users.map((user) => {
-              const isSelected = currentUser.id === user.id;
-              
-              // 模擬顯示用分店角色文字
-              let storeRoleLabel = '';
-              if (user.role === 'SUPER_ADMIN') storeRoleLabel = '系統管理員 (全區)';
-              else if (user.role === 'AUDITOR') storeRoleLabel = '總管理處稽核員 (全區)';
-              else if (user.role === 'STORE_MANAGER') storeRoleLabel = `${user.store} - 店長`;
-              else storeRoleLabel = `${user.store} - 業務`;
-
-              return (
-                <button
-                  key={user.id}
-                  onClick={() => {
-                    setCurrentUser(user);
-                    if (onRefreshData) onRefreshData();
-                  }}
-                  className={`w-full flex items-center justify-between p-4 rounded-2xl border text-left transition-all ${
-                    isSelected
-                      ? 'border-blue-500 bg-white shadow-[0_4px_20px_-4px_rgba(37,99,235,0.08)] ring-1 ring-blue-400'
-                      : 'border-slate-100 bg-white hover:border-slate-200'
-                  }`}
-                >
-                  <div className="flex flex-col space-y-0.5">
-                    <span className="text-sm font-black text-slate-800">{user.name}</span>
-                    <span className="text-[10px] text-slate-400 font-bold">{storeRoleLabel}</span>
-                  </div>
-                  {isSelected && (
-                    <div className="text-blue-500 border border-blue-500 rounded-full p-0.5 flex items-center justify-center bg-blue-50/20">
-                      <Check size={12} strokeWidth={3.5} />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         {/* 帳號管理 */}
         {canManageAccounts ? (
           <div className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100 space-y-4">

@@ -16,10 +16,22 @@ import OrderDetails from './components/OrderDetails';
 const LOGGED_USER_KEY = 'store_mgmt_logged_user';
 const USERS_STORAGE_KEY = 'store_mgmt_users';
 
-// 動態同步維護每個人的「開店-儀容自檢」任務
 const syncPersonalTasks = (currentTasks, currentUsers) => {
   if (!currentTasks) return [];
-  let updatedTasks = [...currentTasks];
+  
+  // 只保留五大核心日常工作職責，以及使用者自訂的任務 (具有標籤屬性)
+  const corePrefixes = [
+    '開店-儀容自檢',
+    '開店-環境清掃',
+    '營業-零用金確認',
+    '營業-隨機盤點庫存',
+    '閉店-庫存表上傳'
+  ];
+  let updatedTasks = currentTasks.filter(t => {
+    const isCore = corePrefixes.some(pref => t.text.startsWith(pref));
+    const isCustom = t.tag !== undefined && t.tag !== null;
+    return isCore || isCustom;
+  });
   
   // 1. 移除已不存在於使用者名單，或已被改店的個人任務
   updatedTasks = updatedTasks.filter(t => {
@@ -150,6 +162,43 @@ export default function App() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
 
+  // 記錄當前在 history state 中的 popup 數量
+  const [historyPopupCount, setHistoryPopupCount] = useState(0);
+
+  // 監聽彈窗狀態，自動 pushState 寫入歷史記錄 (行動端返回鍵優化)
+  useEffect(() => {
+    const openedPopups = [addOrderOpen, isEditing, selectedOrder !== null, settingsOpen].filter(Boolean).length;
+
+    if (openedPopups > historyPopupCount) {
+      window.history.pushState({ popup: openedPopups }, '');
+      setHistoryPopupCount(openedPopups);
+    } else if (openedPopups < historyPopupCount) {
+      if (window.history.state && window.history.state.popup && window.history.state.popup > openedPopups) {
+        window.history.back();
+      }
+      setHistoryPopupCount(openedPopups);
+    }
+  }, [addOrderOpen, isEditing, selectedOrder, settingsOpen, historyPopupCount]);
+
+  useEffect(() => {
+    const handlePopState = (e) => {
+      // 逐層關閉彈窗
+      if (isEditing) {
+        setIsEditing(false);
+      } else if (selectedOrder) {
+        setSelectedOrder(null);
+      } else if (addOrderOpen) {
+        setAddOrderOpen(false);
+      } else if (settingsOpen) {
+        setSettingsOpen(false);
+      }
+      const remainingPopups = [addOrderOpen, isEditing, selectedOrder !== null, settingsOpen].filter(Boolean).length - 1;
+      setHistoryPopupCount(Math.max(0, remainingPopups));
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isEditing, selectedOrder, addOrderOpen, settingsOpen]);
 
   // 偵測本地端登入快取
   useEffect(() => {
@@ -388,6 +437,7 @@ export default function App() {
           <TaskList
             tasks={tasks}
             currentUser={currentUser}
+            users={users}
             onToggleTask={handleToggleTask}
             onUpdateTasks={handleUpdateTasks} // 傳遞 CRUD 回呼
             onOpenSettings={() => setSettingsOpen(true)}
