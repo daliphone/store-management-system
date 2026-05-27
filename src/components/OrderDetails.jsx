@@ -188,7 +188,7 @@ export default function OrderDetails({ order, currentUser, onClose, onEdit, onCo
         >
           <ArrowLeft size={18} />
         </button>
-        <h2 className="text-base font-black text-blue-900 tracking-wide font-outfit">Order Details</h2>
+        <h2 className="text-base font-black text-blue-900 tracking-wide">訂單詳情</h2>
         <div className="w-10 h-10 rounded-full overflow-hidden border border-blue-200 bg-white p-0.5 shadow-sm">
           <ManieIcon pose="welcome" className="w-full h-full object-contain" />
         </div>

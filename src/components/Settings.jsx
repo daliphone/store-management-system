@@ -13,6 +13,14 @@ const ALL_PERMISSIONS = [
   { id: 'manage_accounts', label: '系統帳號與權限設定 (manage_accounts)' }
 ];
 
+const PERM_LABELS = {
+  view_all_stores: '檢視所有分店',
+  manage_orders: '新增與編輯訂單',
+  complete_tasks: '日常任務勾選',
+  cancel_tasks_directly: '免確認取消任務',
+  manage_accounts: '系統帳號與設定'
+};
+
 export default function Settings({ currentUser, setCurrentUser, onClose, onRefreshData, onLogout, users, onUpdateUsers }) {
   const [apiUrl, setApiUrl] = useState('');
   const [syncStatus, setSyncStatus] = useState({ type: '', message: '' });
@@ -541,7 +549,7 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
                     <div className="flex flex-wrap gap-1 pt-1">
                       {(u.permissions || []).map(perm => (
                         <span key={perm} className="text-[9px] font-black bg-[#EFF6FF] text-[#2563EB] px-2 py-0.5 rounded shadow-sm border border-blue-50">
-                          {perm}
+                          {PERM_LABELS[perm] || perm}
                         </span>
                       ))}
                     </div>
