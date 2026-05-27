@@ -34,7 +34,8 @@ export const calculateRemainingDays = (promiseDateStr, status) => {
   return diffDays;
 };
 
-export default function OrderList({ orders, currentUser, onOpenSettings, onOpenAddOrder, statusFilter: propStatusFilter, setStatusFilter: propSetStatusFilter, onUpdateOrderStatus }) {
+export default function OrderList({ orders, currentUser, onOpenSettings, onOpenAddOrder, statusFilter: propStatusFilter, setStatusFilter: propSetStatusFilter, onUpdateOrderStatus, onViewDetails }) {
+
   const [searchTerm, setSearchTerm] = useState('');
   const [localStatusFilter, setLocalStatusFilter] = useState('ALL');
   const [alertSettings, setAlertSettings] = useState({ warningDays: 2, criticalDays: 7 });
@@ -259,8 +260,10 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
             return (
               <div
                 key={order.id}
-                className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] border border-slate-100/80 overflow-hidden flex relative hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300"
+                onClick={() => onViewDetails && onViewDetails(order)}
+                className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] border border-slate-100/80 overflow-hidden flex relative hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer"
               >
+
                 {/* 左側狀態邊條 */}
                 <div className={`w-1.5 shrink-0 ${sideBarColor}`}></div>
 

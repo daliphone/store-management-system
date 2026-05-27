@@ -205,14 +205,18 @@ export const syncLocalToGoogleSheets = async () => {
   }
 };
 
-// 更新單個訂單狀態 (透過 syncAll 機制同步至 Google Sheets)
-export const updateOrderStatus = async (orderId, newStatus) => {
+// 更新單個訂單狀態 (支援簽章更新，透過 syncAll 機制同步至 Google Sheets)
+export const updateOrderStatus = async (orderId, newStatus, signature = null) => {
   const apiUrl = getApiUrl();
   const local = loadLocalData();
 
   const updatedOrders = local.orders.map(o => {
     if (o.id === orderId) {
-      return { ...o, status: newStatus };
+      const updated = { ...o, status: newStatus };
+      if (signature !== null) {
+        updated.signature = signature;
+      }
+      return updated;
     }
     return o;
   });
@@ -249,3 +253,49 @@ export const updateOrderStatus = async (orderId, newStatus) => {
     return { success: true, orders: updatedOrders, source: 'LocalStorage (API 寫入失敗)' };
   }
 };
+
+// 儲存編輯修改後的訂單 (透過 syncAll 機制同步至 Google Sheets)
+export const saveEditedOrder = async (updatedOrder) => {
+  const apiUrl = getApiUrl();
+  const local = loadLocalData();
+
+  const updatedOrders = local.orders.map(o => {
+    if (o.id === updatedOrder.id) {
+      return updatedOrder;
+    }
+    return o;
+  });
+
+  // 寫入本地快取
+  saveLocalData(updatedOrders, null);
+
+  if (!apiUrl) {
+    return { success: true, orders: updatedOrders, source: 'LocalStorage' };
+  }
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      body: JSON.stringify({
+        action: 'syncAll',
+        orders: updatedOrders,
+        tasks: local.tasks
+      })
+    });
+
+    const data = await response.json();
+    if (data.status === 'success') {
+      return { success: true, orders: updatedOrders, source: 'Google Sheets' };
+    } else {
+      throw new Error(data.message || 'API 同步失敗');
+    }
+  } catch (error) {
+    console.error('Google Sheets 同步編輯訂單失敗，已儲存在本地快取:', error);
+    return { success: true, orders: updatedOrders, source: 'LocalStorage (API 寫入失敗)' };
+  }
+};
+

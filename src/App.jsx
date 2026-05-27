@@ -7,9 +7,11 @@ import TaskList from './components/TaskList';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import CustomerList from './components/CustomerList';
-import { loadData, addOrder, updateTaskStatus, updateOrderStatus } from './services/googleSheetsService';
+import { loadData, addOrder, updateTaskStatus, updateOrderStatus, saveEditedOrder } from './services/googleSheetsService';
 import { USERS } from './mockData';
 import { Loader2, AlertCircle, Database, Check } from 'lucide-react';
+import OrderDetails from './components/OrderDetails';
+
 
 const LOGGED_USER_KEY = 'store_mgmt_logged_user';
 const USERS_STORAGE_KEY = 'store_mgmt_users';
@@ -134,6 +136,9 @@ export default function App() {
   // Modals 控制
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addOrderOpen, setAddOrderOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+
 
   // 偵測本地端登入快取
   useEffect(() => {
@@ -245,6 +250,45 @@ export default function App() {
     }
   };
 
+  // 確認交機簽收處理 (將狀態更新為已交單，並寫入手寫簽名圖檔)
+  const handleConfirmHandover = async (orderId, signature) => {
+    setIsLoading(true);
+    try {
+      const result = await updateOrderStatus(orderId, '已交單', signature);
+      if (result.success) {
+        setOrders(result.orders);
+        setDataSource(result.source);
+        // 同步更新當前選取的訂單狀態，以在詳情頁面即時反映
+        setSelectedOrder(prev => prev ? { ...prev, status: '已交單', signature } : null);
+      }
+    } catch (error) {
+      console.error('確認簽收交機錯誤：', error);
+      alert('交機更新失敗：' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 編輯修改訂單存檔
+  const handleSaveEditOrder = async (updatedOrder) => {
+    setIsLoading(true);
+    try {
+      const result = await saveEditedOrder(updatedOrder);
+      if (result.success) {
+        setOrders(result.orders);
+        setDataSource(result.source);
+        setSelectedOrder(updatedOrder); // 更新當前選取詳情資料
+        setIsEditing(false);
+      }
+    } catch (error) {
+      console.error('儲存編輯訂單錯誤：', error);
+      alert('修改儲存失敗：' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
   // 任務管理更新 (CRUD)
   const handleUpdateTasks = async (newTasks) => {
     setTasks(newTasks);
@@ -321,8 +365,10 @@ export default function App() {
             statusFilter={orderStatusFilter}
             setStatusFilter={setOrderStatusFilter}
             onUpdateOrderStatus={handleUpdateOrderStatus}
+            onViewDetails={(order) => setSelectedOrder(order)}
           />
         );
+
       case 'tasks':
         return (
           <TaskList
@@ -403,6 +449,27 @@ export default function App() {
         />
       )}
 
+      {/* 編輯訂單 Modal/Page */}
+      {isEditing && selectedOrder && (
+        <OrderForm
+          currentUser={currentUser}
+          editOrder={selectedOrder}
+          onSave={handleSaveEditOrder}
+          onClose={() => setIsEditing(false)}
+        />
+      )}
+
+      {/* 訂單詳情頁面 */}
+      {selectedOrder && !isEditing && (
+        <OrderDetails
+          order={selectedOrder}
+          currentUser={currentUser}
+          onClose={() => setSelectedOrder(null)}
+          onEdit={() => setIsEditing(true)}
+          onConfirmHandover={handleConfirmHandover}
+        />
+      )}
+
       {/* 設定 Modal/Page */}
       {settingsOpen && (
         <Settings
@@ -415,6 +482,7 @@ export default function App() {
           onUpdateUsers={handleUpdateUsers}
         />
       )}
+
     </div>
   );
 }

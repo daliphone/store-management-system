@@ -17,7 +17,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto bg-white border-t border-gray-200 py-2 px-3 flex justify-around items-center z-50 shadow-lg rounded-t-2xl">
+    <nav className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto bg-white border-t border-slate-100 py-2 px-3 flex justify-around items-center z-50 shadow-lg rounded-t-2xl">
       {tabs.map((tab) => {
         const IconComponent = tab.icon;
         const isActive = activeTab === tab.id;
@@ -30,7 +30,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
           >
             <div className={`p-1 rounded-xl transition-all duration-300 ${
               isActive 
-                ? 'text-blue-500 scale-110' 
+                ? 'text-rose-500 scale-110' 
                 : tab.id === 'checkin' 
                   ? 'text-green-600' 
                   : 'text-gray-400'
@@ -38,12 +38,12 @@ export default function BottomNav({ activeTab, setActiveTab }) {
               <IconComponent size={24} strokeWidth={isActive ? 2.5 : 2} />
             </div>
             <span className={`text-[10px] mt-0.5 font-medium transition-colors duration-200 ${
-              isActive ? 'text-blue-600 font-semibold' : 'text-gray-500'
+              isActive ? 'text-rose-600 font-extrabold' : 'text-gray-500'
             }`}>
               {tab.label}
             </span>
             {isActive && (
-              <span className="absolute -top-1 w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse-subtle"></span>
+              <span className="absolute bottom-0 w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse-subtle"></span>
             )}
           </button>
         );

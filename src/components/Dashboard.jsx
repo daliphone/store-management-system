@@ -1,26 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ManieIcon from './ManieIcon';
-import { Settings, AlertCircle, Calendar, UserCheck, CheckSquare, Target, Wrench } from 'lucide-react';
+import { Settings, Calendar, AlertTriangle, Clock, Check, X, Database, LogOut, Target, Wrench } from 'lucide-react';
 
-export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, setActiveTab, setOrderStatusFilter, onLogout }) {
+export default function Dashboard({ 
+  orders, 
+  tasks, 
+  currentUser, 
+  onOpenSettings, 
+  setActiveTab, 
+  setOrderStatusFilter, 
+  onLogout 
+}) {
   const [activeSubTab, setActiveSubTab] = useState('quote'); // 'quote' 或 'shortcut'
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [maniePose, setManiePose] = useState('idle');
   const [isBouncing, setIsBouncing] = useState(false);
+  const [alertSettings, setAlertSettings] = useState({ warningDays: 2, criticalDays: 7 });
 
-  // 根據時間動態判斷招呼語
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) {
-      return '早安！';
-    } else if (hour >= 12 && hour < 18) {
-      return '午安！';
-    } else {
-      return '晚安！辛苦啦~';
+  // 載入時效設定
+  useEffect(() => {
+    const cached = localStorage.getItem('store_mgmt_alert_settings');
+    if (cached) {
+      try {
+        setAlertSettings(JSON.parse(cached));
+      } catch (e) {}
     }
-  };
+  }, []);
 
-  // 門市銷售激勵金句資料庫 (B方案)
+  // 門市銷售激勵金句資料庫
   const SALES_QUOTES = [
     "客戶買的不是商品，是您專業又貼心的服務！😊",
     "今天攜碼客戶是主力，配件搭配與加購大有機會喔！🏆",
@@ -45,20 +52,71 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
 
   const todayStr = getTodayStr();
 
-  // 根據功能權限與分店過濾訂單
-  const filteredOrders = orders.filter(order => {
+  // 1. 根據功能權限與分店過濾訂單
+  const getRoleFilteredOrders = () => {
     const perms = currentUser.permissions || [];
-    if (perms.includes('view_all_stores')) return true; // 具備檢視全店權限
-    if (currentUser.role === 'STORE_MANAGER') return order.store === currentUser.store; // 店長過濾分店
-    return order.creator === currentUser.name; // 一般店員僅看自己提單
-  });
+    if (perms.includes('view_all_stores')) return orders;
+    if (currentUser.role === 'STORE_MANAGER') {
+      return orders.filter(o => o.store === currentUser.store);
+    }
+    return orders.filter(o => o.creator === currentUser.name);
+  };
 
+  const baseOrdersForStats = getRoleFilteredOrders();
+
+  // 2. 根據時間動態判斷招呼語
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) {
+      return '早安';
+    } else if (hour >= 12 && hour < 18) {
+      return '午安';
+    } else {
+      return '晚安';
+    }
+  };
+
+  // 3. 計算核心指標數據
+  // 逾期訂單 (已交機/已交單除外，且逾期天數 > 0)
+  const calculateOverdueDaysLocal = (promiseDateStr, status) => {
+    if (status === '已交機' || status === '已交單' || !promiseDateStr) return 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const promise = new Date(promiseDateStr);
+    promise.setHours(0, 0, 0, 0);
+    const diffTime = today.getTime() - promise.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+  const calculateRemainingDaysLocal = (promiseDateStr, status) => {
+    if (status === '已交機' || status === '已交單' || !promiseDateStr) return 999;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const promise = new Date(promiseDateStr);
+    promise.setHours(0, 0, 0, 0);
+    const diffTime = promise.getTime() - today.getTime();
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const overdueCount = baseOrdersForStats.filter(o => {
+    const isHandedOver = o.status === '已交單' || o.status === '已交機';
+    return !isHandedOver && calculateOverdueDaysLocal(o.promiseDate, o.status) > 0;
+  }).length;
+
+  const dueTodayCount = baseOrdersForStats.filter(o => {
+    const isHandedOver = o.status === '已交單' || o.status === '已交機';
+    return !isHandedOver && calculateRemainingDaysLocal(o.promiseDate, o.status) === 0;
+  }).length;
+
+  // 與我相關 (一般店員是自己提單的，店長是自己店的，管理員是全部)
+  const myRelatedCount = baseOrdersForStats.filter(o => o.creator === currentUser.name).length;
+
+  // 全店待辦 (依據店過濾的任務數)
   const filteredTasks = tasks.filter(t => {
-    // 依據店過濾
     const isSameStore = currentUser.store === '全分店' || t.store === currentUser.store;
     if (!isSameStore) return false;
-    
-    // 依據個人自檢過濾
+
     if (t.text && t.text.startsWith('開店-儀容自檢 (')) {
       const nameMatch = t.text.match(/開店-儀容自檢 \((.+)\)/);
       if (nameMatch) {
@@ -72,20 +130,9 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
     return true;
   });
 
-  // 計算數據
-  const overdueCount = filteredOrders.filter(o => o.overdueDays > 0 && o.status !== '已交機').length;
-  const todayDueCount = filteredOrders.filter(o => o.promiseDate === todayStr && o.status !== '已交機').length;
-  
-  // 「我相關」
-  const myRelatedCount = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR'
-    ? orders.length 
-    : currentUser.role === 'STORE_MANAGER'
-      ? orders.filter(o => o.store === currentUser.store).length
-      : orders.filter(o => o.creator === currentUser.name).length;
-
   const pendingTasksCount = filteredTasks.filter(t => !t.completed).length;
 
-  // manie 點擊互動：切換金句與姿勢表情 (B方案)
+  // manie 點擊互動：切換金句與姿勢表情
   const handleManieClick = () => {
     setIsBouncing(true);
     setTimeout(() => setIsBouncing(false), 500);
@@ -94,27 +141,39 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
       const nextIndex = (quoteIndex + 1) % SALES_QUOTES.length;
       setQuoteIndex(nextIndex);
       
-      // 隨機切換姿勢表情 (welcome, thinking, idle)
-      const poses = ['welcome', 'thinking', 'idle'];
+      const poses = ['welcome', 'thinking', 'idle', 'gold'];
       const randomPose = poses[Math.floor(Math.random() * poses.length)];
       setManiePose(randomPose);
     }
   };
 
   return (
-    <div className="flex-1 flex flex-col pb-20 overflow-y-auto no-scrollbar">
+    <div className="flex-1 flex flex-col pb-20 overflow-y-auto no-scrollbar bg-slate-50 font-['Outfit',_'Inter',_sans-serif]">
+      {/* 頂部狀態列 */}
+      <div className="bg-slate-900 text-white px-4 py-1.5 flex justify-between items-center text-[10px] font-medium sticky top-0 z-20 shadow-sm">
+        <div className="flex items-center space-x-1">
+          <Database className="text-emerald-400" size={12} />
+          <span className="text-emerald-400 font-extrabold">SyncAll 同步連線正常</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <span>最後更新: 剛剛</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        </div>
+      </div>
+
       {/* 頂部標題 */}
-      <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between z-10 shadow-sm">
+      <div className="bg-white border-b border-gray-200 px-4 py-3.5 flex items-center justify-between z-10 shadow-sm sticky top-[28px]">
         <button
           onClick={onLogout}
           className="flex items-center space-x-1 text-red-500 hover:text-red-700 font-extrabold text-xs transition-colors p-1.5 rounded-lg hover:bg-red-50 active:scale-95"
         >
+          <LogOut size={14} />
           <span>登出</span>
         </button>
-        <h1 className="text-base font-bold text-gray-800 tracking-wide">門市店務管理系統</h1>
+        <h1 className="text-lg font-black text-gray-800 tracking-wide font-['Outfit']">Manie 儀表板</h1>
         <button
           onClick={onOpenSettings}
-          className="flex items-center space-x-1 text-gray-600 hover:text-blue-500 font-medium text-xs transition-colors p-1.5 rounded-lg hover:bg-gray-100"
+          className="flex items-center space-x-1 text-gray-600 hover:text-blue-500 font-bold text-xs transition-colors p-1.5 rounded-lg hover:bg-gray-100 active:scale-95"
         >
           <Settings size={16} />
           <span>設定</span>
@@ -122,118 +181,150 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
       </div>
 
       <div className="p-4 space-y-4">
-
-        {/* 歡迎與問候語 + manie 金幣圖示 */}
-        <div className="pt-2 flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-100/60 shadow-sm">
+        {/* 歡迎區塊 */}
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 shadow-sm border border-blue-100/60 flex items-center justify-between">
           <div className="space-y-1">
-            <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">{getGreeting()}{currentUser.name}</h2>
-            <p className="text-xs text-gray-500 font-semibold">
-              {currentUser.name} ({currentUser.roleLabel})
+            <h2 className="text-xl font-black text-blue-900 font-['Outfit']">
+              {getGreeting()}，{currentUser.name}！
+            </h2>
+            <p className="text-xs font-bold text-blue-700 mt-1">
+              {currentUser.roleLabel} · 今天又是元氣滿滿的一天 🚀
             </p>
-            <p className="text-[10px] text-gray-400 font-medium font-mono">
-              日期：{new Date().toLocaleDateString('zh-TW')}
+            <p className="text-[10px] text-blue-500/80 font-mono">
+              系統日期：{new Date().toLocaleDateString('zh-TW')}
             </p>
           </div>
-          {/* 金幣 manie 姿勢 */}
-          <ManieIcon pose="gold" className="w-20 h-16 drop-shadow-sm hover:scale-105 transition-transform" />
+          <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center border-2 border-blue-100 overflow-hidden shrink-0">
+            <ManieIcon pose="gold" className="w-14 h-14" />
+          </div>
         </div>
 
-        {/* 2x2 統計方格 */}
+        {/* 2x2 核心指標數據 */}
         <div className="grid grid-cols-2 gap-3">
-          {/* 逾期 */}
+          {/* 逾期訂單 */}
           <div 
-            onClick={() => setActiveTab('orders')}
-            className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex flex-col justify-between h-24 shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-98"
+            onClick={() => {
+              setOrderStatusFilter('OVERDUE_HANDOVER');
+              setActiveTab('orders');
+            }}
+            className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[inset_0_2px_10px_rgba(0,0,0,0.01),0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between h-24 active:scale-95 transition-all cursor-pointer hover:shadow-md"
           >
-            <span className="text-3xl font-black text-amber-700">{overdueCount}</span>
-            <div className="flex items-center space-x-1 text-xs text-amber-600 font-bold">
-              <span>🚨</span>
-              <span>逾期</span>
+            <div className="flex items-center space-x-1.5 mb-2">
+              <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="text-red-600" size={12} />
+              </div>
+              <span className="text-xs font-bold text-gray-500">逾期訂單</span>
+            </div>
+            <div className="flex items-baseline space-x-1">
+              <span className="text-3xl font-black text-red-600 font-['Outfit']">{overdueCount}</span>
+              <span className="text-[10px] font-bold text-gray-400">件</span>
             </div>
           </div>
 
           {/* 今日到期 */}
           <div 
-            onClick={() => setActiveTab('orders')}
-            className="bg-white border border-gray-100 p-4 rounded-2xl flex flex-col justify-between h-24 shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-98"
+            onClick={() => {
+              setOrderStatusFilter('DUE_SOON');
+              setActiveTab('orders');
+            }}
+            className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[inset_0_2px_10px_rgba(0,0,0,0.01),0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between h-24 active:scale-95 transition-all cursor-pointer hover:shadow-md"
           >
-            <span className="text-3xl font-black text-gray-800">{todayDueCount}</span>
-            <div className="flex items-center space-x-1 text-xs text-gray-500 font-bold">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>
-              <span>今日到期</span>
+            <div className="flex items-center space-x-1.5 mb-2">
+              <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center">
+                <Clock className="text-orange-600" size={12} />
+              </div>
+              <span className="text-xs font-bold text-gray-500">今日到期</span>
+            </div>
+            <div className="flex items-baseline space-x-1">
+              <span className="text-3xl font-black text-orange-500 font-['Outfit']">{dueTodayCount}</span>
+              <span className="text-[10px] font-bold text-gray-400">件</span>
             </div>
           </div>
 
-          {/* 我相關 */}
+          {/* 與我相關 */}
           <div 
-            onClick={() => setActiveTab('orders')}
-            className="bg-white border border-gray-100 p-4 rounded-2xl flex flex-col justify-between h-24 shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-98"
+            onClick={() => {
+              setOrderStatusFilter('ALL');
+              setActiveTab('orders');
+            }}
+            className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[inset_0_2px_10px_rgba(0,0,0,0.01),0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between h-24 active:scale-95 transition-all cursor-pointer hover:shadow-md"
           >
-            <span className="text-3xl font-black text-gray-800">{myRelatedCount}</span>
-            <div className="flex items-center space-x-1 text-xs text-gray-500 font-bold">
-              <span>👤</span>
-              <span>我相關</span>
+            <div className="flex items-center space-x-1.5 mb-2">
+              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs">
+                👤
+              </div>
+              <span className="text-xs font-bold text-gray-500">與我相關</span>
+            </div>
+            <div className="flex items-baseline space-x-1">
+              <span className="text-3xl font-black text-blue-600 font-['Outfit']">{myRelatedCount}</span>
+              <span className="text-[10px] font-bold text-gray-400">件</span>
             </div>
           </div>
 
           {/* 全店待辦 */}
           <div 
-            onClick={() => setActiveTab('tasks')}
-            className="bg-white border border-gray-100 p-4 rounded-2xl flex flex-col justify-between h-24 shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-98"
+            onClick={() => {
+              setActiveTab('tasks');
+            }}
+            className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[inset_0_2px_10px_rgba(0,0,0,0.01),0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between h-24 active:scale-95 transition-all cursor-pointer hover:shadow-md"
           >
-            <span className="text-3xl font-black text-gray-800">{pendingTasksCount}</span>
-            <div className="flex items-center space-x-1 text-xs text-gray-500 font-bold">
-              <span>📋</span>
-              <span>全店待辦</span>
+            <div className="flex items-center space-x-1.5 mb-2">
+              <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-xs">
+                📋
+              </div>
+              <span className="text-xs font-bold text-gray-500">全店待辦</span>
+            </div>
+            <div className="flex items-baseline space-x-1">
+              <span className="text-3xl font-black text-purple-600 font-['Outfit']">{pendingTasksCount}</span>
+              <span className="text-[10px] font-bold text-gray-400">件</span>
             </div>
           </div>
         </div>
 
-        {/* 長條卡片 1: 有望追蹤 */}
-        <div 
-          onClick={() => setActiveTab('orders')}
-          className="bg-amber-100/50 border border-amber-200/50 p-4 rounded-2xl flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-99"
-        >
-          <div className="space-y-1">
-            <div className="flex items-center space-x-1.5 text-amber-800 font-bold text-sm">
-              <Target size={16} className="text-amber-600" />
-              <span>有望追蹤</span>
+        {/* 雙卡片區：有望追蹤 & 全店維修 */}
+        <div className="grid grid-cols-1 gap-3">
+          {/* 有望追蹤 */}
+          <button 
+            type="button"
+            className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between active:scale-95 transition-all group hover:shadow-md"
+            onClick={() => { setActiveTab('orders'); setOrderStatusFilter('ALL'); }}
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-lg">
+                🎯
+              </div>
+              <div className="text-left">
+                <h3 className="font-black text-gray-800 text-sm font-['Outfit']">有望追蹤</h3>
+                <p className="text-[10px] font-bold text-gray-400 mt-0.5">檢視所有商機與進度</p>
+              </div>
             </div>
-            <div className="text-xl font-black text-amber-900">
-              {orders.filter(o => o.type === '訂貨').length} <span className="text-xs font-semibold">筆</span>
+            <div className="w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-50 transition-colors text-xs font-extrabold">
+              ➔
             </div>
-            <div className="text-[10px] text-amber-700 font-medium">
-              ⏰ {orders.filter(o => o.type === '訂貨').length} 筆今日要跟進
+          </button>
+
+          {/* 全店維修 */}
+          <button 
+            type="button"
+            className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between active:scale-95 transition-all group hover:shadow-md"
+            onClick={() => setActiveTab('tasks')}
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-lg">
+                🛠️
+              </div>
+              <div className="text-left">
+                <h3 className="font-black text-gray-800 text-sm font-['Outfit']">全店維修</h3>
+                <p className="text-[10px] font-bold text-gray-400 mt-0.5">管理店內報修與環境任務</p>
+              </div>
             </div>
-          </div>
-          <div className="w-12 h-12 bg-amber-200/50 rounded-xl flex items-center justify-center text-2xl">
-            🎯
-          </div>
+            <div className="w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-50 transition-colors text-xs font-extrabold">
+              ➔
+            </div>
+          </button>
         </div>
 
-        {/* 長條卡片 2: 全店維修 */}
-        <div 
-          onClick={() => setActiveTab('tasks')}
-          className="bg-sky-100/50 border border-sky-200/50 p-4 rounded-2xl flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-99"
-        >
-          <div className="space-y-1">
-            <div className="flex items-center space-x-1.5 text-sky-800 font-bold text-sm">
-              <Wrench size={16} className="text-sky-600" />
-              <span>全店維修</span>
-            </div>
-            <div className="text-xl font-black text-sky-900">
-              0 <span className="text-xs font-semibold">件</span>
-            </div>
-            <div className="text-[10px] text-sky-700 font-medium">
-              點擊查看清單
-            </div>
-          </div>
-          <div className="w-12 h-12 bg-sky-200/50 rounded-xl flex items-center justify-center text-2xl">
-            🔧
-          </div>
-        </div>
-
-        {/* manie 互動助理區塊 (B+C 方案結合) */}
+        {/* manie 互動助理區塊 (每日金句與快捷待辦) */}
         <div className="bg-gradient-to-r from-rose-50 to-pink-50 border border-pink-100 rounded-3xl p-4 shadow-sm space-y-3.5">
           {/* 頂部膠囊分頁按鈕 */}
           <div className="flex space-x-1.5 bg-pink-100/50 p-1 rounded-xl w-fit text-[11px] font-bold">
@@ -277,7 +368,7 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
               }`}
               title={activeSubTab === 'quote' ? "點我換一句金句！" : undefined}
             >
-              <div className="h-20 w-20 flex items-center justify-center overflow-hidden">
+              <div className="h-20 w-20 flex items-center justify-center">
                 <ManieIcon pose={maniePose} className="w-20 drop-shadow-md" />
               </div>
               {activeSubTab === 'quote' && (
@@ -293,7 +384,7 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
               <div className="absolute left-[-6px] top-6 w-3 h-3 bg-white border-l border-b border-pink-100/80 rotate-45"></div>
               
               {activeSubTab === 'quote' ? (
-                // 激勵金句 (B方案)
+                // 激勵金句
                 <div className="space-y-1">
                   <p className="text-[11px] text-gray-700 font-extrabold leading-relaxed">
                     {SALES_QUOTES[quoteIndex]}
@@ -303,20 +394,21 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
                   </p>
                 </div>
               ) : (
-                // 快捷待辦 (C方案)
+                // 快捷待辦 (已修復未定義變數 ReferenceError)
                 <div className="space-y-1.5">
                   <div className="text-[10px] text-gray-400 font-bold pb-1 border-b border-dashed border-gray-100 flex justify-between items-center">
                     <span>本日待辦清單 (點擊直達)：</span>
                     <span className="text-[9px] bg-rose-100 text-rose-600 px-1.5 py-0.25 rounded-md font-extrabold font-mono">
-                      {overdueCount + todayDueCount + pendingTasksCount}
+                      {overdueCount + dueTodayCount + pendingTasksCount}
                     </span>
                   </div>
                   
                   <div className="space-y-1 text-[11px] font-bold">
                     {overdueCount > 0 ? (
                       <button
+                        type="button"
                         onClick={() => {
-                          setOrderStatusFilter('OVERDUE');
+                          setOrderStatusFilter('OVERDUE_HANDOVER');
                           setActiveTab('orders');
                         }}
                         className="w-full flex items-center justify-between text-left text-red-600 hover:bg-red-50 p-1 rounded-md transition-colors"
@@ -326,21 +418,23 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
                       </button>
                     ) : null}
 
-                    {todayDueCount > 0 ? (
+                    {dueTodayCount > 0 ? (
                       <button
+                        type="button"
                         onClick={() => {
-                          setOrderStatusFilter('WARNING'); // WARNING 會過濾出 0~2 天內交貨的
+                          setOrderStatusFilter('DUE_SOON');
                           setActiveTab('orders');
                         }}
                         className="w-full flex items-center justify-between text-left text-amber-600 hover:bg-amber-50 p-1 rounded-md transition-colors"
                       >
-                        <span>⏳ 有 {todayDueCount} 筆訂單今日交貨</span>
+                        <span>⏳ 有 {dueTodayCount} 筆訂單今日交貨</span>
                         <span className="text-[9px] bg-amber-100 px-1.5 rounded font-mono font-extrabold">GO</span>
                       </button>
                     ) : null}
 
                     {pendingTasksCount > 0 ? (
                       <button
+                        type="button"
                         onClick={() => setActiveTab('tasks')}
                         className="w-full flex items-center justify-between text-left text-blue-600 hover:bg-blue-50 p-1 rounded-md transition-colors"
                       >
@@ -349,7 +443,7 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
                       </button>
                     ) : null}
 
-                    {overdueCount === 0 && todayDueCount === 0 && pendingTasksCount === 0 ? (
+                    {overdueCount === 0 && dueTodayCount === 0 && pendingTasksCount === 0 ? (
                       <div className="text-center py-2 text-green-600 text-[11px] font-extrabold">
                         🎉 太優秀了！今日店務已全數清空！
                       </div>
