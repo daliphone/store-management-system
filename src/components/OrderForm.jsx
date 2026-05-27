@@ -151,7 +151,7 @@ export default function OrderForm({ currentUser, onSave, onClose }) {
       quantity: Number(formData.quantity) || 1,
       price: Number(formData.price) || 0,
       cost: Number(formData.cost) || 0,
-      status: '未到貨',
+      status: '訂貨需求',
       createdAt: todayStr,
       promiseDate: formData.promiseDate,
       overdueDays: 0,

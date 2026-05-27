@@ -7,7 +7,7 @@ import TaskList from './components/TaskList';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import CustomerList from './components/CustomerList';
-import { loadData, addOrder, updateTaskStatus } from './services/googleSheetsService';
+import { loadData, addOrder, updateTaskStatus, updateOrderStatus } from './services/googleSheetsService';
 import { USERS } from './mockData';
 import { Loader2, AlertCircle, Database, Check } from 'lucide-react';
 
@@ -228,6 +228,23 @@ export default function App() {
     }
   };
 
+  // 變更訂單狀態並同步 (透過 syncAll 將變更同步至 GAS)
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    setIsLoading(true);
+    try {
+      const result = await updateOrderStatus(orderId, newStatus);
+      if (result.success) {
+        setOrders(result.orders);
+        setDataSource(result.source);
+      }
+    } catch (error) {
+      console.error('變更訂單狀態錯誤：', error);
+      alert('更新訂單狀態失敗：' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // 任務管理更新 (CRUD)
   const handleUpdateTasks = async (newTasks) => {
     setTasks(newTasks);
@@ -303,6 +320,7 @@ export default function App() {
             onOpenAddOrder={() => setAddOrderOpen(true)}
             statusFilter={orderStatusFilter}
             setStatusFilter={setOrderStatusFilter}
+            onUpdateOrderStatus={handleUpdateOrderStatus}
           />
         );
       case 'tasks':

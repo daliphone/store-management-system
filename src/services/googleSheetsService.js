@@ -204,3 +204,48 @@ export const syncLocalToGoogleSheets = async () => {
     throw new Error(data.message || '同步失敗');
   }
 };
+
+// 更新單個訂單狀態 (透過 syncAll 機制同步至 Google Sheets)
+export const updateOrderStatus = async (orderId, newStatus) => {
+  const apiUrl = getApiUrl();
+  const local = loadLocalData();
+
+  const updatedOrders = local.orders.map(o => {
+    if (o.id === orderId) {
+      return { ...o, status: newStatus };
+    }
+    return o;
+  });
+
+  // 寫入本地快取
+  saveLocalData(updatedOrders, null);
+
+  if (!apiUrl) {
+    return { success: true, orders: updatedOrders, source: 'LocalStorage' };
+  }
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      body: JSON.stringify({
+        action: 'syncAll',
+        orders: updatedOrders,
+        tasks: local.tasks
+      })
+    });
+
+    const data = await response.json();
+    if (data.status === 'success') {
+      return { success: true, orders: updatedOrders, source: 'Google Sheets' };
+    } else {
+      throw new Error(data.message || 'API 同步失敗');
+    }
+  } catch (error) {
+    console.error('Google Sheets 同步訂單狀態失敗，已儲存在本地快取:', error);
+    return { success: true, orders: updatedOrders, source: 'LocalStorage (API 寫入失敗)' };
+  }
+};

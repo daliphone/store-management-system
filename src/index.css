@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    font-size: 18px;
+  }
   body {
     background-color: #f3f4f6;
     font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;

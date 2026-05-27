@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Award, Plus, Trash2, Edit2, X, Camera, Check, AlertCircle, Eye, Info } from 'lucide-react';
+import { Settings, Award, Plus, Trash2, Edit2, X, Camera, Check, AlertCircle, Eye, Info, CheckSquare } from 'lucide-react';
 import Modal from './Modal';
 import ManieIcon from './ManieIcon';
 import { STORES } from '../mockData';
@@ -107,13 +107,27 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
     setPendingCancelTaskId(null);
   };
 
-  // 處理拍照相機檔案選擇
+  // 手動觸發相機 input 點擊，防止 React Label 雙擊與事件氣泡導致反白 Crash
+  const triggerCamera = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const inputEl = document.getElementById('reporting-camera-input');
+    if (inputEl) {
+      inputEl.click();
+    }
+  };
+
+  // 處理拍照相機檔案選擇 (加強防呆，防止 Crash)
   const handleCameraChange = (e) => {
+    if (!e.target || !e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhoto(reader.result); // Base64
+      };
+      reader.onerror = () => {
+        console.error("讀取拍照檔案失敗");
       };
       reader.readAsDataURL(file);
     }
@@ -366,6 +380,20 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
             </div>
           </div>
 
+          {/* 超級管理員與稽核員專屬直達試算表按鈕 */}
+          {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR') && (
+            <div className="px-4 pt-4">
+              <a
+                href="https://docs.google.com/spreadsheets/d/13kUwwjkiPo-C5kBCxpV0JRLtB_dD6zgTwcDLAZAOu90/edit?gid=1293678477#gid=1293678477"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center space-x-2 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-extrabold py-3.5 px-4 rounded-2xl text-xs transition-all shadow-md active:scale-99 border border-green-600/20"
+              >
+                <span>📑 前往雲端試算表稽核歷史存檔</span>
+              </a>
+            </div>
+          )}
+
           {/* 任務列表 */}
           <div className="p-4 space-y-3 flex-1">
             <div className="flex justify-between items-center px-1 text-xs font-bold text-gray-400">
@@ -553,16 +581,17 @@ export default function TaskList({ tasks, currentUser, onToggleTask, onUpdateTas
                         onChange={handleCameraChange} 
                         className="hidden" 
                       />
-                      <label 
-                        htmlFor="reporting-camera-input" 
-                        className="flex flex-col items-center justify-center border-2 border-dashed border-rose-200 rounded-2xl p-7 bg-rose-50/10 hover:bg-rose-50/30 cursor-pointer transition-all active:scale-98"
+                      <button 
+                        type="button" 
+                        onClick={triggerCamera} 
+                        className="w-full flex flex-col items-center justify-center border-2 border-dashed border-rose-200 rounded-2xl p-7 bg-rose-50/10 hover:bg-rose-50/30 cursor-pointer transition-all active:scale-98 focus:outline-none"
                       >
-                        <Camera className="w-8 h-8 text-rose-500 mb-2 animate-bounce-subtle" />
-                        <span className="text-xs text-rose-600 font-extrabold">點擊啟動相機拍照</span>
-                        <span className="text-[9px] text-gray-400 font-semibold mt-1">
+                        <Camera className="w-8 h-8 text-rose-500 mb-2 animate-bounce-subtle pointer-events-none" />
+                        <span className="text-xs text-rose-600 font-extrabold pointer-events-none">點擊啟動相機拍照</span>
+                        <span className="text-[9px] text-gray-400 font-semibold mt-1 pointer-events-none">
                           行動端將自動啟用後置鏡頭
                         </span>
-                      </label>
+                      </button>
                     </div>
                   ) : (
                     <div className="relative rounded-2xl overflow-hidden border border-gray-150 shadow-sm w-full max-h-48 flex justify-center bg-black/5">

@@ -122,17 +122,7 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
       </div>
 
       <div className="p-4 space-y-4">
-        {/* 超級管理員與稽核員專屬直達試算表按鈕 */}
-        {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR') && (
-          <a
-            href="https://docs.google.com/spreadsheets/d/13kUwwjkiPo-C5kBCxpV0JRLtB_dD6zgTwcDLAZAOu90/edit?gid=1293678477#gid=1293678477"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center space-x-2 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-extrabold py-3.5 px-4 rounded-2xl text-xs transition-all shadow-md active:scale-99 border border-green-600/20"
-          >
-            <span>📑 前往雲端試算表稽核歷史存檔</span>
-          </a>
-        )}
+
         {/* 歡迎與問候語 + manie 金幣圖示 */}
         <div className="pt-2 flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-100/60 shadow-sm">
           <div className="space-y-1">
