@@ -186,13 +186,16 @@ export const USERS = [
     "name": "文和",
     "username": "1028",
     "password": "123",
-    "role": "STAFF",
-    "roleLabel": "一般店員",
-    "store": "東門店",
-    "avatar": "👩‍💼",
+    "role": "SUPER_ADMIN",
+    "roleLabel": "超級管理員",
+    "store": "全分店",
+    "avatar": "👨‍💼",
     "permissions": [
+      "view_all_stores",
       "manage_orders",
-      "complete_tasks"
+      "complete_tasks",
+      "cancel_tasks_directly",
+      "manage_accounts"
     ]
   },
   {
