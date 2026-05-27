@@ -124,7 +124,7 @@ export const USERS = [
   },
   {
     "id": "user_1015",
-    "name": "黃鐙緯",
+    "name": "鐙緯",
     "username": "1015",
     "password": "123",
     "role": "STAFF",
@@ -138,7 +138,7 @@ export const USERS = [
   },
   {
     "id": "user_1019",
-    "name": "陳妍家",
+    "name": "妍家",
     "username": "1019",
     "password": "0805",
     "role": "STAFF",
@@ -166,7 +166,7 @@ export const USERS = [
   },
   {
     "id": "user_1023",
-    "name": "蔡韻涵",
+    "name": "韻涵",
     "username": "1023",
     "password": "1996",
     "role": "AUDITOR",
@@ -181,7 +181,7 @@ export const USERS = [
   },
   {
     "id": "user_1028",
-    "name": "陳文和",
+    "name": "文和",
     "username": "1028",
     "password": "123",
     "role": "STAFF",
@@ -195,7 +195,7 @@ export const USERS = [
   },
   {
     "id": "user_1040",
-    "name": "林家琪",
+    "name": "家琪",
     "username": "1040",
     "password": "333",
     "role": "STAFF",
@@ -209,7 +209,7 @@ export const USERS = [
   },
   {
     "id": "user_1042",
-    "name": "張博瑋",
+    "name": "博瑋",
     "username": "1042",
     "password": "123",
     "role": "STAFF",
@@ -223,7 +223,7 @@ export const USERS = [
   },
   {
     "id": "user_1057",
-    "name": "林喻潔",
+    "name": "喻潔",
     "username": "1057",
     "password": "0530",
     "role": "STAFF",
@@ -237,7 +237,7 @@ export const USERS = [
   },
   {
     "id": "user_1065",
-    "name": "李湘婷",
+    "name": "湘婷",
     "username": "1065",
     "password": "123",
     "role": "STAFF",
@@ -251,7 +251,7 @@ export const USERS = [
   },
   {
     "id": "user_1066",
-    "name": "蔡澤偉",
+    "name": "澤偉",
     "username": "1066",
     "password": "123",
     "role": "STAFF",
@@ -265,7 +265,7 @@ export const USERS = [
   },
   {
     "id": "user_1074",
-    "name": "呂櫂陽",
+    "name": "櫂陽",
     "username": "1074",
     "password": "123",
     "role": "STAFF",
@@ -279,7 +279,7 @@ export const USERS = [
   },
   {
     "id": "user_1077",
-    "name": "劉凱寧",
+    "name": "凱寧",
     "username": "1077",
     "password": "123",
     "role": "STAFF",
@@ -293,7 +293,7 @@ export const USERS = [
   },
   {
     "id": "user_1080",
-    "name": "邱薪融",
+    "name": "薪融",
     "username": "1080",
     "password": "123",
     "role": "STAFF",
@@ -307,7 +307,7 @@ export const USERS = [
   },
   {
     "id": "user_1082",
-    "name": "林淑萍",
+    "name": "淑萍",
     "username": "1082",
     "password": "123",
     "role": "STAFF",
@@ -321,7 +321,7 @@ export const USERS = [
   },
   {
     "id": "user_1092",
-    "name": "向宜安",
+    "name": "宜安",
     "username": "1092",
     "password": "0702",
     "role": "STAFF",
@@ -335,7 +335,7 @@ export const USERS = [
   },
   {
     "id": "user_1094",
-    "name": "劉孝澄",
+    "name": "孝澄",
     "username": "1094",
     "password": "123",
     "role": "STAFF",
@@ -349,7 +349,7 @@ export const USERS = [
   },
   {
     "id": "user_1096",
-    "name": "張育齊",
+    "name": "育齊",
     "username": "1096",
     "password": "123",
     "role": "STAFF",
@@ -363,7 +363,7 @@ export const USERS = [
   },
   {
     "id": "user_1098",
-    "name": "許俊彥",
+    "name": "俊彥",
     "username": "1098",
     "password": "123",
     "role": "STAFF",
@@ -377,7 +377,7 @@ export const USERS = [
   },
   {
     "id": "user_1099",
-    "name": "翁文玲",
+    "name": "文玲",
     "username": "1099",
     "password": "123",
     "role": "STAFF",
@@ -405,7 +405,7 @@ export const USERS = [
   },
   {
     "id": "user_1102",
-    "name": "郭芥侖",
+    "name": "芥侖",
     "username": "1102",
     "password": "123",
     "role": "STAFF",
@@ -419,7 +419,7 @@ export const USERS = [
   },
   {
     "id": "user_1103",
-    "name": "劉宸菲",
+    "name": "宸菲",
     "username": "1103",
     "password": "123",
     "role": "STAFF",
