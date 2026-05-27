@@ -335,9 +335,12 @@ export default function App() {
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-3">
-          <Loader2 size={32} className="text-blue-500 animate-spin" />
-          <span className="text-xs text-gray-500 font-bold">正在與儲存庫連線中...</span>
+        <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-4 bg-slate-50/50 font-['Outfit']">
+          <Loader2 size={36} className="text-rose-500 animate-spin" />
+          <div className="text-center space-y-1">
+            <span className="text-xs text-slate-800 font-black">正在安全同步雲端資料...</span>
+            <span className="text-[10px] text-slate-400 font-bold block">請稍候，SyncAll 正在與 Google Sheets 建立連線</span>
+          </div>
         </div>
       );
     }
@@ -423,14 +426,14 @@ export default function App() {
   return (
     <div className="mobile-container select-none">
       {/* 頂部儲存庫狀態提示條 */}
-      <div className="bg-slate-800 text-[10px] text-slate-300 px-4 py-1.5 flex justify-between items-center font-mono z-10 shadow-sm">
-        <div className="flex items-center space-x-1">
-          <Database size={10} className={dataSource.includes('Google') ? 'text-green-400' : 'text-yellow-400'} />
-          <span>儲存庫: {dataSource}</span>
+      <div className="bg-slate-950 text-[10px] text-slate-300 px-4 py-1.5 flex justify-between items-center font-mono z-10 shadow-sm tracking-wider font-semibold border-b border-slate-900 select-none">
+        <div className="flex items-center space-x-1.5">
+          <Database size={11} className={dataSource.includes('Google') ? 'text-emerald-400' : 'text-amber-400'} />
+          <span>儲存庫: <strong className={dataSource.includes('Google') ? 'text-emerald-400 font-black' : 'text-amber-400 font-black'}>{dataSource}</strong></span>
         </div>
-        <div className="flex items-center space-x-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse-subtle"></span>
-          <span>連線中</span>
+        <div className="flex items-center space-x-1.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+          <span className="text-[9px]">連線正常</span>
         </div>
       </div>
 

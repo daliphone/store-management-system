@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ManieIcon from './ManieIcon';
-import { Shield, Key, Loader2, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Shield, Key, Loader2, ArrowRight, Eye, EyeOff, Check } from 'lucide-react';
 
 export default function Login({ users, onLogin }) {
   const [selectedUser, setSelectedUser] = useState(users[0] || null);
@@ -9,7 +9,7 @@ export default function Login({ users, onLogin }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // 當 users 名單改變時 (例如被刪除了預設首位)，動態更新 selectedUser
+  // 當 users 名單改變時，動態更新 selectedUser
   React.useEffect(() => {
     if (users && users.length > 0 && !selectedUser) {
       setSelectedUser(users[0]);
@@ -38,26 +38,33 @@ export default function Login({ users, onLogin }) {
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-center items-center px-6 py-12 bg-gradient-to-b from-blue-50 via-gray-50 to-gray-100 min-h-screen">
+    <div className="flex-1 flex flex-col justify-center items-center px-6 py-12 bg-gradient-to-b from-blue-50/50 via-slate-50 to-slate-100 min-h-screen font-['Outfit',_'Inter',_sans-serif]">
       {/* 標頭與 manie welcome 姿勢圖示 */}
-      <div className="w-full max-w-sm text-center space-y-2 mb-6">
-        <ManieIcon pose="welcome" className="w-28 h-24 mx-auto drop-shadow-md animate-pulse-subtle" />
-        <div>
-          <h1 className="text-xl font-black text-gray-800 tracking-tight">門市店務管理系統</h1>
-          <p className="text-[10px] text-gray-500 font-semibold mt-0.5">請登入以存取店務與訂單管理</p>
+      <div className="w-full max-w-sm text-center space-y-2 mb-6 animate-fade-in">
+        <ManieIcon pose="welcome" className="w-28 h-24 mx-auto drop-shadow-md hover:scale-105 transition-transform" />
+        <div className="space-y-1">
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight font-['Outfit']">門市店務管理系統</h1>
+          <p className="text-[10px] text-slate-400 font-bold tracking-wider">請登入以存取店務與訂單管理系統</p>
         </div>
       </div>
 
-      {/* 登入卡片 */}
-      <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-xl border border-gray-150/40">
-        <form onSubmit={handleLoginSubmit} className="space-y-4">
+      {/* 登入卡片 (大圓角與微立體陰影) */}
+      <div className="w-full max-w-sm bg-white rounded-[32px] p-6 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.02)] border border-slate-100/50">
+        <form onSubmit={handleLoginSubmit} className="space-y-5">
           
-          {/* 使用者選擇 */}
-          <div className="space-y-1.5">
-            <label className="text-xs text-gray-500 font-bold block">選擇登入人員</label>
-            <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto no-scrollbar pr-0.5">
+          {/* 使用者選擇 (100% 對齊設定頁模擬卡片樣式) */}
+          <div className="space-y-2">
+            <label className="text-xs text-slate-500 font-bold block">選擇登入人員</label>
+            <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto no-scrollbar pr-0.5">
               {users.map((user) => {
                 const isSelected = selectedUser && selectedUser.id === user.id;
+                
+                // 模擬顯示分店角色文字
+                let storeRoleLabel = '';
+                if (user.role === 'SUPER_ADMIN') storeRoleLabel = '系統管理員 (全區)';
+                else if (user.role === 'AUDITOR') storeRoleLabel = '總管理處稽核員 (全區)';
+                else storeRoleLabel = `${user.store} - ${user.role === 'STORE_MANAGER' ? '店長' : '業務'}`;
+
                 return (
                   <button
                     type="button"
@@ -67,21 +74,20 @@ export default function Login({ users, onLogin }) {
                       setErrorMsg('');
                       setPassword('');
                     }}
-                    className={`flex items-center justify-between p-2.5 rounded-xl border text-left transition-all ${
+                    className={`w-full flex items-center justify-between p-3.5 rounded-2xl border text-left transition-all ${
                       isSelected
-                        ? 'border-blue-500 bg-blue-50/40 ring-1 ring-blue-400'
-                        : 'border-gray-100 hover:border-gray-200 bg-gray-50/50'
+                        ? 'border-blue-500 bg-white shadow-[0_4px_16px_rgba(37,99,235,0.06)] ring-1 ring-blue-400'
+                        : 'border-slate-100 bg-white hover:border-slate-200'
                     }`}
                   >
-                    <div className="flex items-center space-x-3">
-                      <span className="text-xl">{user.avatar}</span>
-                      <div>
-                        <div className="font-bold text-gray-800 text-xs">{user.name} ({user.username})</div>
-                        <div className="text-[9px] text-gray-400 mt-0.5">{user.store} · {user.roleLabel}</div>
-                      </div>
+                    <div className="flex flex-col space-y-0.5">
+                      <span className="text-xs font-black text-slate-800">{user.name}</span>
+                      <span className="text-[9px] text-slate-400 font-bold">{storeRoleLabel}</span>
                     </div>
                     {isSelected && (
-                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                      <div className="text-blue-500 border border-blue-500 rounded-full p-0.5 flex items-center justify-center bg-blue-50/20">
+                        <Check size={10} strokeWidth={3.5} />
+                      </div>
                     )}
                   </button>
                 );
@@ -91,14 +97,12 @@ export default function Login({ users, onLogin }) {
 
           {/* 密碼欄位 */}
           {selectedUser && (
-            <div className="space-y-1.5 animate-fade-in">
-              <div className="flex justify-between items-center">
-                <label className="text-xs text-gray-500 font-bold block">
-                  輸入密碼 {selectedUser.password === '' && <span className="text-[10px] text-green-600 font-normal">(此帳號免密碼)</span>}
-                </label>
-              </div>
+            <div className="space-y-2 animate-fade-in">
+              <label className="text-xs text-slate-500 font-bold block">
+                輸入密碼 {selectedUser.password === '' && <span className="text-[10px] text-emerald-600 font-bold ml-1">(此帳號免密碼)</span>}
+              </label>
               <div className="relative rounded-xl shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <Key size={14} />
                 </div>
                 <input
@@ -106,12 +110,12 @@ export default function Login({ users, onLogin }) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={selectedUser.password === '' ? '免密碼，請直接登入' : '請輸入密碼'}
-                  className="block w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                  className="block w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs font-bold text-slate-800"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
                 >
                   {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
@@ -120,20 +124,20 @@ export default function Login({ users, onLogin }) {
           )}
 
           {errorMsg && (
-            <div className="p-2.5 bg-red-50 rounded-lg text-[10px] text-red-500 font-bold flex items-center space-x-1 border border-red-100">
+            <div className="p-3 bg-red-50 rounded-xl text-[10px] text-red-500 font-bold flex items-center space-x-1.5 border border-red-100 animate-shake">
               <span>⚠️</span>
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* 登入按鈕 */}
+          {/* 登入按鈕 (深藍色/桃紅色質感大按鈕) */}
           <button
             type="submit"
             disabled={isLoggingIn || !selectedUser}
-            className={`w-full text-white font-bold py-3 px-4 rounded-xl text-xs transition-all shadow-md flex items-center justify-center space-x-2 ${
+            className={`w-full text-white font-extrabold py-3.5 px-4 rounded-xl text-xs transition-all shadow-md flex items-center justify-center space-x-2 active:scale-95 ${
               !selectedUser 
-                ? 'bg-gray-200 cursor-not-allowed text-gray-400 shadow-none' 
-                : 'bg-blue-500 hover:bg-blue-600 active:scale-95'
+                ? 'bg-slate-200 cursor-not-allowed text-slate-400 shadow-none' 
+                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 hover:shadow-lg'
             }`}
           >
             {isLoggingIn ? (
@@ -152,8 +156,8 @@ export default function Login({ users, onLogin }) {
       </div>
 
       {/* 底部商標 */}
-      <div className="w-full max-w-sm text-center mt-6 text-[9px] text-gray-400 font-medium">
-        © 2026 馬尼行動通訊 money3c.com.tw
+      <div className="w-full max-w-sm text-center mt-8 text-[9px] text-slate-400 font-bold font-mono tracking-wider select-none">
+        © 2026 馬尼行動通訊 MONEY3C.COM.TW
       </div>
     </div>
   );
