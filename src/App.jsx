@@ -14,6 +14,55 @@ import { Loader2, AlertCircle, Database, Check } from 'lucide-react';
 const LOGGED_USER_KEY = 'store_mgmt_logged_user';
 const USERS_STORAGE_KEY = 'store_mgmt_users';
 
+// 動態同步維護每個人的「開店-儀容自檢」任務
+const syncPersonalTasks = (currentTasks, currentUsers) => {
+  if (!currentTasks) return [];
+  let updatedTasks = [...currentTasks];
+  
+  // 1. 移除已不存在於使用者名單，或已被改店的個人任務
+  updatedTasks = updatedTasks.filter(t => {
+    if (t.text && t.text.startsWith('開店-儀容自檢 (')) {
+      const nameMatch = t.text.match(/開店-儀容自檢 \((.+)\)/);
+      if (nameMatch) {
+        const userName = nameMatch[1];
+        // 檢查該使用者是否依然存在，且在相同分店，且不是超級管理員/稽核員
+        const exists = currentUsers.some(u => 
+          u.name === userName && 
+          u.store === t.store && 
+          u.role !== 'SUPER_ADMIN' && 
+          u.role !== 'AUDITOR'
+        );
+        return exists;
+      }
+    }
+    return true;
+  });
+
+  // 2. 確保當前所有非管理員/非稽核員的使用者，在其分店皆有專屬儀容自檢任務
+  currentUsers.forEach(u => {
+    if (u.role === 'SUPER_ADMIN' || u.role === 'AUDITOR' || u.store === '全分店') return;
+    
+    const taskText = `開店-儀容自檢 (${u.name})`;
+    const taskExists = updatedTasks.some(t => t.store === u.store && t.text === taskText);
+    
+    if (!taskExists) {
+      updatedTasks.push({
+        id: `tsk_${u.store}_personal_${Math.random().toString(36).substr(2, 9)}`,
+        store: u.store,
+        text: taskText,
+        score: 10,
+        completed: false,
+        completedAt: null,
+        completedBy: null,
+        photo: null,
+        notes: null
+      });
+    }
+  });
+
+  return updatedTasks;
+};
+
 export default function App() {
   // 初始化動態使用者列表 (從 localStorage 讀取或使用 mockData 的預設值，並加上權限防呆修復)
   const [users, setUsers] = useState(() => {
@@ -109,8 +158,15 @@ export default function App() {
     try {
       const data = await loadData();
       setOrders(data.orders);
-      setTasks(data.tasks);
+      // 動態同步個人自檢任務
+      const syncedTasks = syncPersonalTasks(data.tasks, users);
+      setTasks(syncedTasks);
       setDataSource(data.source);
+      
+      // 若有新增或移除個人任務，悄悄同步回本地
+      if (JSON.stringify(syncedTasks) !== JSON.stringify(data.tasks)) {
+        localStorage.setItem('store_mgmt_tasks', JSON.stringify(syncedTasks));
+      }
     } catch (error) {
       console.error('載入資料錯誤：', error);
     } finally {
@@ -137,6 +193,10 @@ export default function App() {
   const handleUpdateUsers = (newUsers) => {
     setUsers(newUsers);
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(newUsers));
+    
+    // 使用者名單異動時，同步重構日常任務中的個人自檢任務
+    const synced = syncPersonalTasks(tasks, newUsers);
+    handleUpdateTasks(synced);
   };
 
   // 新增訂單
@@ -154,10 +214,10 @@ export default function App() {
     }
   };
 
-  // 任務勾選狀態變更
-  const handleToggleTask = async (taskId, completed, completedBy) => {
+  // 任務勾選狀態變更 (支援照片與備註/金額)
+  const handleToggleTask = async (taskId, completed, completedBy, photo = null, notes = '') => {
     try {
-      const result = await updateTaskStatus(taskId, completed, completedBy);
+      const result = await updateTaskStatus(taskId, completed, completedBy, photo, notes);
       if (result.success) {
         setTasks(result.tasks);
         setDataSource(result.source);
@@ -231,6 +291,7 @@ export default function App() {
             onOpenSettings={() => setSettingsOpen(true)}
             setActiveTab={setActiveTab}
             setOrderStatusFilter={setOrderStatusFilter}
+            onLogout={handleLogout}
           />
         );
       case 'orders':

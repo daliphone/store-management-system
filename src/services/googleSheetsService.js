@@ -121,14 +121,21 @@ export const addOrder = async (newOrder) => {
 };
 
 // 更新任務狀態 (自動偵測 API 或 LocalStorage)
-export const updateTaskStatus = async (taskId, completed, completedBy) => {
+export const updateTaskStatus = async (taskId, completed, completedBy, photo = null, notes = '') => {
   const apiUrl = getApiUrl();
   const local = loadLocalData();
   
   const completedAt = completed ? new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : null;
   const updatedTasks = local.tasks.map(t => {
     if (t.id === taskId) {
-      return { ...t, completed, completedBy: completed ? completedBy : null, completedAt };
+      return { 
+        ...t, 
+        completed, 
+        completedBy: completed ? completedBy : null, 
+        completedAt,
+        photo: completed ? photo : null,
+        notes: completed ? notes : null
+      };
     }
     return t;
   });
@@ -152,7 +159,9 @@ export const updateTaskStatus = async (taskId, completed, completedBy) => {
         taskId,
         completed,
         completedBy: completed ? completedBy : '',
-        completedAt: completed ? completedAt : ''
+        completedAt: completed ? completedAt : '',
+        photo: completed ? (photo || '') : '',
+        notes: completed ? (notes || '') : ''
       })
     });
 

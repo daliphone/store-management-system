@@ -2,11 +2,23 @@ import React, { useState } from 'react';
 import ManieIcon from './ManieIcon';
 import { Settings, AlertCircle, Calendar, UserCheck, CheckSquare, Target, Wrench } from 'lucide-react';
 
-export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, setActiveTab, setOrderStatusFilter }) {
+export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, setActiveTab, setOrderStatusFilter, onLogout }) {
   const [activeSubTab, setActiveSubTab] = useState('quote'); // 'quote' 或 'shortcut'
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [maniePose, setManiePose] = useState('idle');
   const [isBouncing, setIsBouncing] = useState(false);
+
+  // 根據時間動態判斷招呼語
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) {
+      return '早安！';
+    } else if (hour >= 12 && hour < 18) {
+      return '午安！';
+    } else {
+      return '晚安！辛苦啦~';
+    }
+  };
 
   // 門市銷售激勵金句資料庫 (B方案)
   const SALES_QUOTES = [
@@ -41,9 +53,23 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
     return order.creator === currentUser.name; // 一般店員僅看自己提單
   });
 
-  const filteredTasks = tasks.filter(task => {
-    if (currentUser.role === 'SUPER_ADMIN') return true;
-    return true; // 簡化處理，所有角色都能看到全店待辦
+  const filteredTasks = tasks.filter(t => {
+    // 依據店過濾
+    const isSameStore = currentUser.store === '全分店' || t.store === currentUser.store;
+    if (!isSameStore) return false;
+    
+    // 依據個人自檢過濾
+    if (t.text && t.text.startsWith('開店-儀容自檢 (')) {
+      const nameMatch = t.text.match(/開店-儀容自檢 \((.+)\)/);
+      if (nameMatch) {
+        const userName = nameMatch[1];
+        if (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR' || currentUser.role === 'STORE_MANAGER') {
+          return true;
+        }
+        return currentUser.name === userName;
+      }
+    }
+    return true;
   });
 
   // 計算數據
@@ -51,7 +77,7 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
   const todayDueCount = filteredOrders.filter(o => o.promiseDate === todayStr && o.status !== '已交機').length;
   
   // 「我相關」
-  const myRelatedCount = currentUser.role === 'SUPER_ADMIN' 
+  const myRelatedCount = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR'
     ? orders.length 
     : currentUser.role === 'STORE_MANAGER'
       ? orders.filter(o => o.store === currentUser.store).length
@@ -79,7 +105,13 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
     <div className="flex-1 flex flex-col pb-20 overflow-y-auto no-scrollbar">
       {/* 頂部標題 */}
       <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between z-10 shadow-sm">
-        <h1 className="text-lg font-bold text-gray-800 tracking-wide">門市店務管理系統</h1>
+        <button
+          onClick={onLogout}
+          className="flex items-center space-x-1 text-red-500 hover:text-red-700 font-extrabold text-xs transition-colors p-1.5 rounded-lg hover:bg-red-50 active:scale-95"
+        >
+          <span>登出</span>
+        </button>
+        <h1 className="text-base font-bold text-gray-800 tracking-wide">門市店務管理系統</h1>
         <button
           onClick={onOpenSettings}
           className="flex items-center space-x-1 text-gray-600 hover:text-blue-500 font-medium text-xs transition-colors p-1.5 rounded-lg hover:bg-gray-100"
@@ -90,10 +122,21 @@ export default function Dashboard({ orders, tasks, currentUser, onOpenSettings, 
       </div>
 
       <div className="p-4 space-y-4">
+        {/* 超級管理員與稽核員專屬直達試算表按鈕 */}
+        {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR') && (
+          <a
+            href="https://docs.google.com/spreadsheets/d/13kUwwjkiPo-C5kBCxpV0JRLtB_dD6zgTwcDLAZAOu90/edit?gid=1293678477#gid=1293678477"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center space-x-2 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-extrabold py-3.5 px-4 rounded-2xl text-xs transition-all shadow-md active:scale-99 border border-green-600/20"
+          >
+            <span>📑 前往雲端試算表稽核歷史存檔</span>
+          </a>
+        )}
         {/* 歡迎與問候語 + manie 金幣圖示 */}
         <div className="pt-2 flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-100/60 shadow-sm">
           <div className="space-y-1">
-            <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">早啊~{currentUser.name}</h2>
+            <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">{getGreeting()}{currentUser.name}</h2>
             <p className="text-xs text-gray-500 font-semibold">
               {currentUser.name} ({currentUser.roleLabel})
             </p>

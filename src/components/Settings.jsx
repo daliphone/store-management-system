@@ -103,6 +103,8 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
     let defaultPerms = [];
     if (role === 'SUPER_ADMIN') {
       defaultPerms = ['view_all_stores', 'manage_orders', 'complete_tasks', 'cancel_tasks_directly', 'manage_accounts'];
+    } else if (role === 'AUDITOR') {
+      defaultPerms = ['view_all_stores', 'complete_tasks', 'manage_accounts'];
     } else if (role === 'STORE_MANAGER') {
       defaultPerms = ['manage_orders', 'complete_tasks', 'cancel_tasks_directly'];
     } else {
@@ -113,7 +115,7 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
       ...prev,
       role,
       permissions: defaultPerms,
-      store: role === 'SUPER_ADMIN' ? '全分店' : prev.store === '全分店' ? '東門店' : prev.store
+      store: (role === 'SUPER_ADMIN' || role === 'AUDITOR') ? '全分店' : prev.store === '全分店' ? '東門店' : prev.store
     }));
   };
 
@@ -146,6 +148,7 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
 
     const roleLabels = {
       SUPER_ADMIN: '超級管理員',
+      AUDITOR: '總管理處稽核員',
       STORE_MANAGER: '分店店長',
       STAFF: '一般店員'
     };
@@ -157,8 +160,8 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
       password: userForm.password,
       role: userForm.role,
       roleLabel: roleLabels[userForm.role],
-      store: userForm.role === 'SUPER_ADMIN' ? '全分店' : userForm.store,
-      avatar: userForm.role === 'SUPER_ADMIN' ? '👨‍💼' : userForm.role === 'STORE_MANAGER' ? '👨‍⚕️' : '👩‍💼',
+      store: (userForm.role === 'SUPER_ADMIN' || userForm.role === 'AUDITOR') ? '全分店' : userForm.store,
+      avatar: userForm.role === 'SUPER_ADMIN' ? '👨‍💼' : userForm.role === 'AUDITOR' ? '🕵️‍♂️' : userForm.role === 'STORE_MANAGER' ? '👨‍⚕️' : '👩‍💼',
       permissions: userForm.permissions
     };
 
@@ -198,6 +201,7 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
 
     const roleLabels = {
       SUPER_ADMIN: '超級管理員',
+      AUDITOR: '總管理處稽核員',
       STORE_MANAGER: '分店店長',
       STAFF: '一般店員'
     };
@@ -211,8 +215,8 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
           password: userForm.password,
           role: userForm.role,
           roleLabel: roleLabels[userForm.role],
-          store: userForm.role === 'SUPER_ADMIN' ? '全分店' : userForm.store,
-          avatar: userForm.role === 'SUPER_ADMIN' ? '👨‍💼' : userForm.role === 'STORE_MANAGER' ? '👨‍⚕️' : '👩‍💼',
+          store: (userForm.role === 'SUPER_ADMIN' || userForm.role === 'AUDITOR') ? '全分店' : userForm.store,
+          avatar: userForm.role === 'SUPER_ADMIN' ? '👨‍💼' : userForm.role === 'AUDITOR' ? '🕵️‍♂️' : userForm.role === 'STORE_MANAGER' ? '👨‍⚕️' : '👩‍💼',
           permissions: userForm.permissions
         };
         if (currentUser.id === u.id) {
@@ -414,6 +418,7 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
                         <option value="STAFF">一般店員 (預設)</option>
                         <option value="STORE_MANAGER">分店店長 (預設)</option>
                         <option value="SUPER_ADMIN">超級管理員 (預設)</option>
+                        <option value="AUDITOR">總管理處稽核員 (預設)</option>
                       </select>
                     </div>
                     <div>
@@ -421,10 +426,10 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
                       <select
                         value={userForm.store}
                         onChange={(e) => setUserForm({ ...userForm, store: e.target.value })}
-                        disabled={userForm.role === 'SUPER_ADMIN'}
+                        disabled={userForm.role === 'SUPER_ADMIN' || userForm.role === 'AUDITOR'}
                         className="block w-full px-2 py-2 border border-gray-200 rounded-lg text-xs bg-white disabled:bg-gray-150 disabled:text-gray-400"
                       >
-                        {userForm.role === 'SUPER_ADMIN' ? (
+                        {(userForm.role === 'SUPER_ADMIN' || userForm.role === 'AUDITOR') ? (
                           <option value="全分店">全分店</option>
                         ) : (
                           STORES.map(s => <option key={s} value={s}>{s}</option>)
@@ -660,6 +665,18 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
           </div>
 
           <div className="space-y-4">
+            {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR') && (
+              <div className="mb-1">
+                <a
+                  href="https://docs.google.com/spreadsheets/d/13kUwwjkiPo-C5kBCxpV0JRLtB_dD6zgTwcDLAZAOu90/edit?gid=1293678477#gid=1293678477"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-2.5 rounded-xl text-xs font-bold active:scale-98 transition-all"
+                >
+                  <span>📑 開啟 Google 試算表稽核存檔</span>
+                </a>
+              </div>
+            )}
             <div>
               <label className="text-xs text-gray-500 font-semibold block mb-1.5">
                 Google Apps Script Web App URL：

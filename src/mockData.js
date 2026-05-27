@@ -25,6 +25,17 @@ export const USERS = [
     permissions: ['view_all_stores', 'manage_orders', 'complete_tasks', 'cancel_tasks_directly', 'manage_accounts']
   },
   {
+    id: 'user_admin',
+    name: '總管理處',
+    username: 'admin',
+    password: '8888',
+    role: 'AUDITOR',
+    roleLabel: '總管理處稽核員',
+    store: '全分店',
+    avatar: '🕵️‍♂️',
+    permissions: ['view_all_stores', 'complete_tasks', 'manage_accounts']
+  },
+  {
     id: 'user_2',
     name: '何易俞',
     username: 'yiyu',
@@ -132,26 +143,55 @@ export const INITIAL_ORDERS = [
   }
 ];
 
-// 預設店務任務資料 (新增分店歸屬屬性)
-export const INITIAL_TASKS = [
-  // 東門店任務
-  { id: 'tsk_1', store: '東門店', shift: 'morning', counter: 'M1 櫃台', text: '檢查 Mail / 公告資訊 / 回覆 MAIL', score: 5, completed: true, completedAt: '2026-05-26 09:15:00', completedBy: '揭怡庭' },
-  { id: 'tsk_2', store: '東門店', shift: 'morning', counter: 'M1 櫃台', text: '掃地 (騎樓 / 賣場 / 後場)', score: 5, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_3', store: '東門店', shift: 'morning', counter: 'M1 櫃台', text: '盯手機與配件庫存', score: 10, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_4', store: '東門店', shift: 'morning', counter: 'M1 櫃台', text: '陳列灰塵清潔', score: 5, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_5', store: '東門店', shift: 'morning', counter: 'M2 櫃台', text: '擦玻璃', score: 5, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_6', store: '東門店', shift: 'morning', counter: 'M2 櫃台', text: '銀行換零錢', score: 10, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_7', store: '東門店', shift: 'morning', counter: 'M3 櫃台', text: '新進貨上架與檢查', score: 15, completed: true, completedAt: '2026-05-26 10:20:00', completedBy: '何易俞' },
-  { id: 'tsk_8', store: '東門店', shift: 'noon', counter: 'M1 櫃台', text: '午間銷售結帳核對', score: 10, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_9', store: '東門店', shift: 'noon', counter: 'M2 櫃台', text: '垃圾整理分類', score: 5, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_10', store: '東門店', shift: 'noon', counter: 'M3 櫃台', text: '輪班環境交接清潔', score: 5, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_11', store: '東門店', shift: 'evening', counter: 'M1 櫃台', text: '晚間銷售日結報表', score: 15, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_12', store: '東門店', shift: 'evening', counter: 'M1 櫃台', text: '鎖櫃盤點備份', score: 10, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_13', store: '東門店', shift: 'evening', counter: 'M2 櫃台', text: '吸地拖地垃圾打包', score: 10, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_14', store: '東門店', shift: 'evening', counter: 'M3 櫃台', text: '關閉所有示範機與店面招牌燈', score: 10, completed: false, completedAt: null, completedBy: null },
-
-  // 小西門店任務
-  { id: 'tsk_x1', store: '小西門店', shift: 'morning', counter: 'M1 櫃台', text: '檢查 Mail / 公告資訊 / 回覆 MAIL', score: 5, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_x2', store: '小西門店', shift: 'morning', counter: 'M1 櫃台', text: '掃地與賣場清潔', score: 5, completed: false, completedAt: null, completedBy: null },
-  { id: 'tsk_x3', store: '小西門店', shift: 'evening', counter: 'M1 櫃台', text: '晚間銷售日結報表', score: 15, completed: false, completedAt: null, completedBy: null }
+// 5 大核心日常工作職責模板
+export const DEFAULT_TASKS_TEMPLATE = [
+  { text: '開店-儀容自檢', score: 10, isPersonal: true },
+  { text: '環境清掃', score: 10, isPersonal: false },
+  { text: '零用金確認', score: 15, isPersonal: false },
+  { text: '隨機盤點庫存', score: 15, isPersonal: false },
+  { text: '庫存表上傳', score: 20, isPersonal: false }
 ];
+
+// 為 9 家分店動態生成日常工作職責任務 (INITIAL_TASKS)
+export const INITIAL_TASKS = STORES.flatMap((store, sIdx) => {
+  // 取得屬於該分店的人員，用來動態生成「開店-儀容自檢 (姓名)」
+  const storeUsers = USERS.filter(u => u.store === store && u.role !== 'SUPER_ADMIN' && u.role !== 'AUDITOR');
+  
+  const tasks = [];
+  
+  // 1. 生成個人儀容自檢任務
+  storeUsers.forEach((u, uIdx) => {
+    // 東門店的揭怡庭預設完成
+    const isEastStoreDemo = store === '東門店' && u.name === '揭怡庭';
+    tasks.push({
+      id: `tsk_${sIdx}_personal_${uIdx}`,
+      store: store,
+      text: `開店-儀容自檢 (${u.name})`,
+      score: 10,
+      completed: isEastStoreDemo,
+      completedAt: isEastStoreDemo ? '2026-05-26 09:15:00' : null,
+      completedBy: isEastStoreDemo ? '揭怡庭' : null,
+      photo: null,
+      notes: null
+    });
+  });
+
+  // 2. 生成分店共用任務 (環境清掃、零用金確認、隨機盤點庫存、庫存表上傳)
+  DEFAULT_TASKS_TEMPLATE.filter(t => !t.isPersonal).forEach((t, tIdx) => {
+    // 東門店的環境清掃預設完成
+    const isEastStoreDemo = store === '東門店' && t.text === '環境清掃';
+    tasks.push({
+      id: `tsk_${sIdx}_common_${tIdx}`,
+      store: store,
+      text: t.text,
+      score: t.score,
+      completed: isEastStoreDemo,
+      completedAt: isEastStoreDemo ? '2026-05-26 09:15:00' : null,
+      completedBy: isEastStoreDemo ? '何易俞' : null,
+      photo: null,
+      notes: null
+    });
+  });
+
+  return tasks;
+});

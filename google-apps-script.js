@@ -1,5 +1,5 @@
 /**
- * 門市訂貨承諾與店務管理系統 - Google Apps Script (GAS) 同步指令碼
+ * 門市店務管理系統 - Google Apps Script (GAS) 同步指令碼
  * 
  * 部署說明：
  * 1. 開啟您的 Google 試算表。
@@ -38,13 +38,13 @@ var ORDER_MAPPING = {
 var TASK_MAPPING = {
   'id': '任務編號',
   'store': '分店',
-  'shift': '時段',
-  'counter': '櫃台',
   'text': '任務內容',
   'score': '分數',
   'completed': '是否完成',
   'completedAt': '完成時間',
-  'completedBy': '完成人員'
+  'completedBy': '完成人員',
+  'photo': '現場照片',
+  'notes': '備註'
 };
 
 var REVERSE_ORDER_MAPPING = getReverseMapping(ORDER_MAPPING);
@@ -86,9 +86,9 @@ function initializeSystemSheets() {
     }
   }
 
-  // 2. 初始化 Tasks
+  // 2. 初始化 Tasks (配合無時段、無櫃台之新店務)
   var taskSheet = ss.getSheetByName("Tasks");
-  var cnTaskHeaders = ['任務編號', '分店', '時段', '櫃台', '任務內容', '分數', '是否完成', '完成時間', '完成人員'];
+  var cnTaskHeaders = ['任務編號', '分店', '任務內容', '分數', '是否完成', '完成時間', '完成人員', '現場照片', '備註'];
   
   if (!taskSheet) {
     taskSheet = ss.insertSheet("Tasks");
@@ -114,7 +114,7 @@ function initializeSystemSheets() {
     taskSheet.getRange(1, 1, 1000, cnTaskHeaders.length).setHorizontalAlignment("left");
     taskSheet.getRange(1, 1, 1, cnTaskHeaders.length).setHorizontalAlignment("center");
     
-    // 執行細部排版優化 (設定固定寬度，防止 Base64 簽名撐爆欄位)
+    // 執行細部排版優化 (設定固定寬度，防止 Base64 簽名與照片撐爆欄位)
     formatOrderSheet(orderSheet);
     formatTaskSheet(taskSheet);
   } catch(e) {}
@@ -129,7 +129,7 @@ function initializeSystemSheets() {
 
   // 彈出成功提示
   try {
-    SpreadsheetApp.getUi().alert('🎉 馬尼門市系統初始化成功！\n\n1. 已自動建立「Orders」與「Tasks」分頁並填入中文標題。\n2. 已自動防止「客戶簽名」超長文字欄位撐爆版面。\n3. 已套用「時效警示條件式格式」(嚴重逾期-紅、一般逾期-橘、即將到期-黃、已到貨-綠、已交機-藍)。\n4. 逾期天數已與試算表公式自動連動，換日會自動更新！');
+    SpreadsheetApp.getUi().alert('🎉 馬尼門市系統初始化成功！\n\n1. 已自動建立「Orders」與「Tasks」分頁並填入中文標題。\n2. 已自動防止「客戶簽名」與「現場照片」超長文字欄位撐爆版面。\n3. 已套用「時效警示條件式格式」(嚴重逾期-紅、一般逾期-橘、即將到期-黃、已到貨-綠、已交機-藍)。\n4. 逾期天數已與試算表公式自動連動，換日會自動更新！');
   } catch(e) {}
   
   return { status: 'success', message: '工作表初始化建立成功' };
@@ -181,11 +181,8 @@ function formatOrderSheet(sheet) {
   }
 
   // 4. 設定換行與剪裁模式
-  // 商品與承諾內容 (D欄 - 4)、備註 (R欄 - 18) 設定為自動換行 (Wrap)
   sheet.getRange(2, 4, maxRows - 1, 1).setWrap(true);
   sheet.getRange(2, 18, maxRows - 1, 1).setWrap(true);
-  
-  // 客戶簽名 Base64 (Q欄 - 17) 強制設為剪裁 (Clip)，不換行不撐大高度
   sheet.getRange(2, 17, maxRows - 1, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
 }
 
@@ -195,20 +192,22 @@ function formatTaskSheet(sheet) {
   var lastRow = sheet.getLastRow();
   var maxRows = Math.max(lastRow, 1000);
   
+  // 現場照片在第 8 欄，寬度固定 80 像素，防止 base64 撐寬
+  sheet.setColumnWidth(8, 80);
+  sheet.setColumnWidth(9, 160); // 備註固定 160 像素
+  
   try {
-    sheet.autoResizeColumns(1, 9);
+    sheet.autoResizeColumns(1, 7);
   } catch(e) {}
   
   var minWidths = {
     1: 85,  // 任務編號
     2: 85,  // 分店
-    3: 60,  // 時段
-    4: 60,  // 櫃台
-    5: 250, // 任務內容
-    6: 60,  // 分數
-    7: 80,  // 是否完成
-    8: 125, // 完成時間
-    9: 80   // 完成人員
+    3: 250, // 任務內容
+    4: 60,  // 分數
+    5: 80,  // 是否完成
+    6: 125, // 完成時間
+    7: 80   // 完成人員
   };
   
   for (var col in minWidths) {
@@ -220,8 +219,11 @@ function formatTaskSheet(sheet) {
     } catch(e) {}
   }
   
-  // 任務內容 (E欄 - 5) 設定為自動換行 (Wrap)
-  sheet.getRange(2, 5, maxRows - 1, 1).setWrap(true);
+  // 任務內容 (C欄 - 3)、備註 (I欄 - 9) 設定為自動換行 (Wrap)
+  sheet.getRange(2, 3, maxRows - 1, 1).setWrap(true);
+  sheet.getRange(2, 9, maxRows - 1, 1).setWrap(true);
+  // 現場照片 (H欄 - 8) 設定為剪裁
+  sheet.getRange(2, 8, maxRows - 1, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
 }
 
 // 自動設置試算表的條件式格式 (時效提示連動)
@@ -231,11 +233,9 @@ function applyConditionalFormatting(sheet) {
   sheet.clearConditionalFormatRules();
   var rules = [];
   
-  // 取得資料範圍 A2:R1000 (排除首行標題)
   var range = sheet.getRange("A2:R1000");
   
   // Rule 1: 已交機 (藍色背景 - 整列套用)
-  // M 欄是「到貨狀態」，公式 =$M2="已交機"
   var ruleDelivered = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=$M2="已交機"')
     .setBackground("#E0F2FE") // sky-100 (淺藍)
@@ -245,7 +245,6 @@ function applyConditionalFormatting(sheet) {
   rules.push(ruleDelivered);
     
   // Rule 2: 嚴重逾期 (紅色背景，逾期 >= 7 天)
-  // M 欄非已交機 且 P 欄「逾期天數」>= 7，公式 =AND($M2<>"已交機", $P2>=7)
   var ruleCritical = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=AND($M2<>"已交機", $P2>=7)')
     .setBackground("#FEE2E2") // red-100 (淺紅)
@@ -255,7 +254,6 @@ function applyConditionalFormatting(sheet) {
   rules.push(ruleCritical);
     
   // Rule 3: 一般逾期 (橘色背景，逾期 1~6 天)
-  // M 欄非已交機 且 P 欄「逾期天數」> 0 且 < 7，公式 =AND($M2<>"已交機", $P2>0, $P2<7)
   var ruleOverdue = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=AND($M2<>"已交機", $P2>0, $P2<7)')
     .setBackground("#FFEDD5") // orange-100 (淺橘)
@@ -265,7 +263,6 @@ function applyConditionalFormatting(sheet) {
   rules.push(ruleOverdue);
     
   // Rule 4: 即將到期 (黃色背景，交貨日前 2 天內且尚未逾期)
-  // M 欄非已交機 且 P 欄=0 且 預計交貨日(O欄)與今天差值在 0~2 天內，公式 =AND($M2<>"已交機", $P2=0, ($O2-TODAY())<=2, ($O2-TODAY())>=0)
   var ruleWarning = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=AND($M2<>"已交機", $P2=0, ($O2-TODAY())<=2, ($O2-TODAY())>=0)')
     .setBackground("#FEF9C3") // yellow-100 (淺黃)
@@ -275,7 +272,6 @@ function applyConditionalFormatting(sheet) {
   rules.push(ruleWarning);
 
   // Rule 5: 已到貨且未逾期 (綠色背景)
-  // M 欄="已到貨" 且 P 欄=0，公式 =AND($M2="已到貨", $P2=0)
   var ruleArrived = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=AND($M2="已到貨", $P2=0)')
     .setBackground("#DCFCE7") // green-100 (淺綠)
@@ -320,7 +316,7 @@ function doPost(e) {
     if (action === 'addOrder') {
       result = handleAddOrder(postData.order);
     } else if (action === 'updateTask') {
-      result = handleUpdateTask(postData.taskId, postData.completed, postData.completedBy, postData.completedAt);
+      result = handleUpdateTask(postData.taskId, postData.completed, postData.completedBy, postData.completedAt, postData.photo, postData.notes);
     } else if (action === 'syncAll') {
       result = handleSyncAll(postData.orders, postData.tasks);
     }
@@ -412,7 +408,6 @@ function handleAddOrder(order) {
     if (engKey === 'tags') {
       newRow.push(JSON.stringify(val || []));
     } else if (engKey === 'overdueDays') {
-      // P 欄寫入公式：若 M 欄「到貨狀態」="已交機" 則為 0，否則為 MAX(0, 今天 - O 欄「預計交貨日」)
       newRow.push('=IF(M' + targetRow + '="已交機", 0, MAX(0, TODAY() - O' + targetRow + '))');
     } else {
       newRow.push(val !== undefined ? val : '');
@@ -421,7 +416,6 @@ function handleAddOrder(order) {
   
   sheet.appendRow(newRow);
   
-  // 寫入後自動重整格式與寬度
   try {
     formatOrderSheet(sheet);
     applyConditionalFormatting(sheet);
@@ -430,8 +424,8 @@ function handleAddOrder(order) {
   return { status: 'success', message: '訂單新增成功', orderId: order.id };
 }
 
-// 更新任務狀態
-function handleUpdateTask(taskId, completed, completedBy, completedAt) {
+// 更新任務狀態 (支援照片與備註回報)
+function handleUpdateTask(taskId, completed, completedBy, completedAt, photo, notes) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Tasks");
   if (!sheet) return { status: 'error', message: '找不到 Tasks 工作表' };
@@ -443,6 +437,8 @@ function handleUpdateTask(taskId, completed, completedBy, completedAt) {
   var compColIndex = headers.indexOf('是否完成');
   var userColIndex = headers.indexOf('完成人員');
   var dateColIndex = headers.indexOf('完成時間');
+  var photoColIndex = headers.indexOf('現場照片');
+  var notesColIndex = headers.indexOf('備註');
   
   if (idColIndex === -1 || compColIndex === -1) {
     return { status: 'error', message: 'Tasks 工作表格式不正確' };
@@ -453,6 +449,8 @@ function handleUpdateTask(taskId, completed, completedBy, completedAt) {
       sheet.getRange(i + 1, compColIndex + 1).setValue(completed ? '是' : '否');
       if (userColIndex !== -1) sheet.getRange(i + 1, userColIndex + 1).setValue(completed ? completedBy : '');
       if (dateColIndex !== -1) sheet.getRange(i + 1, dateColIndex + 1).setValue(completed ? completedAt : '');
+      if (photoColIndex !== -1) sheet.getRange(i + 1, photoColIndex + 1).setValue(completed ? (photo || '') : '');
+      if (notesColIndex !== -1) sheet.getRange(i + 1, notesColIndex + 1).setValue(completed ? (notes || '') : '');
       
       try {
         formatTaskSheet(sheet);
@@ -465,7 +463,7 @@ function handleUpdateTask(taskId, completed, completedBy, completedAt) {
   return { status: 'error', message: '找不到該任務 ID' };
 }
 
-// 批次全量同步 (寫入試算表動態逾期公式)
+// 批次全量同步 (支援照片與備註)
 function handleSyncAll(orders, tasks) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
@@ -477,14 +475,13 @@ function handleSyncAll(orders, tasks) {
     orderSheet.getRange(1, 1, 1, cnOrderHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
     
     orders.forEach(function(ord, idx) {
-      var targetRow = idx + 2; // 第一行為標題列，資料從第 2 行開始
+      var targetRow = idx + 2;
       var row = cnOrderHeaders.map(function(cnHeader) {
         var engKey = REVERSE_ORDER_MAPPING[cnHeader] || cnHeader;
         var val = ord[engKey];
         if (engKey === 'tags') {
           return JSON.stringify(val || []);
         } else if (engKey === 'overdueDays') {
-          // P 欄寫入公式：若 M 欄「到貨狀態」="已交機" 則為 0，否則為 MAX(0, 今天 - O 欄「預計交貨日」)
           return '=IF(M' + targetRow + '="已交機", 0, MAX(0, TODAY() - O' + targetRow + '))';
         }
         return val !== undefined ? val : '';
@@ -492,7 +489,6 @@ function handleSyncAll(orders, tasks) {
       orderSheet.appendRow(row);
     });
     
-    // 套用格式
     try {
       orderSheet.getRange(1, 1, 1000, cnOrderHeaders.length).setHorizontalAlignment("left");
       orderSheet.getRange(1, 1, 1, cnOrderHeaders.length).setHorizontalAlignment("center");
@@ -504,7 +500,7 @@ function handleSyncAll(orders, tasks) {
   var taskSheet = ss.getSheetByName("Tasks");
   if (taskSheet) {
     taskSheet.clearContents();
-    var cnTaskHeaders = ['任務編號', '分店', '時段', '櫃台', '任務內容', '分數', '是否完成', '完成時間', '完成人員'];
+    var cnTaskHeaders = ['任務編號', '分店', '任務內容', '分數', '是否完成', '完成時間', '完成人員', '現場照片', '備註'];
     taskSheet.appendRow(cnTaskHeaders);
     taskSheet.getRange(1, 1, 1, cnTaskHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
     
