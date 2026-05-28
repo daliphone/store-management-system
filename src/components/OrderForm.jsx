@@ -169,11 +169,13 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
       const mm = String(today.getMonth() + 1).padStart(2, '0');
       const dd = String(today.getDate()).padStart(2, '0');
       const todayStr = `${yyyy}-${mm}-${dd}`;
-      const randomId = `ord_${Math.random().toString(36).substr(2, 9)}`;
+      const isECommerce = currentUser.store === '電商部';
+      const randomId = isECommerce ? '' : `ord_${Math.random().toString(36).substr(2, 9)}`;
+      const defaultPlatform = isECommerce ? '蝦商 長期免運' : '門市';
       setFormData(prev => ({ 
         ...prev, 
         id: randomId,
-        platform: '門市',
+        platform: defaultPlatform,
         promiseDate: todayStr 
       }));
       
@@ -1188,13 +1190,13 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                 </div>
               </div>
 
-              {/* 平台計算器按鈕區塊 (移到下方，不再與單價擠在一起) */}
+              {/* 平台計算器按鈕區塊 (移到下方，兩邊切齊滿版面) */}
               {canShowCalculator && (
-                <div className="pt-2 flex justify-end">
+                <div className="pt-2">
                   <button
                     type="button"
                     onClick={handleOpenCalculator}
-                    className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-xl flex items-center justify-center space-x-1.5 shadow-sm transition-all duration-150 active:scale-95 hover:scale-102"
+                    className="w-full px-4 py-2.5 text-xs font-black text-orange-700 bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-xl flex items-center justify-center space-x-1.5 shadow-sm transition-all duration-150 active:scale-95 hover:scale-102"
                     title="開啟蝦皮手續費毛利試算彈窗"
                   >
                     <Calculator size={13} />

@@ -163,9 +163,22 @@ export default function Dashboard({
 
   // 全店待辦 (依據店過濾的任務數)
   const filteredTasks = tasks.filter(t => {
+    // 1. 同一分店/部門過濾
     const isSameStore = currentUser.store === '全分店' || t.store === currentUser.store;
     if (!isSameStore) return false;
 
+    // 2. 如果是電商部，排除五大項常規店務任務
+    if (currentUser.store === '電商部') {
+      const isFiveDefaultTask = 
+        (t.text && t.text.startsWith('開店-儀容自檢')) || 
+        t.text === '開店-環境清掃' || 
+        t.text === '營業-零用金確認' || 
+        t.text === '營業-隨機盤點庫存' || 
+        t.text === '閉店-庫存表上傳';
+      if (isFiveDefaultTask) return false;
+    }
+
+    // 3. 儀容自檢個人名字過濾
     if (t.text && t.text.startsWith('開店-儀容自檢 (')) {
       const nameMatch = t.text.match(/開店-儀容自檢 \((.+)\)/);
       if (nameMatch) {
@@ -176,6 +189,15 @@ export default function Dashboard({
         return currentUser.name === userName;
       }
     }
+
+    // 4. 指派對象為個人過濾 (一般店員只能看見指派給自己的任務，主管/稽核能檢視全部)
+    if (t.assignType === '個人' && t.assignedTo) {
+      if (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR' || currentUser.role === 'STORE_MANAGER') {
+        return true;
+      }
+      return currentUser.name === t.assignedTo;
+    }
+
     return true;
   });
 
