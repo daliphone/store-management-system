@@ -1156,20 +1156,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
               {/* 6. 商品單價 與 成本 */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs text-slate-700 font-black block">商品單價 (實拿) *</label>
-                    {canShowCalculator && (
-                      <button
-                        type="button"
-                        onClick={handleOpenCalculator}
-                        className="px-1.5 py-0.5 text-[10px] text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-md flex items-center space-x-0.5 shadow-sm transition-all duration-150 active:scale-95"
-                        title="開啟蝦皮手續費毛利試算"
-                      >
-                        <Calculator size={10} />
-                        <span>平台計算器</span>
-                      </button>
-                    )}
-                  </div>
+                  <label className="text-xs text-slate-700 font-black block">商品單價 (實拿) *</label>
                   <input
                     type="number"
                     min="0"
@@ -1200,11 +1187,223 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                   />
                 </div>
               </div>
+
+              {/* 平台計算器按鈕區塊 (移到下方，不再與單價擠在一起) */}
+              {canShowCalculator && (
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleOpenCalculator}
+                    className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-xl flex items-center justify-center space-x-1.5 shadow-sm transition-all duration-150 active:scale-95 hover:scale-102"
+                    title="開啟蝦皮手續費毛利試算彈窗"
+                  >
+                    <Calculator size={13} />
+                    <span>平台手續費與毛利計算器</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* 內置折疊式計算機卡片區塊 */}
-            {isCalcOpen && (
-              <div className="bg-orange-50/60 border border-orange-200 rounded-[24px] p-4.5 space-y-4 text-xs font-bold text-slate-700 animate-slide-up shadow-sm">
+
+
+            {/* 按鈕 */}
+            <div className="pt-3 border-t border-slate-100">
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3.5 rounded-2xl flex items-center justify-center space-x-1.5 active:scale-95 transition-all shadow-md shadow-blue-200/50 border border-blue-500 focus:outline-none"
+              >
+                <Check size={15} strokeWidth={3} />
+                <span>{editOrder ? '確認修改並儲存' : '確認無誤，建立訂單'}</span>
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Tab 2: 電商文字批次匯入 */}
+        {activeTab === 'batch' && (
+          <div className="space-y-4">
+            {/* 文字貼上輸入區卡片 */}
+            <div className="bg-white rounded-[28px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80 space-y-4">
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs text-slate-750 font-black flex items-center space-x-1.5">
+                    <FileText size={14} className="text-blue-500" />
+                    <span>貼上電商/網拍調貨文字清單</span>
+                  </label>
+                  <span className="text-[10px] text-gray-400 font-bold">自動依 🔵/🟠/🔴 解析狀態與庫存</span>
+                </div>
+                <textarea
+                  placeholder="請在此貼上複製的電商群組調貨文字，例如：&#10;🔵MOTO G06 橘 *1&#10;網拍21&#10;🔴A16 256G&#10;黃色+保 *1"
+                  value={batchText}
+                  onChange={(e) => setBatchText(e.target.value)}
+                  className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-bold text-slate-800 h-44 resize-none leading-relaxed font-mono bg-slate-50/30"
+                />
+              </div>
+
+              {/* 解析按鈕 */}
+              <button
+                type="button"
+                onClick={handleParse}
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-extrabold py-3 rounded-xl text-xs active:scale-95 transition-all shadow-md flex items-center justify-center space-x-2 border border-blue-500"
+              >
+                <RefreshCw size={14} className="animate-pulse-subtle" />
+                <span>智能解析文字清單</span>
+              </button>
+            </div>
+
+            {/* 解析預覽卡片 */}
+            {parsedOrders.length > 0 && (
+              <div className="bg-white rounded-[28px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80 space-y-4 animate-fade-in pb-6">
+                <div className="flex justify-between items-center pb-2.5 border-b border-slate-100">
+                  <h3 className="text-xs font-black text-slate-800 flex items-center space-x-1.5">
+                    <Check size={14} className="text-emerald-500" strokeWidth={3} />
+                    <span>解析結果預覽 (共 {parsedOrders.length} 筆項目)</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setParsedOrders([])}
+                    className="text-[10px] text-red-500 font-black hover:underline"
+                  >
+                    重置清空
+                  </button>
+                </div>
+
+                {/* 統一設定面板 (WOW 體驗！) */}
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/60 grid grid-cols-2 gap-2 text-xs">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold block">統一預預計交貨日</label>
+                    <input
+                      type="date"
+                      value={batchSettings.globalPromiseDate}
+                      onChange={(e) => handleGlobalDateChange(e.target.value)}
+                      className="w-full px-2 py-1.5 border border-slate-200 bg-white rounded-lg font-mono font-bold text-slate-800 focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold block">統一所屬分店</label>
+                    <select
+                      value={batchSettings.globalStore}
+                      onChange={(e) => handleGlobalStoreChange(e.target.value)}
+                      className="w-full px-2 py-1.5 border border-slate-200 bg-white rounded-lg font-bold text-slate-700 focus:outline-none"
+                    >
+                      {STORES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* 預覽訂單編輯清單 */}
+                <div className="space-y-3.5 max-h-[300px] overflow-y-auto no-scrollbar pr-1">
+                  {parsedOrders.map((draft, idx) => {
+                    let statusBadge = 'bg-slate-50 text-slate-700 border-slate-200';
+                    if (draft.status === '已下訂') {
+                      statusBadge = 'bg-indigo-50 text-indigo-700 border-indigo-150';
+                    } else if (draft.status === '訂貨需求') {
+                      statusBadge = 'bg-slate-50 text-slate-700 border-slate-200';
+                    }
+                    
+                    return (
+                      <div key={draft.id} className="p-3 bg-slate-50/60 rounded-2xl border border-slate-150 relative flex flex-col space-y-2 group shadow-sm hover:border-slate-300 transition-all duration-200">
+                        {/* 頂行：品項與刪除 */}
+                        <div className="flex justify-between items-start pr-6">
+                          <input
+                            type="text"
+                            value={draft.productName}
+                            onChange={(e) => handleEditDraftItem(draft.id, 'productName', e.target.value)}
+                            className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 font-black text-xs text-slate-800 focus:outline-none w-full py-0.5"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDraftItem(draft.id)}
+                            className="absolute right-2.5 top-2.5 p-1 text-slate-400 hover:text-red-500 rounded bg-white border shadow-sm active:scale-90 transition-all"
+                            title="刪除此筆"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+
+                        {/* 中行：數量與狀態設定 */}
+                        <div className="flex items-center space-x-2 text-[10px] font-bold">
+                          <div className="flex items-center space-x-1 shrink-0 bg-white border px-1.5 py-0.5 rounded-lg">
+                            <span>數量:</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={draft.quantity}
+                              onChange={(e) => handleEditDraftItem(draft.id, 'quantity', parseInt(e.target.value) || 1)}
+                              className="w-8 text-center font-mono focus:outline-none"
+                            />
+                          </div>
+
+                          {/* 狀態切換 */}
+                          <select
+                            value={draft.status}
+                            onChange={(e) => handleEditDraftItem(draft.id, 'status', e.target.value)}
+                            className="bg-white border text-slate-700 px-2 py-0.5 rounded-lg focus:outline-none"
+                          >
+                            <option value="訂貨需求">📋 訂貨需求</option>
+                            <option value="已下訂">📦 已下訂</option>
+                            <option value="已到貨">🟢 已到貨</option>
+                            <option value="退貨中">🛑 退貨中</option>
+                            <option value="換貨中">🔄 換貨中</option>
+                            <option value="待處理">⏳ 待處理</option>
+                          </select>
+
+                          {/* 分店個別選擇 */}
+                          <select
+                            value={draft.store}
+                            onChange={(e) => handleEditDraftItem(draft.id, 'store', e.target.value)}
+                            className="bg-white border text-slate-700 px-2 py-0.5 rounded-lg focus:outline-none ml-auto"
+                          >
+                            {STORES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+
+                        {/* 底行：備註與交期 */}
+                        <div className="grid grid-cols-2 gap-2 text-[10px] text-gray-500 font-bold border-t border-dashed border-slate-200 pt-2">
+                          <div className="flex items-center space-x-1 font-mono">
+                            <Calendar size={11} className="text-gray-400" />
+                            <input
+                              type="date"
+                              value={draft.promiseDate}
+                              onChange={(e) => handleEditDraftItem(draft.id, 'promiseDate', e.target.value)}
+                              className="bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none w-full"
+                            />
+                          </div>
+                          <div className="truncate text-slate-400 italic text-right" title={draft.notes}>
+                            {draft.notes}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* 批次匯入確認按鈕 */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <div className="text-[10px] text-slate-400 font-bold flex items-center space-x-1">
+                    <AlertCircle size={12} className="text-blue-500" />
+                    <span>即將一次性安全寫入並同步至 Google Sheets</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleBatchSubmit}
+                    className="bg-green-600 hover:bg-green-700 text-white font-extrabold py-3 px-6 rounded-2xl flex items-center justify-center space-x-1.5 active:scale-95 transition-all shadow-md shadow-green-200/50 border border-green-600 text-xs focus:outline-none"
+                  >
+                    <Check size={14} strokeWidth={3} />
+                    <span>確認匯入 (共 {parsedOrders.length} 筆)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+
+      {/* 蝦皮毛利計算器 Modal 彈窗 */}
+      {isCalcOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 animate-fade-in" onClick={() => setIsCalcOpen(false)}>
+          <div className="bg-orange-50 border border-orange-200 rounded-[28px] p-6 space-y-4 text-xs font-bold text-slate-750 shadow-2xl max-w-md w-full animate-scale-in max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+<div className="space-y-4">
                 {/* 標題 */}
                 <div className="flex items-center justify-between pb-2 border-b border-orange-200/50">
                   <div className="flex items-center space-x-1.5 text-orange-700">
@@ -1216,7 +1415,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                     onClick={() => setIsCalcOpen(false)}
                     className="text-orange-700 hover:text-orange-900 font-extrabold text-[10px] bg-white border border-orange-200 rounded-md px-2 py-1 shadow-sm active:scale-95 transition-all"
                   >
-                    收起計算器 ✕
+                    關閉 ✕
                   </button>
                 </div>
 
@@ -1458,200 +1657,9 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                   </button>
                 </div>
               </div>
-            )}
-
-            {/* 按鈕 */}
-            <div className="pt-3 border-t border-slate-100">
-              <button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3.5 rounded-2xl flex items-center justify-center space-x-1.5 active:scale-95 transition-all shadow-md shadow-blue-200/50 border border-blue-500 focus:outline-none"
-              >
-                <Check size={15} strokeWidth={3} />
-                <span>{editOrder ? '確認修改並儲存' : '確認無誤，建立訂單'}</span>
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Tab 2: 電商文字批次匯入 */}
-        {activeTab === 'batch' && (
-          <div className="space-y-4">
-            {/* 文字貼上輸入區卡片 */}
-            <div className="bg-white rounded-[28px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80 space-y-4">
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs text-slate-750 font-black flex items-center space-x-1.5">
-                    <FileText size={14} className="text-blue-500" />
-                    <span>貼上電商/網拍調貨文字清單</span>
-                  </label>
-                  <span className="text-[10px] text-gray-400 font-bold">自動依 🔵/🟠/🔴 解析狀態與庫存</span>
-                </div>
-                <textarea
-                  placeholder="請在此貼上複製的電商群組調貨文字，例如：&#10;🔵MOTO G06 橘 *1&#10;網拍21&#10;🔴A16 256G&#10;黃色+保 *1"
-                  value={batchText}
-                  onChange={(e) => setBatchText(e.target.value)}
-                  className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-bold text-slate-800 h-44 resize-none leading-relaxed font-mono bg-slate-50/30"
-                />
-              </div>
-
-              {/* 解析按鈕 */}
-              <button
-                type="button"
-                onClick={handleParse}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-extrabold py-3 rounded-xl text-xs active:scale-95 transition-all shadow-md flex items-center justify-center space-x-2 border border-blue-500"
-              >
-                <RefreshCw size={14} className="animate-pulse-subtle" />
-                <span>智能解析文字清單</span>
-              </button>
-            </div>
-
-            {/* 解析預覽卡片 */}
-            {parsedOrders.length > 0 && (
-              <div className="bg-white rounded-[28px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80 space-y-4 animate-fade-in pb-6">
-                <div className="flex justify-between items-center pb-2.5 border-b border-slate-100">
-                  <h3 className="text-xs font-black text-slate-800 flex items-center space-x-1.5">
-                    <Check size={14} className="text-emerald-500" strokeWidth={3} />
-                    <span>解析結果預覽 (共 {parsedOrders.length} 筆項目)</span>
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setParsedOrders([])}
-                    className="text-[10px] text-red-500 font-black hover:underline"
-                  >
-                    重置清空
-                  </button>
-                </div>
-
-                {/* 統一設定面板 (WOW 體驗！) */}
-                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/60 grid grid-cols-2 gap-2 text-xs">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold block">統一預預計交貨日</label>
-                    <input
-                      type="date"
-                      value={batchSettings.globalPromiseDate}
-                      onChange={(e) => handleGlobalDateChange(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-slate-200 bg-white rounded-lg font-mono font-bold text-slate-800 focus:outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold block">統一所屬分店</label>
-                    <select
-                      value={batchSettings.globalStore}
-                      onChange={(e) => handleGlobalStoreChange(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-slate-200 bg-white rounded-lg font-bold text-slate-700 focus:outline-none"
-                    >
-                      {STORES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {/* 預覽訂單編輯清單 */}
-                <div className="space-y-3.5 max-h-[300px] overflow-y-auto no-scrollbar pr-1">
-                  {parsedOrders.map((draft, idx) => {
-                    let statusBadge = 'bg-slate-50 text-slate-700 border-slate-200';
-                    if (draft.status === '已下訂') {
-                      statusBadge = 'bg-indigo-50 text-indigo-700 border-indigo-150';
-                    } else if (draft.status === '訂貨需求') {
-                      statusBadge = 'bg-slate-50 text-slate-700 border-slate-200';
-                    }
-                    
-                    return (
-                      <div key={draft.id} className="p-3 bg-slate-50/60 rounded-2xl border border-slate-150 relative flex flex-col space-y-2 group shadow-sm hover:border-slate-300 transition-all duration-200">
-                        {/* 頂行：品項與刪除 */}
-                        <div className="flex justify-between items-start pr-6">
-                          <input
-                            type="text"
-                            value={draft.productName}
-                            onChange={(e) => handleEditDraftItem(draft.id, 'productName', e.target.value)}
-                            className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 font-black text-xs text-slate-800 focus:outline-none w-full py-0.5"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteDraftItem(draft.id)}
-                            className="absolute right-2.5 top-2.5 p-1 text-slate-400 hover:text-red-500 rounded bg-white border shadow-sm active:scale-90 transition-all"
-                            title="刪除此筆"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-
-                        {/* 中行：數量與狀態設定 */}
-                        <div className="flex items-center space-x-2 text-[10px] font-bold">
-                          <div className="flex items-center space-x-1 shrink-0 bg-white border px-1.5 py-0.5 rounded-lg">
-                            <span>數量:</span>
-                            <input
-                              type="number"
-                              min="1"
-                              value={draft.quantity}
-                              onChange={(e) => handleEditDraftItem(draft.id, 'quantity', parseInt(e.target.value) || 1)}
-                              className="w-8 text-center font-mono focus:outline-none"
-                            />
-                          </div>
-
-                          {/* 狀態切換 */}
-                          <select
-                            value={draft.status}
-                            onChange={(e) => handleEditDraftItem(draft.id, 'status', e.target.value)}
-                            className="bg-white border text-slate-700 px-2 py-0.5 rounded-lg focus:outline-none"
-                          >
-                            <option value="訂貨需求">📋 訂貨需求</option>
-                            <option value="已下訂">📦 已下訂</option>
-                            <option value="已到貨">🟢 已到貨</option>
-                            <option value="退貨中">🛑 退貨中</option>
-                            <option value="換貨中">🔄 換貨中</option>
-                            <option value="待處理">⏳ 待處理</option>
-                          </select>
-
-                          {/* 分店個別選擇 */}
-                          <select
-                            value={draft.store}
-                            onChange={(e) => handleEditDraftItem(draft.id, 'store', e.target.value)}
-                            className="bg-white border text-slate-700 px-2 py-0.5 rounded-lg focus:outline-none ml-auto"
-                          >
-                            {STORES.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </div>
-
-                        {/* 底行：備註與交期 */}
-                        <div className="grid grid-cols-2 gap-2 text-[10px] text-gray-500 font-bold border-t border-dashed border-slate-200 pt-2">
-                          <div className="flex items-center space-x-1 font-mono">
-                            <Calendar size={11} className="text-gray-400" />
-                            <input
-                              type="date"
-                              value={draft.promiseDate}
-                              onChange={(e) => handleEditDraftItem(draft.id, 'promiseDate', e.target.value)}
-                              className="bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none w-full"
-                            />
-                          </div>
-                          <div className="truncate text-slate-400 italic text-right" title={draft.notes}>
-                            {draft.notes}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* 批次匯入確認按鈕 */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <div className="text-[10px] text-slate-400 font-bold flex items-center space-x-1">
-                    <AlertCircle size={12} className="text-blue-500" />
-                    <span>即將一次性安全寫入並同步至 Google Sheets</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleBatchSubmit}
-                    className="bg-green-600 hover:bg-green-700 text-white font-extrabold py-3 px-6 rounded-2xl flex items-center justify-center space-x-1.5 active:scale-95 transition-all shadow-md shadow-green-200/50 border border-green-600 text-xs focus:outline-none"
-                  >
-                    <Check size={14} strokeWidth={3} />
-                    <span>確認匯入 (共 {parsedOrders.length} 筆)</span>
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
-        )}
-
+        </div>
+      )}
 
       </div>
     </div>
