@@ -120,6 +120,19 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
       return;
     }
 
+    // 電商平台防呆：必須填寫真實平台訂單編號，不可留空或使用系統預設的 ord_ 開頭隨機編號
+    if (formData.platform !== '門市' && formData.platform !== '其他') {
+      const trimmedId = formData.id.trim();
+      if (!trimmedId) {
+        alert('電商訂單必須填寫【真實平台訂單編號】以利後續追蹤！');
+        return;
+      }
+      if (trimmedId.startsWith('ord_')) {
+        alert('偵測到系統預設的隨機訂單編號。外部電商訂單請填寫【真實平台訂單編號】，不可使用預設隨機編號！');
+        return;
+      }
+    }
+
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
@@ -982,7 +995,25 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                     value={formData.platform}
                     onChange={(e) => {
                       const platVal = e.target.value;
-                      setFormData({ ...formData, platform: platVal });
+                      let updatedId = formData.id;
+                      
+                      // 防呆邏輯：切換至外部電商平台時，若為系統預設隨機編號則清空
+                      if (platVal !== '門市' && platVal !== '其他') {
+                        if (formData.id.startsWith('ord_')) {
+                          updatedId = '';
+                        }
+                      } else {
+                        // 切換回門市或其他時，若編號為空，則補上系統隨機編號
+                        if (!formData.id.trim()) {
+                          updatedId = `ord_${Math.random().toString(36).substr(2, 9)}`;
+                        }
+                      }
+
+                      setFormData({ 
+                        ...formData, 
+                        platform: platVal,
+                        id: updatedId
+                      });
                       
                       // 智慧聯動：如果選了蝦皮平台，自動設定計算器預設平台
                       let calcPlatform = 'mall';
@@ -1017,7 +1048,11 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                   <label className="text-xs text-slate-700 font-black block">訂單編號</label>
                   <input
                     type="text"
-                    placeholder="請輸入訂單編號"
+                    placeholder={
+                      formData.platform !== '門市' && formData.platform !== '其他'
+                        ? "請輸入平台真實訂單編號 (必填)"
+                        : "請輸入訂單編號 (選填)"
+                    }
                     value={formData.id}
                     onChange={(e) => setFormData({ ...formData, id: e.target.value })}
                     className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-800 font-mono"
