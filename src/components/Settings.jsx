@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getApiUrl, saveApiUrl, syncLocalToGoogleSheets } from '../services/googleSheetsService';
+import { getApiUrl, saveApiUrl, syncLocalToGoogleSheets, getLineConfig, saveLineConfig, testLinePush } from '../services/googleSheetsService';
 import ManieIcon from './ManieIcon';
 import { STORES } from '../mockData';
 import { Settings as SettingsIcon, X, User, Users, Clock, Database, Link, RefreshCw, AlertTriangle, Plus, Trash2, Edit2, Key, Check } from 'lucide-react';
@@ -25,6 +25,16 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
   const [apiUrl, setApiUrl] = useState('');
   const [syncStatus, setSyncStatus] = useState({ type: '', message: '' });
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // LINE Bot 設定狀態
+  const [lineConfig, setLineConfig] = useState({
+    accessToken: '',
+    groupId: '',
+    reminderTime: '09:00'
+  });
+  const [lineStatus, setLineStatus] = useState({ type: '', message: '' });
+  const [isSavingLine, setIsSavingLine] = useState(false);
+  const [isTestingLine, setIsTestingLine] = useState(false);
 
   // 帳號管理狀態
   const [isAddingUser, setIsAddingUser] = useState(false);
@@ -61,7 +71,58 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
         setAlertForm(JSON.parse(cachedAlert));
       } catch (e) {}
     }
+
+    // 載入 LINE Bot 設定
+    const loadLineSettings = async () => {
+      try {
+        const config = await getLineConfig();
+        setLineConfig(config);
+      } catch (e) {
+        console.error('載入 LINE 設定失敗:', e);
+      }
+    };
+    loadLineSettings();
   }, []);
+
+  const handleSaveLineConfigSubmit = async (e) => {
+    e.preventDefault();
+    setIsSavingLine(true);
+    setLineStatus({ type: 'info', message: '正在儲存 LINE 設定...' });
+    
+    try {
+      const res = await saveLineConfig(lineConfig.accessToken, lineConfig.groupId, lineConfig.reminderTime);
+      if (res.success) {
+        setLineStatus({ 
+          type: 'success', 
+          message: `儲存成功！已同步至 ${res.source === 'Google Sheets' ? 'Google 試算表' : '本地快取'}` 
+        });
+      } else {
+        throw new Error(res.error || '儲存失敗');
+      }
+    } catch (err) {
+      setLineStatus({ type: 'error', message: `儲存失敗: ${err.message}` });
+    } finally {
+      setIsSavingLine(false);
+      setTimeout(() => setLineStatus({ type: '', message: '' }), 3000);
+    }
+  };
+
+  const handleTestLinePushClick = async () => {
+    setIsTestingLine(true);
+    setLineStatus({ type: 'info', message: '正在發送測試推播...' });
+    
+    try {
+      const res = await testLinePush();
+      if (res.success) {
+        setLineStatus({ type: 'success', message: '測試推播成功！請至 LINE 電商群組確認。' });
+      }
+    } catch (err) {
+      setLineStatus({ type: 'error', message: `測試推播失敗: ${err.message}` });
+    } finally {
+      setIsTestingLine(false);
+      setTimeout(() => setLineStatus({ type: '', message: '' }), 4000);
+    }
+  };
 
   const handleSaveApi = () => {
     saveApiUrl(apiUrl);
@@ -648,8 +709,101 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onRefre
         {/* Google Sheets 連線設定與部署教學 (加入權限控管，僅限 SUPER_ADMIN 或 AUDITOR 顯示) */}
         {currentUser && (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR') && (
           <>
+            {/* LINE 官方帳號推播設定 */}
+            <div className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100 space-y-4 mb-4">
+              <div className="flex items-center space-x-2 text-blue-600 font-extrabold text-sm mb-1">
+                <svg className="w-5 h-5 text-blue-500 fill-current shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M21.9 10.4c0-4.6-4.5-8.4-10-8.4S1.9 5.8 1.9 10.4c0 4.1 3.5 7.6 8.3 8.3.3.1.8.2 1 .5l.1.8c.1.5-.1 1.2-.2 1.8 0 0-.2 1.3 1 1 1-.3 4.2-2.7 5.7-4.7 2.6-2.2 4.1-4.8 4.1-7.7z"/>
+                </svg>
+                <span>LINE 電商群推播設定</span>
+              </div>
+
+              <form onSubmit={handleSaveLineConfigSubmit} className="space-y-4">
+                <div className="space-y-3.5 text-xs font-bold text-slate-700">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold block">LINE 官方帳號 Access Token (通道存取權杖)</label>
+                    <input
+                      type="text"
+                      value={lineConfig.accessToken}
+                      onChange={(e) => setLineConfig({ ...lineConfig, accessToken: e.target.value })}
+                      placeholder="請輸入 LINE Channel Access Token"
+                      className="block w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-700 bg-slate-50/50 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold block">電商 LINE 群組 ID (Group ID)</label>
+                    <input
+                      type="text"
+                      value={lineConfig.groupId}
+                      onChange={(e) => setLineConfig({ ...lineConfig, groupId: e.target.value })}
+                      placeholder="請輸入群組 ID (例如: Ca4b5...)"
+                      className="block w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-700 bg-slate-50/50 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <span className="text-[9px] text-slate-450 font-semibold block leading-tight">
+                      註：群組 ID 通常是以小寫 c 或 g 開頭的 33 碼字串。您可以將 Bot 加入群組後，在群組發送訊息並藉由 Webhook 日誌或測試工具取得。
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold block">每日推播提醒時間</label>
+                    <input
+                      type="time"
+                      value={lineConfig.reminderTime}
+                      onChange={(e) => setLineConfig({ ...lineConfig, reminderTime: e.target.value })}
+                      className="block w-32 px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50/50 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      required
+                    />
+                    <span className="text-[9px] text-slate-450 font-semibold block leading-tight">
+                      設定每日系統自動向 LINE 群組發送電商調貨與待辦任務進度的時間。
+                    </span>
+                  </div>
+                </div>
+
+                {lineStatus.message && (
+                  <div className={`p-3.5 rounded-xl text-xs flex items-center space-x-2 ${
+                    lineStatus.type === 'success' 
+                      ? 'bg-green-50 text-green-700 border border-green-200' 
+                      : lineStatus.type === 'error'
+                        ? 'bg-red-50 text-red-700 border border-red-200'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200'
+                  }`}>
+                    {lineStatus.type === 'error' ? (
+                      <AlertTriangle size={15} className="shrink-0" />
+                    ) : (
+                      <RefreshCw size={15} className={`shrink-0 ${isSavingLine || isTestingLine ? 'animate-spin' : ''}`} />
+                    )}
+                    <span className="font-extrabold">{lineStatus.message}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="submit"
+                    disabled={isSavingLine}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white font-extrabold py-3 px-4 rounded-xl text-xs transition-all shadow-md active:scale-95 disabled:bg-gray-150 disabled:text-gray-400"
+                  >
+                    {isSavingLine ? '儲存中...' : '儲存 LINE 設定'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTestLinePushClick}
+                    disabled={isTestingLine || !apiUrl || !lineConfig.accessToken || !lineConfig.groupId}
+                    className={`w-full font-extrabold py-3 px-4 rounded-xl text-xs transition-all shadow-md flex items-center justify-center space-x-1.5 ${
+                      isTestingLine || !apiUrl || !lineConfig.accessToken || !lineConfig.groupId
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 shadow-none'
+                        : 'bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95'
+                    }`}
+                  >
+                    <RefreshCw size={13} className={isTestingLine ? 'animate-spin' : ''} />
+                    <span>測試發送推播</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
             {/* Google Sheets 連線設定 */}
-            <div className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100">
+            <div className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100 mb-4">
               <div className="flex items-center space-x-2 text-green-600 font-extrabold text-sm mb-4">
                 <Database size={18} />
                 <span>Google 試算表資料同步</span>

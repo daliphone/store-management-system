@@ -241,6 +241,12 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
               statusBadgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-150';
             } else if (order.status === '訂貨需求') {
               statusBadgeClass = 'bg-slate-50 text-slate-700 border-slate-200';
+            } else if (order.status === '退貨中') {
+              statusBadgeClass = 'bg-rose-50 text-rose-700 border-rose-150';
+            } else if (order.status === '換貨中') {
+              statusBadgeClass = 'bg-purple-50 text-purple-700 border-purple-150';
+            } else if (order.status === '待處理') {
+              statusBadgeClass = 'bg-amber-50 text-amber-700 border-amber-150';
             }
 
             // 3. 決定左側狀態邊條顏色
@@ -255,6 +261,12 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
               sideBarColor = 'bg-green-500';
             } else if (order.status === '已下訂') {
               sideBarColor = 'bg-indigo-400';
+            } else if (order.status === '退貨中') {
+              sideBarColor = 'bg-rose-500';
+            } else if (order.status === '換貨中') {
+              sideBarColor = 'bg-purple-500';
+            } else if (order.status === '待處理') {
+              sideBarColor = 'bg-amber-500';
             }
 
             return (
@@ -423,7 +435,10 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
                 { id: '訂貨需求', label: '📋 訂貨需求', desc: '客戶落訂，待採購下單' },
                 { id: '已下訂', label: '📦 已下訂', desc: '向總部/廠商下訂，運送中' },
                 { id: '已到貨', label: '🟢 已到貨', desc: '商品已到店點收，候取件' },
-                { id: '已交單', label: '🔵 已交單', desc: '客戶驗機並完成手寫簽名' }
+                { id: '已交單', label: '🔵 已交單', desc: '客戶驗機並完成手寫簽名' },
+                { id: '退貨中', label: '🛑 退貨中', desc: '電商退貨處理中' },
+                { id: '換貨中', label: '🔄 換貨中', desc: '電商換貨處理中' },
+                { id: '待處理', label: '⏳ 待處理', desc: '新進客需，等候人員確認' }
               ].map(statusOption => {
                 const isSelected = statusUpdatingOrder.status === statusOption.id;
                 return (

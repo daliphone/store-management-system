@@ -339,4 +339,100 @@ export const addOrdersBatch = async (newOrders) => {
   }
 };
 
+// 取得 LINE 設定
+export const getLineConfig = async () => {
+  const apiUrl = getApiUrl();
+  const localConfig = localStorage.getItem('store_mgmt_line_config');
+  const defaultVal = { accessToken: '', groupId: '', reminderTime: '09:00' };
+  
+  if (!apiUrl) {
+    return localConfig ? JSON.parse(localConfig) : defaultVal;
+  }
+  
+  try {
+    const response = await fetch(`${apiUrl}?action=getLineConfig`, {
+      method: 'GET',
+      mode: 'cors',
+    });
+    if (!response.ok) throw new Error('讀取設定失敗');
+    const data = await response.json();
+    if (data.status === 'success') {
+      localStorage.setItem('store_mgmt_line_config', JSON.stringify(data.config));
+      return data.config;
+    }
+    return localConfig ? JSON.parse(localConfig) : defaultVal;
+  } catch (error) {
+    console.warn('讀取試算表 LINE 設定失敗，使用本地快取:', error);
+    return localConfig ? JSON.parse(localConfig) : defaultVal;
+  }
+};
+
+// 儲存 LINE 設定
+export const saveLineConfig = async (accessToken, groupId, reminderTime) => {
+  const apiUrl = getApiUrl();
+  const config = { accessToken, groupId, reminderTime };
+  
+  // 先儲存在本地
+  localStorage.setItem('store_mgmt_line_config', JSON.stringify(config));
+  
+  if (!apiUrl) {
+    return { success: true, source: 'LocalStorage' };
+  }
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      body: JSON.stringify({
+        action: 'saveLineConfig',
+        accessToken,
+        groupId,
+        reminderTime
+      })
+    });
+    const data = await response.json();
+    if (data.status === 'success') {
+      return { success: true, source: 'Google Sheets' };
+    } else {
+      throw new Error(data.message || '儲存設定失敗');
+    }
+  } catch (error) {
+    console.error('儲存 LINE 設定失敗:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// 測試發送 LINE 推播
+export const testLinePush = async () => {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) {
+    throw new Error('未設定 API 網址，無法發送測試推播！');
+  }
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      body: JSON.stringify({
+        action: 'testLinePush'
+      })
+    });
+    const data = await response.json();
+    if (data.status === 'success') {
+      return { success: true, message: '測試推播已成功發送！' };
+    } else {
+      throw new Error(data.message || '測試推播失敗');
+    }
+  } catch (error) {
+    console.error('測試推播失敗:', error);
+    throw error;
+  }
+};
+
 

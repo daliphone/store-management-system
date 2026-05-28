@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Check, Calendar, Trash2, Edit2, FileText, Plus, AlertCircle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Check, Calendar, Trash2, Edit2, FileText, Plus, AlertCircle, RefreshCw, Calculator } from 'lucide-react';
 import { STORES } from '../mockData';
 
 export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, editOrder }) {
@@ -9,7 +9,21 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
     customerPhone: '',
     store: currentUser.store !== '全分店' ? currentUser.store : '東門店',
     productName: '',
-    promiseDate: ''
+    promiseDate: '',
+    price: 0,
+    cost: 0
+  });
+
+  // 蝦皮毛利計算器狀態
+  const [isCalcOpen, setIsCalcOpen] = useState(false);
+  const [calcData, setCalcData] = useState({
+    price: '',
+    cost: '',
+    platform: 'mall',
+    category: 'phone',
+    isPromoDay: false,
+    isPreOrder: false,
+    hasCryptoFee: true
   });
 
   // 批次匯入狀態
@@ -29,7 +43,9 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
         customerPhone: editOrder.customerPhone || '',
         store: editOrder.store || currentUser.store,
         productName: editOrder.productName || '',
-        promiseDate: editOrder.promiseDate || ''
+        promiseDate: editOrder.promiseDate || '',
+        price: editOrder.price || 0,
+        cost: editOrder.cost || 0
       });
     } else {
       // 新增模式：預設承諾日期為今天
@@ -84,7 +100,9 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
         customerPhone: formData.customerPhone.trim(),
         store: formData.store,
         productName: formData.productName.trim(),
-        promiseDate: formData.promiseDate
+        promiseDate: formData.promiseDate,
+        price: Number(formData.price) || 0,
+        cost: Number(formData.cost) || 0
       };
       onSave(updatedOrder);
     } else {
@@ -100,8 +118,8 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
         source: '門市',
         tags: [],
         quantity: 1,
-        price: 0,
-        cost: 0,
+        price: Number(formData.price) || 0,
+        cost: Number(formData.cost) || 0,
         status: '訂貨需求',
         createdAt: todayStr,
         promiseDate: formData.promiseDate,
@@ -113,7 +131,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
     }
   };
 
-  // 智能文字解析器 (Text Parser)
+  // 智能文字解析器 (Text Parser - 支援標準標記與 LINE 對話紀錄)
   const parseBatchText = (text) => {
     if (!text.trim()) return [];
     
@@ -122,160 +140,206 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
     
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    
-    // 解析取得過期日期指示，若有，使用截止日期，否則預設 3 天後
     let generalPromiseDate = batchSettings.globalPromiseDate;
-    for (let line of lines) {
-      const dateMatch = line.match(/(\d+)\/(\d+)~(\d+)\/(\d+)之間過期/);
-      if (dateMatch) {
-        const month = dateMatch[3];
-        const day = dateMatch[4];
-        const targetYear = new Date().getFullYear();
-        generalPromiseDate = `${targetYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        break;
-      }
-    }
-
-    let i = 0;
-    while (i < lines.length) {
-      let line = lines[i];
+    
+    // 偵測是否為 LINE 對話紀錄模式 (包含時間標記 hh:mm 與發言人)
+    const isLineChatLog = text.includes(':') && lines.some(line => line.match(/^\d{2}:\d{2}/));
+    
+    if (isLineChatLog) {
+      let currentYear = today.getFullYear();
+      let currentMonth = today.getMonth() + 1;
+      let currentDay = today.getDate();
       
-      // 過濾說明文字
-      if (line.includes('今日網拍調貨') || line.includes('🔵可從東門調') || line.includes('✅') || line.includes('🟠分店調看看')) {
-        i++;
-        continue;
-      }
+      // 1. 將對話紀錄整理成發言區塊
+      const blocks = [];
+      let currentBlock = null;
       
-      const isNewItem = line.startsWith('🔵') || line.startsWith('🟠') || line.startsWith('🔴');
-      
-      if (isNewItem) {
-        const isBlue = line.startsWith('🔵');
-        const isOrange = line.startsWith('🟠');
-        const isRed = line.startsWith('🔴');
+      for (let line of lines) {
+        // 偵測日期行，例如: "2023.02.02 星期四"
+        const dateMatch = line.match(/^(\d{4})\.(\d{2})\.(\d{2})/);
+        if (dateMatch) {
+          currentYear = parseInt(dateMatch[1]);
+          currentMonth = parseInt(dateMatch[2]);
+          currentDay = parseInt(dateMatch[3]);
+          continue;
+        }
         
-        const rest = line.substring(1).trim();
-        
-        // 判斷是否為跨行子項目的主型號 (如 🔴A16 256G)
-        const nextLine = i + 1 < lines.length ? lines[i + 1] : '';
-        const hasSubItems = !rest.includes('*') && nextLine && !nextLine.startsWith('🔵') && !nextLine.startsWith('🟠') && !nextLine.startsWith('🔴') && nextLine.includes('*');
-        
-        if (hasSubItems) {
-          const mainProduct = rest;
-          i++; // 移到下一行子品項開始
+        // 偵測發言人行，例如: "09:16 妏（馬尼東門） 紅米 10..."
+        const msgMatch = line.match(/^(\d{2}):(\d{2})\s+([^\s]+)\s*(.*)/);
+        if (msgMatch) {
+          const hours = msgMatch[1];
+          const minutes = msgMatch[2];
+          const sender = msgMatch[3];
+          const firstLineContent = msgMatch[4] || '';
           
-          while (i < lines.length) {
-            let subLine = lines[i];
-            if (subLine.startsWith('🔵') || subLine.startsWith('🟠') || subLine.startsWith('🔴')) {
-              i--; // 退回一行，讓外層大迴圈處理
-              break;
-            }
-            if (subLine.includes('過期')) {
-              i++;
+          // 解析發言人分店
+          let store = '電商部';
+          if (sender.includes('東門')) store = '東門店';
+          else if (sender.includes('小西門')) store = '小西門店';
+          else if (sender.includes('文賢')) store = '文賢店';
+          else if (sender.includes('永康')) store = '永康店';
+          else if (sender.includes('歸仁')) store = '歸仁店';
+          else if (sender.includes('安中')) store = '安中店';
+          else if (sender.includes('鹽行')) store = '鹽行店';
+          else if (sender.includes('五甲')) store = '五甲店';
+          else if (sender.includes('延平')) store = '遠傳延平店';
+          
+          currentBlock = {
+            sender,
+            store,
+            lines: []
+          };
+          blocks.push(currentBlock);
+          
+          if (firstLineContent.trim()) {
+            currentBlock.lines.push(firstLineContent.trim());
+          }
+        } else if (currentBlock) {
+          currentBlock.lines.push(line);
+        }
+      }
+      
+      // 2. 針對每個發言區塊進行語意分析
+      blocks.forEach(block => {
+        const fullText = block.lines.join('\n');
+        
+        // --- 模式 A: 調貨清單 (包含 "調貨" 關鍵字) ---
+        if (fullText.includes('調貨')) {
+          let currentTargetStore = block.store;
+          
+          for (let i = 0; i < block.lines.length; i++) {
+            let l = block.lines[i];
+            if (l.includes('調貨') || l.includes('【已調未回】') || l.includes('過期') || l.includes('謝謝')) {
               continue;
             }
             
-            // 解析子項目，如 "黃色+保 *1" 或 "銀色*3"
-            const parts = subLine.split('*');
+            // 檢查是否為分店名稱
+            const matchedStore = STORES.find(s => l.replace('店', '').trim() && l.includes(s.replace('店', '')));
+            if (matchedStore) {
+              currentTargetStore = matchedStore;
+              continue;
+            }
+            
+            // 檢查是否為 "商品 *數量" 或 "商品*數量"
+            const parts = l.split('*');
             if (parts.length >= 2) {
-              const specAndAcc = parts[0].trim();
+              const productName = parts[0].trim();
               const qty = parseInt(parts[1].trim()) || 1;
-              
-              let finalSpec = specAndAcc;
-              let acc = '';
-              if (specAndAcc.includes('+')) {
-                const spl = specAndAcc.split('+');
-                finalSpec = spl[0].trim();
-                acc = spl[1].trim();
-              }
-              
-              let status = '訂貨需求';
-              let stockNote = '無庫存';
-              if (isBlue) { status = '已下訂'; stockNote = '可從東門調'; }
-              if (isOrange) { status = '訂貨需求'; stockNote = '分店調看看'; }
+              const notes = `[調貨] 由 ${block.sender} 於 LINE 群發起`;
               
               items.push({
-                id: `ord_batch_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}`,
+                id: `ord_line_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}`,
                 customerName: '網拍調貨',
                 customerPhone: '0900-000-000',
-                productName: `${mainProduct} ${finalSpec}`,
+                productName: productName,
                 type: '調貨',
-                store: batchSettings.globalStore,
-                creator: currentUser.name,
+                store: currentTargetStore,
+                creator: block.sender,
                 source: '網拍電商',
                 tags: ['電商調貨'],
                 quantity: qty,
                 price: 0,
                 cost: 0,
-                status: status,
+                status: '訂貨需求',
                 createdAt: todayStr,
                 promiseDate: generalPromiseDate,
                 overdueDays: 0,
                 signature: '',
-                notes: `[調貨庫存] ${stockNote}${acc ? ` | 配件: ${acc}` : ''}`
+                notes: notes
               });
-            }
-            i++;
-          }
-        } else {
-          // 一般單行項目，如：🔵MOTO G06 4G (4/64) 橘 *1
-          const parts = rest.split('*');
-          let rawProductName = rest;
-          let qty = 1;
-          
-          if (parts.length >= 2) {
-            rawProductName = parts[0].trim();
-            qty = parseInt(parts[1].trim()) || 1;
-          }
-          
-          let finalProduct = rawProductName;
-          let accNote = '';
-          
-          // 檢查商品名稱內或數量後是否帶有配件，如：(MK保)*1
-          if (parts.length >= 2) {
-            const secondPart = parts[1].trim();
-            const accMatch = secondPart.match(/\((.+?)\)/);
-            if (accMatch) {
-              accNote = accMatch[1];
-            }
-          }
-          if (parts.length >= 3) {
-            const accMatch = parts[1].match(/\((.+?)\)/);
-            if (accMatch) {
-              accNote = accMatch[1];
+            } else if (l.trim()) {
+              if (i + 1 < block.lines.length && block.lines[i + 1].startsWith('*')) {
+                const qty = parseInt(block.lines[i + 1].replace('*', '').trim()) || 1;
+                items.push({
+                  id: `ord_line_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}`,
+                  customerName: '網拍調貨',
+                  customerPhone: '0900-000-000',
+                  productName: l.trim(),
+                  type: '調貨',
+                  store: currentTargetStore,
+                  creator: block.sender,
+                  source: '網拍電商',
+                  tags: ['電商調貨'],
+                  quantity: qty,
+                  price: 0,
+                  cost: 0,
+                  status: '訂貨需求',
+                  createdAt: todayStr,
+                  promiseDate: generalPromiseDate,
+                  overdueDays: 0,
+                  signature: '',
+                  notes: `[調貨] 由 ${block.sender} 於 LINE 群發起`
+                });
+                i++;
+              }
             }
           }
+          return;
+        }
+        
+        // --- 模式 B: 欠貨需求 (包含 "欠" 關鍵字) ---
+        if (fullText.includes('欠')) {
+          const qtyMatch = fullText.match(/欠\s*(\d+)/);
+          const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
           
-          // 檢查下一行是否為庫存資訊，如 "網拍21"
-          let nextLine = i + 1 < lines.length ? lines[i + 1] : '';
-          let stockNote = '無庫存';
-          let status = '訂貨需求';
+          let cleanProduct = fullText
+            .replace(/欠\s*\d+\s*(幫出)?/, '')
+            .replace(/[，,。!！\s]/g, '')
+            .replace(/幫出/g, '')
+            .replace(/謝謝/g, '');
           
-          if (isBlue) { status = '已下訂'; stockNote = '可從東門調'; }
-          if (isOrange) { status = '訂貨需求'; stockNote = '分店調看看'; }
-          
-          if (nextLine && !nextLine.startsWith('🔵') && !nextLine.startsWith('🟠') && !nextLine.startsWith('🔴')) {
-            const stockMatch = nextLine.match(/([^\d]+)(\d+)/);
-            if (stockMatch) {
-              const loc = stockMatch[1].trim(); // 網拍
-              const num = stockMatch[2].trim(); // 21
-              stockNote = `${loc}: ${num}`;
-            } else {
-              stockNote = nextLine;
-            }
-            i++; // 跳過下一行
+          if (cleanProduct.trim()) {
+            items.push({
+              id: `ord_line_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}`,
+              customerName: '電商欠貨',
+              customerPhone: '0900-000-000',
+              productName: cleanProduct.trim(),
+              type: '訂貨',
+              store: block.store,
+              creator: block.sender,
+              source: '網拍電商',
+              tags: ['電商欠貨'],
+              quantity: qty,
+              price: 0,
+              cost: 0,
+              status: '訂貨需求',
+              createdAt: todayStr,
+              promiseDate: generalPromiseDate,
+              overdueDays: 0,
+              signature: '',
+              notes: `[欠貨] 由 ${block.sender} 於 LINE 群提出: ${fullText}`
+            });
           }
+          return;
+        }
+        
+        // --- 模式 C: 退貨與換貨 (包含 "退" 或 "換" 關鍵字) ---
+        const hasReturn = fullText.includes('退');
+        const hasExchange = fullText.includes('換');
+        
+        if (hasReturn || hasExchange) {
+          const type = '退換貨';
+          const status = hasReturn ? '退貨中' : '換貨中';
+          const notes = `[退換貨] 於 LINE 群提出: ${fullText}`;
           
+          let cleanProduct = fullText
+            .replace(/[，,。!！\s]/g, '')
+            .replace(/退貨/g, '')
+            .replace(/換貨/g, '')
+            .replace(/退/g, '')
+            .replace(/換/g, '');
+            
           items.push({
-            id: `ord_batch_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}`,
-            customerName: '網拍調貨',
+            id: `ord_line_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}`,
+            customerName: '退換貨客戶',
             customerPhone: '0900-000-000',
-            productName: finalProduct,
-            type: '調貨',
-            store: batchSettings.globalStore,
-            creator: currentUser.name,
+            productName: cleanProduct.trim() || fullText.substring(0, 30),
+            type: type,
+            store: block.store,
+            creator: block.sender,
             source: '網拍電商',
-            tags: ['電商調貨'],
-            quantity: qty,
+            tags: [hasReturn ? '退貨' : '換貨'],
+            quantity: 1,
             price: 0,
             cost: 0,
             status: status,
@@ -283,14 +347,361 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
             promiseDate: generalPromiseDate,
             overdueDays: 0,
             signature: '',
-            notes: `[調貨庫存] ${stockNote}${accNote ? ` | 配件: ${accNote}` : ''}`
+            notes: notes
           });
+          return;
         }
+        
+        // --- 模式 D: 客訂 (包含 "客訂" 或 "客需") ---
+        if (fullText.includes('客訂') || fullText.includes('客需')) {
+          let cleanProduct = fullText.replace(/客訂/g, '').replace(/客需/g, '').trim();
+          items.push({
+            id: `ord_line_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}`,
+            customerName: '客訂客戶',
+            customerPhone: '0900-000-000',
+            productName: cleanProduct || fullText.substring(0, 30),
+            type: '訂貨',
+            store: block.store,
+            creator: block.sender,
+            source: '網拍電商',
+            tags: ['客訂'],
+            quantity: 1,
+            price: 0,
+            cost: 0,
+            status: '待處理',
+            createdAt: todayStr,
+            promiseDate: generalPromiseDate,
+            overdueDays: 0,
+            signature: '',
+            notes: `[客訂] 於 LINE 群提出: ${fullText}`
+          });
+          return;
+        }
+        
+        // --- 模式 E: 到貨通知 ---
+        if (fullText.includes('到貨通知') || fullText.includes('到貨')) {
+          let cleanProduct = fullText.replace(/到貨通知/g, '').replace(/到貨/g, '').replace(/神腦/g, '').trim();
+          items.push({
+            id: `ord_line_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}`,
+            customerName: '預計到貨',
+            customerPhone: '0900-000-000',
+            productName: cleanProduct || fullText.substring(0, 30),
+            type: '訂貨',
+            store: block.store,
+            creator: block.sender,
+            source: '網拍電商',
+            tags: ['預計到貨'],
+            quantity: 1,
+            price: 0,
+            cost: 0,
+            status: '已下訂',
+            createdAt: todayStr,
+            promiseDate: generalPromiseDate,
+            overdueDays: 0,
+            signature: '',
+            notes: `[到貨通知] 於 LINE 群提出: ${fullText}`
+          });
+          return;
+        }
+      });
+      
+      return items;
+    } else {
+      // 🔵🟠🔴 標準格式解析
+      let i = 0;
+      while (i < lines.length) {
+        let line = lines[i];
+        if (line.includes('今日網拍調貨') || line.includes('🔵可從東門調') || line.includes('✅') || line.includes('🟠分店調看看')) {
+          i++;
+          continue;
+        }
+        
+        const isNewItem = line.startsWith('🔵') || line.startsWith('🟠') || line.startsWith('🔴');
+        
+        if (isNewItem) {
+          const isBlue = line.startsWith('🔵');
+          const isOrange = line.startsWith('🟠');
+          const rest = line.substring(1).trim();
+          
+          const nextLine = i + 1 < lines.length ? lines[i + 1] : '';
+          const hasSubItems = !rest.includes('*') && nextLine && !nextLine.startsWith('🔵') && !nextLine.startsWith('🟠') && !nextLine.startsWith('🔴') && nextLine.includes('*');
+          
+          if (hasSubItems) {
+            const mainProduct = rest;
+            i++;
+            
+            while (i < lines.length) {
+              let subLine = lines[i];
+              if (subLine.startsWith('🔵') || subLine.startsWith('🟠') || subLine.startsWith('🔴')) {
+                i--;
+                break;
+              }
+              if (subLine.includes('過期')) {
+                i++;
+                continue;
+              }
+              
+              const parts = subLine.split('*');
+              if (parts.length >= 2) {
+                const specAndAcc = parts[0].trim();
+                const qty = parseInt(parts[1].trim()) || 1;
+                
+                let finalSpec = specAndAcc;
+                let acc = '';
+                if (specAndAcc.includes('+')) {
+                  const spl = specAndAcc.split('+');
+                  finalSpec = spl[0].trim();
+                  acc = spl[1].trim();
+                }
+                
+                let status = '訂貨需求';
+                let stockNote = '無庫存';
+                if (isBlue) { status = '已下訂'; stockNote = '可從東門調'; }
+                if (isOrange) { status = '訂貨需求'; stockNote = '分店調看看'; }
+                
+                items.push({
+                  id: `ord_batch_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}`,
+                  customerName: '網拍調貨',
+                  customerPhone: '0900-000-000',
+                  productName: `${mainProduct} ${finalSpec}`,
+                  type: '調貨',
+                  store: batchSettings.globalStore,
+                  creator: currentUser.name,
+                  source: '網拍電商',
+                  tags: ['電商調貨'],
+                  quantity: qty,
+                  price: 0,
+                  cost: 0,
+                  status: status,
+                  createdAt: todayStr,
+                  promiseDate: generalPromiseDate,
+                  overdueDays: 0,
+                  signature: '',
+                  notes: `[調貨庫存] ${stockNote}${acc ? ` | 配件: ${acc}` : ''}`
+                });
+              }
+              i++;
+            }
+          } else {
+            const parts = rest.split('*');
+            let rawProductName = rest;
+            let qty = 1;
+            
+            if (parts.length >= 2) {
+              rawProductName = parts[0].trim();
+              qty = parseInt(parts[1].trim()) || 1;
+            }
+            
+            let finalProduct = rawProductName;
+            let accNote = '';
+            
+            if (parts.length >= 2) {
+              const secondPart = parts[1].trim();
+              const accMatch = secondPart.match(/\((.+?)\)/);
+              if (accMatch) {
+                accNote = accMatch[1];
+              }
+            }
+            
+            let nextLine = i + 1 < lines.length ? lines[i + 1] : '';
+            let stockNote = '無庫存';
+            let status = '訂貨需求';
+            
+            if (isBlue) { status = '已下訂'; stockNote = '可從東門調'; }
+            if (isOrange) { status = '訂貨需求'; stockNote = '分店調看看'; }
+            
+            if (nextLine && !nextLine.startsWith('🔵') && !nextLine.startsWith('🟠') && !nextLine.startsWith('🔴')) {
+              const stockMatch = nextLine.match(/([^\d]+)(\d+)/);
+              if (stockMatch) {
+                stockNote = `${stockMatch[1].trim()}: ${stockMatch[2].trim()}`;
+              } else {
+                stockNote = nextLine;
+              }
+              i++;
+            }
+            
+            items.push({
+              id: `ord_batch_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}`,
+              customerName: '網拍調貨',
+              customerPhone: '0900-000-000',
+              productName: finalProduct,
+              type: '調貨',
+              store: batchSettings.globalStore,
+              creator: currentUser.name,
+              source: '網拍電商',
+              tags: ['電商調貨'],
+              quantity: qty,
+              price: 0,
+              cost: 0,
+              status: status,
+              createdAt: todayStr,
+              promiseDate: generalPromiseDate,
+              overdueDays: 0,
+              signature: '',
+              notes: `[調貨庫存] ${stockNote}${accNote ? ` | 配件: ${accNote}` : ''}`
+            });
+          }
+        }
+        i++;
       }
-      i++;
+      return items;
+    }
+  };
+
+  // 蝦皮手續費與活動費計算公式 (對齊 2026年Q1 Excel 公式與最新蝦皮公告)
+  const calculateShopeeFees = () => {
+    const price = parseFloat(calcData.price) || 0;
+    const cost = parseFloat(calcData.cost) || 0;
+    
+    let commissionRate = 0;
+    let transactionRate = 0.025; // 金流費 2.5%
+    let coinRate = 0; // 蝦幣活動費率
+    let shippingRate = 0; // 免運活動費率 (例如方案一 6%)
+    let flatFee = 0; // 方案固定費 60 元
+    let backProfitRate = 0; // 直送後毛 2%
+    let hasCap = false; // 成交費是否有 35,000 上限限制
+    
+    const p = calcData.platform;
+    const cat = calcData.category;
+    
+    const isAuction = p === 'auction' || p === 'auction_10' || p === 'auction_5';
+    const isMall = p === 'mall';
+    const isDirect = p === 'direct';
+    
+    // 是否參加了蝦幣回饋專案 (用來判斷是否免收活動日加收手續費)
+    const hasCoinCampaign = p === 'mall' || p === 'auction_10' || p === 'auction_5';
+    
+    if (isMall) {
+      flatFee = 60;
+      coinRate = 0.015; // 5%回饋 1.5%
+    } else if (isAuction) {
+      hasCap = true;
+      if (p === 'auction_10') {
+        flatFee = 60; // 方案二固定費
+        coinRate = 0.025; // 10%回饋 (原本3%，因同時參加免運折抵0.5%後為2.5%)
+      } else if (p === 'auction_5') {
+        flatFee = 0;
+        shippingRate = 0.06; // 免運方案一 6%
+        coinRate = 0.015; // 5%回饋 1.5%
+      }
+    } else if (isDirect) {
+      backProfitRate = 0.02; // 後毛 2%
+      transactionRate = 0; // 直送無金流
+      coinRate = 0;
+      flatFee = 0;
     }
     
-    return items;
+    // 依據精細分類設置成交手續費費率
+    if (cat === 'healthcare_beauty') {
+      commissionRate = isMall ? 0.090 : (isAuction ? 0.060 : 0);
+    } else if (cat === 'phone') {
+      commissionRate = isMall ? 0.038 : (isAuction ? 0.055 : 0.055);
+    } else if (cat === 'tablet') {
+      commissionRate = isMall ? 0.040 : (isAuction ? 0.055 : 0.065);
+    } else if (cat === 'wearable') {
+      commissionRate = isMall ? 0.045 : (isAuction ? 0.055 : 0.065);
+    } else if (cat === 'earphone') {
+      commissionRate = isMall ? 0.065 : (isAuction ? 0.055 : 0.10);
+    } else if (cat === 'speaker') {
+      commissionRate = isMall ? 0.075 : (isAuction ? 0.060 : 0.12);
+    } else if (cat === 'laptop') {
+      commissionRate = isMall ? 0.040 : (isAuction ? 0.050 : 0.065);
+    } else if (cat === 'keyboard_mouse') {
+      commissionRate = isMall ? 0.070 : (isAuction ? 0.060 : 0.065);
+    } else if (cat === 'appliances') {
+      commissionRate = isMall ? 0.060 : (isAuction ? 0.055 : 0.10);
+    } else if (cat === 'game_console') {
+      commissionRate = isMall ? 0.035 : (isAuction ? 0.055 : 0.065);
+    } else if (cat === 'game_software') {
+      commissionRate = isMall ? 0.065 : (isAuction ? 0.055 : 0.065);
+    } else if (cat === 'accessories') {
+      commissionRate = isMall ? 0.095 : (isAuction ? 0.075 : 0.12);
+    }
+    
+    // 特殊調整 1：活動促銷日加收 (僅在「未參加蝦幣回饋」時適用)
+    let promoRate = 0;
+    if (calcData.isPromoDay && !hasCoinCampaign && !isDirect) {
+      promoRate = isMall ? 0.03 : (isAuction ? 0.02 : 0);
+    }
+    
+    // 特殊調整 2：預購訂單 (較長備貨) 額外 +3%
+    let preOrderRate = calcData.isPreOrder ? 0.03 : 0;
+    
+    // 總成交手續費率 (基本 + 促銷加收 + 預購加收)
+    const finalCommissionRate = commissionRate + promoRate + preOrderRate;
+    
+    // 成交手續費 (拍賣有 35,000 元上限)
+    let commBase = price;
+    if (hasCap && price > 35000) {
+      commBase = 35000;
+    }
+    const commissionFee = Math.round(commBase * finalCommissionRate);
+    
+    // 金流服務費 2.5%
+    const transactionFee = Math.round(price * transactionRate);
+    
+    // 蝦幣回饋服務費
+    const coinCampaignFee = Math.round(price * coinRate);
+    
+    // 免運服務費 (方案一比例費，或方案二固定費 60)
+    const shippingCampaignFee = shippingRate > 0 ? Math.round(price * shippingRate) : flatFee;
+    
+    // 物流隱碼服務費 (僅限一般賣家/拍賣方案收，預設 10 元，商城與直送除外)
+    const cryptoFee = (calcData.hasCryptoFee && isAuction) ? 10 : 0;
+    
+    // 直送後毛服務費 2%
+    const backProfitFee = Math.round(price * backProfitRate);
+    
+    // 總手續費
+    const totalFees = commissionFee + transactionFee + coinCampaignFee + shippingCampaignFee + backProfitFee + cryptoFee;
+    
+    // 實拿金額
+    const payout = Math.max(0, price - totalFees);
+    
+    // 預估毛利與毛利率
+    const profit = payout - cost;
+    const profitMargin = price > 0 ? (profit / price) * 100 : 0;
+    
+    return {
+      commissionFee,
+      commissionRate: finalCommissionRate,
+      baseCommissionRate: commissionRate,
+      promoRate,
+      preOrderRate,
+      transactionFee,
+      coinCampaignFee,
+      shippingCampaignFee,
+      cryptoFee,
+      backProfitFee,
+      totalFees,
+      payout,
+      profit,
+      profitMargin
+    };
+  };
+
+  // 代入計算結果
+  const handleApplyCalc = () => {
+    const { payout } = calculateShopeeFees();
+    setFormData(prev => ({
+      ...prev,
+      price: payout,
+      cost: parseFloat(calcData.cost) || 0
+    }));
+    setIsCalcOpen(false);
+  };
+
+  const handleOpenCalculator = () => {
+    setCalcData({
+      price: formData.price || '',
+      cost: formData.cost || '',
+      platform: 'mall',
+      category: 'phone',
+      isPromoDay: false,
+      isPreOrder: false,
+      hasCryptoFee: true
+    });
+    setIsCalcOpen(true);
   };
 
   // 處理點選解析
@@ -501,6 +912,46 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                   </div>
                 </div>
               </div>
+
+              {/* 6. 商品單價 與 成本 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs text-slate-700 font-black block">商品單價 (實拿) *</label>
+                    <button
+                      type="button"
+                      onClick={handleOpenCalculator}
+                      className="text-[10px] text-blue-600 font-black flex items-center space-x-0.5 hover:underline"
+                      title="開啟蝦皮手續費毛利試算"
+                    >
+                      <Calculator size={11} />
+                      <span>平台計算器</span>
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="請輸入單價"
+                    value={formData.price || ''}
+                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                    className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-800 font-mono"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-700 font-black block">商品成本 *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="請輸入成本"
+                    value={formData.cost || ''}
+                    onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) || 0 })}
+                    className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-800 font-mono"
+                    required
+                  />
+                </div>
+              </div>
             </div>
 
             {/* 按鈕 */}
@@ -640,6 +1091,9 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                             <option value="訂貨需求">📋 訂貨需求</option>
                             <option value="已下訂">📦 已下訂</option>
                             <option value="已到貨">🟢 已到貨</option>
+                            <option value="退貨中">🛑 退貨中</option>
+                            <option value="換貨中">🔄 換貨中</option>
+                            <option value="待處理">⏳ 待處理</option>
                           </select>
 
                           {/* 分店個別選擇 */}
@@ -689,6 +1143,283 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* 蝦皮毛利計算器 Modal */}
+        {isCalcOpen && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 font-['Outfit',_sans-serif]">
+            <div className="bg-white rounded-[28px] w-full max-w-sm overflow-hidden shadow-2xl border border-slate-100 animate-slide-up flex flex-col max-h-[90vh]">
+              {/* 標題 */}
+              <div className="bg-[#E6EEFF] px-5 py-4 flex items-center justify-between border-b border-blue-100 shrink-0">
+                <div className="flex items-center space-x-2">
+                  <Calculator size={18} className="text-blue-600" />
+                  <span className="text-sm font-black text-blue-900">蝦皮手續費與毛利計算器</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCalcOpen(false)}
+                  className="w-7 h-7 border rounded-full bg-white hover:bg-slate-50 flex items-center justify-center font-bold text-slate-500 active:scale-90 transition-all text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* 內容 */}
+              <div className="p-5 flex-1 overflow-y-auto no-scrollbar space-y-4 text-xs font-bold text-slate-700">
+                {/* 1. 賣價與成本 */}
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold block">商品賣價 (賣場售價)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="輸入賣價"
+                      value={calcData.price}
+                      onChange={(e) => setCalcData({ ...calcData, price: e.target.value })}
+                      className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold block">商品成本</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="輸入成本"
+                      value={calcData.cost}
+                      onChange={(e) => setCalcData({ ...calcData, cost: e.target.value })}
+                      className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* 2. 平台方案 */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold block">平台與賣場方案</label>
+                  <select
+                    value={calcData.platform}
+                    onChange={(e) => {
+                      const nextPlatform = e.target.value;
+                      const isPlatformAuction = nextPlatform === 'auction_10' || nextPlatform === 'auction_5';
+                      setCalcData({
+                        ...calcData,
+                        platform: nextPlatform,
+                        category: 'phone',
+                        hasCryptoFee: isPlatformAuction
+                      });
+                    }}
+                    className="block w-full px-2.5 py-2 border border-slate-200 bg-white rounded-lg text-xs font-black text-slate-850"
+                  >
+                    <option value="mall">蝦商 長期免運2+5%回饋</option>
+                    <option value="direct">蝦皮直送</option>
+                    <option value="auction_10">蝦拍10倍館(綁免運2+10%回饋)</option>
+                    <option value="auction_5">蝦拍5倍館(綁免運1+5%回饋)</option>
+                  </select>
+                </div>
+
+                {/* 3. 商品品類 */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold block">商品品類 (費率不同)</label>
+                  <select
+                    value={calcData.category}
+                    onChange={(e) => setCalcData({ ...calcData, category: e.target.value })}
+                    className="block w-full px-2.5 py-2 border border-slate-200 bg-white rounded-lg text-xs font-black text-slate-850"
+                  >
+                    {calcData.platform !== 'direct' ? (
+                      <>
+                        <option value="phone">📱 智慧型手機 (一般5.5% / 商城3.8%)</option>
+                        <option value="tablet">📟 平板電腦 (一般5.5% / 商城4%)</option>
+                        <option value="wearable">⌚ 穿戴裝置 (一般5.5% / 商城4.5%)</option>
+                        <option value="earphone">🎧 耳機 / 耳麥 / 藍牙耳機 (一般5.5% / 商城6.5%)</option>
+                        <option value="speaker">🔊 音響 / 喇叭 / 電玩主機周邊 (一般6% / 商城7.5%)</option>
+                        <option value="laptop">💻 筆記型電腦 (一般5% / 商城4%)</option>
+                        <option value="keyboard_mouse">⌨️ 鍵盤 / 滑鼠 / 電腦組件 (一般6% / 商城7%)</option>
+                        <option value="appliances">📺 家用電器 - 生活 / 廚房家電 (一般5.5% / 商城6%)</option>
+                        <option value="game_console">🎮 電玩主機 (一般5.5% / 商城3.5%)</option>
+                        <option value="game_software">💿 主機遊戲 / 電玩遊戲 (一般5.5% / 商城6.5%)</option>
+                        <option value="accessories">🔌 配件 / 手機周邊 / 其他 (一般7.5% / 商城9.5%)</option>
+                        <option value="healthcare_beauty">🥗 保健食品 / 醫療 / 美妝保養 (一般6% / 商城9%)</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="phone">📱 直送手機 (前毛5.5% + 後毛2%)</option>
+                        <option value="tablet">📟 直送平板 / 筆電 / 穿戴 / 週邊 (前毛6.5% + 後毛2%)</option>
+                        <option value="earphone">🎧 直送耳機 - 手機品牌 (前毛10% + 後毛2%)</option>
+                        <option value="speaker">🔊 直送耳機 - 其他品牌 / 音響 (前毛12% + 後毛2%)</option>
+                        <option value="appliances">📺 直送家用電器 (前毛10% + 後毛2%)</option>
+                        <option value="accessories">🔌 直送手機配件 / 其他 (前毛12% + 後毛2%)</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                {/* 3.5. 特殊條件 (勾選控制) */}
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[10px] text-slate-400 font-bold block">加收與專案服務費控制</span>
+                  <div className="grid grid-cols-1 gap-2 bg-slate-50/60 p-3 rounded-2xl border border-slate-150 text-[11px] font-bold text-slate-700">
+                    {/* 物流隱碼 */}
+                    <label className={`flex items-center space-x-2 cursor-pointer select-none ${calcData.platform !== 'auction_10' && calcData.platform !== 'auction_5' ? 'text-slate-400' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={calcData.hasCryptoFee}
+                        disabled={calcData.platform !== 'auction_10' && calcData.platform !== 'auction_5'}
+                        onChange={(e) => setCalcData({ ...calcData, hasCryptoFee: e.target.checked })}
+                        className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-slate-300 disabled:opacity-50"
+                      />
+                      <span className={calcData.platform !== 'auction_10' && calcData.platform !== 'auction_5' ? 'line-through' : ''}>
+                        物流隱碼服務費 (固定 NT$10)
+                      </span>
+                      {(calcData.platform !== 'auction_10' && calcData.platform !== 'auction_5') && (
+                        <span className="text-[9px] bg-green-50 text-green-600 px-1 py-0.2 rounded border border-green-150 scale-90 origin-left">
+                          免收
+                        </span>
+                      )}
+                    </label>
+
+                    {/* 預購訂單 */}
+                    <label className="flex items-center space-x-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={calcData.isPreOrder}
+                        onChange={(e) => setCalcData({ ...calcData, isPreOrder: e.target.checked })}
+                        className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-slate-300"
+                      />
+                      <span>預購訂單 / 較長備貨 (成交費 +3%)</span>
+                    </label>
+
+                    {/* 促銷檔期 */}
+                    <div className="flex flex-col space-y-0.5">
+                      <label className="flex items-center space-x-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={calcData.isPromoDay}
+                          disabled={calcData.platform === 'mall' || calcData.platform === 'auction_10' || calcData.platform === 'auction_5' || calcData.platform === 'direct'}
+                          onChange={(e) => setCalcData({ ...calcData, isPromoDay: e.target.checked })}
+                          className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-slate-300 disabled:opacity-50"
+                        />
+                        <span className={calcData.platform === 'mall' || calcData.platform === 'auction_10' || calcData.platform === 'auction_5' ? 'text-slate-400 line-through' : ''}>
+                          促銷檔期日 (一般 +2% / 商城 +3%)
+                        </span>
+                        {(calcData.platform === 'mall' || calcData.platform === 'auction_10' || calcData.platform === 'auction_5') && (
+                          <span className="text-[9px] bg-green-50 text-green-600 px-1 py-0.2 rounded border border-green-150 scale-90 origin-left">
+                            免收
+                          </span>
+                        )}
+                      </label>
+                      <span className="text-[9px] text-slate-400 pl-5.5 font-sans font-normal leading-tight">
+                        (如每月大促雙雙日 11/11、12/12；月中 18 號；或每週三等)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. 即時計算結果 */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-150 space-y-2 font-mono">
+                  <div className="font-extrabold text-[11px] text-slate-400 pb-1.5 border-b border-slate-200 flex justify-between items-center font-sans">
+                    <span>明細試算</span>
+                    <span className="text-[9px] bg-blue-50 text-blue-600 border border-blue-150 px-1.5 py-0.2 rounded font-mono">2026 Q1</span>
+                  </div>
+                  
+                  {(() => {
+                    const fees = calculateShopeeFees();
+                    const otherFeesTotal = fees.cryptoFee + fees.shippingCampaignFee + fees.coinCampaignFee;
+                    return (
+                      <div className="space-y-1.5 text-[11px] text-slate-600">
+                        <div className="flex justify-between">
+                          <span>
+                            成交手續費 ({ (fees.commissionRate * 100).toFixed(1) }%)：
+                          </span>
+                          <span className="font-extrabold text-slate-800">-${fees.commissionFee}</span>
+                        </div>
+                        {fees.transactionFee > 0 && (
+                          <div className="flex justify-between">
+                            <span>金流與系統處理費 (2.5%)：</span>
+                            <span className="font-extrabold text-slate-800">-${fees.transactionFee}</span>
+                          </div>
+                        )}
+                        {otherFeesTotal > 0 && (
+                          <div className="border-t border-slate-200/50 pt-1.5 space-y-1">
+                            <div className="flex justify-between font-bold text-slate-700">
+                              <span>其他服務費 (活動服務費)：</span>
+                              <span className="font-extrabold text-slate-800">-${otherFeesTotal}</span>
+                            </div>
+                            <div className="pl-3.5 space-y-0.5 text-[10px] text-slate-500 font-sans">
+                              {fees.cryptoFee > 0 && (
+                                <div className="flex justify-between">
+                                  <span>• 物流隱碼服務費：</span>
+                                  <span>-${fees.cryptoFee}</span>
+                                </div>
+                              )}
+                              {fees.shippingCampaignFee > 0 && (
+                                <div className="flex justify-between">
+                                  <span>
+                                    • 免運及進階賣家專案 [
+                                    {calcData.platform === 'auction_5' ? '方案一 6%' : '方案二'}
+                                    ] 服務費：
+                                  </span>
+                                  <span>-${fees.shippingCampaignFee}</span>
+                                </div>
+                              )}
+                              {fees.coinCampaignFee > 0 && (
+                                <div className="flex justify-between">
+                                  <span>
+                                    • 蝦幣回饋專案服務費 (
+                                    {calcData.platform === 'auction_10' 
+                                      ? '2.5% 已減免0.5%' 
+                                      : '1.5%'
+                                    })：
+                                  </span>
+                                  <span>-${fees.coinCampaignFee}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {fees.backProfitFee > 0 && (
+                          <div className="flex justify-between">
+                            <span>直送後毛手續費 (2%)：</span>
+                            <span className="font-extrabold text-slate-800">-${fees.backProfitFee}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between border-t border-dashed border-slate-200 pt-1.5 font-bold">
+                          <span>平台抽成總計：</span>
+                          <span className="font-extrabold text-red-500">-${fees.totalFees}</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-black pt-1 border-t border-slate-200">
+                          <span className="text-slate-700">實拿金額：</span>
+                          <span className="text-emerald-600">${fees.payout}</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-black">
+                          <span className="text-slate-700">預估毛利：</span>
+                          <span className={`font-extrabold ${fees.profit >= 0 ? 'text-blue-600' : 'text-rose-500'}`}>
+                            ${fees.profit} ({fees.profitMargin.toFixed(1)}%)
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* 底部代入按鈕 */}
+              <div className="bg-slate-50 px-5 py-4 border-t border-slate-100 flex space-x-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleApplyCalc}
+                  disabled={!calcData.price}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 rounded-xl text-xs shadow-md active:scale-95 transition-all disabled:bg-gray-200 disabled:text-gray-400"
+                >
+                  代入實拿金額至單價
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCalcOpen(false)}
+                  className="px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-extrabold py-3 rounded-xl text-xs active:scale-95 transition-all"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

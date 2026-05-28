@@ -118,6 +118,48 @@ function initializeSystemSheets() {
     }
   }
 
+  // 3.5. 初始化 Config (系統設定參數表，主要存放 LINE Token 等)
+  var configSheet = ss.getSheetByName("Config");
+  var cnConfigHeaders = ['設定鍵', '設定值', '說明'];
+  var defaultConfigRows = [
+    ['LINE_ACCESS_TOKEN', '', 'LINE Channel Access Token (主動推播用)'],
+    ['LINE_GROUP_ID', '', 'LINE Group ID (接收推播的群組編號)'],
+    ['LINE_REMINDER_TIME', '09:00', '每日電商部進度推播時間 (HH:MM)']
+  ];
+  
+  if (!configSheet) {
+    configSheet = ss.insertSheet("Config");
+    configSheet.appendRow(cnConfigHeaders);
+    configSheet.getRange(1, 1, 1, cnConfigHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    defaultConfigRows.forEach(function(row) {
+      configSheet.appendRow(row);
+    });
+    configSheet.setFrozenRows(1);
+  } else {
+    if (configSheet.getLastRow() === 0) {
+      configSheet.appendRow(cnConfigHeaders);
+      configSheet.getRange(1, 1, 1, cnConfigHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+      defaultConfigRows.forEach(function(row) {
+        configSheet.appendRow(row);
+      });
+    } else {
+      // 確保必要的設定鍵都存在
+      var existingData = configSheet.getDataRange().getValues();
+      var existingKeys = existingData.map(function(r) { return r[0]; });
+      defaultConfigRows.forEach(function(row) {
+        if (existingKeys.indexOf(row[0]) === -1) {
+          configSheet.appendRow(row);
+        }
+      });
+    }
+  }
+  
+  try {
+    configSheet.autoResizeColumns(1, 3);
+    configSheet.setColumnWidth(2, 280);
+    configSheet.setColumnWidth(3, 240);
+  } catch(e) {}
+
   // 4. 套用條件式格式設定 (顏色提示連動)
   try {
     applyConditionalFormatting(orderSheet);
@@ -140,7 +182,7 @@ function initializeSystemSheets() {
 
   // 清除預設空白 Sheet1
   var sheet1 = ss.getSheetByName("工作表1") || ss.getSheetByName("Sheet1");
-  if (sheet1 && ss.getSheets().length > 3 && sheet1.getLastRow() === 0) {
+  if (sheet1 && ss.getSheets().length > 4 && sheet1.getLastRow() === 0) {
     try {
       ss.deleteSheet(sheet1);
     } catch(e) {}
@@ -148,7 +190,7 @@ function initializeSystemSheets() {
 
   // 彈出成功提示
   try {
-    SpreadsheetApp.getUi().alert('🎉 馬尼門市系統初始化成功！\n\n1. 已自動建立「Orders」、「Tasks」與「OrderStatus」分頁並填入中文標題。\n2. 已自動防止「客戶簽名」與「現場照片」超長文字欄位撐爆版面。\n3. 已套用「時效警示條件式格式」(嚴重逾期-紅、一般逾期-橘、即將到期-黃、已到貨-綠、已交機-藍)。\n4. 逾期天數已與試算表公式自動連動，換日會自動更新！');
+    SpreadsheetApp.getUi().alert('🎉 馬尼門市系統初始化成功！\n\n1. 已自動建立「Orders」、「Tasks」、「OrderStatus」與「Config」分頁。\n2. 已自動防止簽名與照片欄位撐爆版面。\n3. 已套用「時效警示條件式格式」與公式自動連動！');
   } catch(e) {}
   
   return { status: 'success', message: '工作表初始化建立成功' };
@@ -357,6 +399,8 @@ function doGet(e) {
   
   if (action === 'readAll') {
     return handleReadAll();
+  } else if (action === 'getLineConfig') {
+    return handleGetLineConfig();
   }
   
   return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '未知的 Action' }))
@@ -383,6 +427,10 @@ function doPost(e) {
       result = handleSaveEditedOrder(postData.order, postData.operator);
     } else if (action === 'addOrdersBatch') {
       result = handleAddOrdersBatch(postData.orders);
+    } else if (action === 'saveLineConfig') {
+      result = handleSaveLineConfig(postData.accessToken, postData.groupId, postData.reminderTime);
+    } else if (action === 'testLinePush') {
+      result = handleTestLinePush();
     }
   } catch (err) {
     result = { status: 'error', message: err.toString() };
@@ -787,4 +835,293 @@ function handleSyncAll(orders, tasks) {
   }
   
   return { status: 'success', message: '全量同步成功' };
+}
+
+// 取得 LINE 設定鍵值
+function handleGetLineConfig() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Config");
+  var config = { accessToken: '', groupId: '', reminderTime: '09:00' };
+  
+  if (sheet) {
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var key = data[i][0];
+      var val = data[i][1];
+      if (key === 'LINE_ACCESS_TOKEN') config.accessToken = val;
+      else if (key === 'LINE_GROUP_ID') config.groupId = val;
+      else if (key === 'LINE_REMINDER_TIME') config.reminderTime = val;
+    }
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify({ status: 'success', config: config }))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader("Access-Control-Allow-Origin", "*");
+}
+
+// 儲存 LINE 設定並更新觸發器
+function handleSaveLineConfig(accessToken, groupId, reminderTime) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Config");
+  if (!sheet) return { status: 'error', message: '找不到 Config 工作表' };
+  
+  var data = sheet.getDataRange().getValues();
+  var oldReminderTime = '09:00';
+  var tokenRow = -1, groupRow = -1, timeRow = -1;
+  
+  for (var i = 1; i < data.length; i++) {
+    var key = data[i][0];
+    if (key === 'LINE_ACCESS_TOKEN') tokenRow = i + 1;
+    else if (key === 'LINE_GROUP_ID') groupRow = i + 1;
+    else if (key === 'LINE_REMINDER_TIME') {
+      timeRow = i + 1;
+      oldReminderTime = data[i][1];
+    }
+  }
+  
+  if (tokenRow !== -1) sheet.getRange(tokenRow, 2).setValue(accessToken);
+  if (groupRow !== -1) sheet.getRange(groupRow, 2).setValue(groupId);
+  if (timeRow !== -1) sheet.getRange(timeRow, 2).setValue(reminderTime);
+  
+  // 若提醒時間變更，則更新 Trigger
+  if (reminderTime && reminderTime !== oldReminderTime) {
+    try {
+      updateDailyReminderTrigger(reminderTime);
+    } catch(e) {
+      return { status: 'success', message: '設定儲存成功，但 Trigger 更新失敗：' + e.toString() };
+    }
+  }
+  
+  return { status: 'success', message: '設定儲存成功' };
+}
+
+// 測試發送 LINE 推播
+function handleTestLinePush() {
+  try {
+    var res = sendECommerceDailyReminder(true);
+    return res;
+  } catch(e) {
+    return { status: 'error', message: e.toString() };
+  }
+}
+
+// 更新 GAS 每日定時提醒觸發器
+function updateDailyReminderTrigger(timeStr) {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'sendECommerceDailyReminder') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  
+  if (!timeStr) return;
+  
+  var parts = timeStr.split(':');
+  var hours = parseInt(parts[0]);
+  var minutes = parseInt(parts[1]) || 0;
+  
+  ScriptApp.newTrigger('sendECommerceDailyReminder')
+    .timeBased()
+    .everyDays(1)
+    .atHour(hours)
+    .nearMinute(minutes)
+    .create();
+}
+
+// 內部通用 LINE Push 發送函數
+function sendLineMessageInternal(message) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Config");
+  if (!sheet) return false;
+  
+  var data = sheet.getDataRange().getValues();
+  var token = '', groupId = '';
+  for (var i = 1; i < data.length; i++) {
+    var key = data[i][0];
+    if (key === 'LINE_ACCESS_TOKEN') token = data[i][1];
+    else if (key === 'LINE_GROUP_ID') groupId = data[i][1];
+  }
+  
+  if (!token || !groupId) return false;
+  
+  var url = 'https://api.line.me/v2/bot/message/push';
+  var options = {
+    'method': 'post',
+    'headers': {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token
+    },
+    'payload': JSON.stringify({
+      'to': groupId,
+      'messages': [{
+        'type': 'text',
+        'text': message
+      }]
+    }),
+    'muteHttpExceptions': true
+  };
+  
+  var response = UrlFetchApp.fetch(url, options);
+  var code = response.getResponseCode();
+  if (code !== 200) {
+    Logger.log("LINE Push failed, code: " + code + ", body: " + response.getContentText());
+    throw new Error("LINE 推播失敗 (HTTP " + code + "): " + response.getContentText());
+  }
+  return true;
+}
+
+// 每日電商統計推播主邏輯
+function sendECommerceDailyReminder(isTest) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // 1. 取得電商與調貨訂單
+  var orderSheet = ss.getSheetByName("Orders");
+  var overdueOrders = [];
+  var todayOrders = [];
+  var arrivedOrders = [];
+  
+  var today = new Date();
+  today.setHours(0,0,0,0);
+  
+  if (orderSheet) {
+    var data = orderSheet.getDataRange().getValues();
+    var headers = data[0];
+    
+    var storeIdx = headers.indexOf('分店');
+    var typeIdx = headers.indexOf('類型');
+    var statusIdx = headers.indexOf('到貨狀態');
+    var promiseIdx = headers.indexOf('預計交貨日');
+    var customerIdx = headers.indexOf('客戶姓名');
+    var productIdx = headers.indexOf('商品與承諾內容');
+    var numIdx = headers.indexOf('編號');
+    
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var store = row[storeIdx];
+      var type = row[typeIdx];
+      var status = row[statusIdx];
+      
+      // 篩選電商部或調貨
+      if (store === '電商部' || type === '調貨') {
+        // 排除已交機、已交單 (完成狀態)
+        if (status !== '已交機' && status !== '已交單') {
+          var promiseRaw = row[promiseIdx];
+          var promiseDate = null;
+          if (promiseRaw) {
+            promiseDate = new Date(promiseRaw);
+            promiseDate.setHours(0,0,0,0);
+          }
+          
+          var orderInfo = {
+            id: row[numIdx],
+            customer: row[customerIdx],
+            product: row[productIdx],
+            status: status,
+            store: store,
+            promiseStr: promiseRaw ? Utilities.formatDate(promiseDate, "GMT+8", "yyyy-MM-dd") : '無'
+          };
+          
+          if (status === '已到貨') {
+            arrivedOrders.push(orderInfo);
+          } else {
+            if (promiseDate) {
+              if (promiseDate.getTime() < today.getTime()) {
+                overdueOrders.push(orderInfo);
+              } else if (promiseDate.getTime() === today.getTime()) {
+                todayOrders.push(orderInfo);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // 2. 取得今日電商部待辦日常任務
+  var taskSheet = ss.getSheetByName("Tasks");
+  var pendingTasks = [];
+  if (taskSheet) {
+    var taskData = taskSheet.getDataRange().getValues();
+    var taskHeaders = taskData[0];
+    
+    var taskStoreIdx = taskHeaders.indexOf('分店');
+    var taskTextIdx = taskHeaders.indexOf('任務內容');
+    var taskCompIdx = taskHeaders.indexOf('是否完成');
+    
+    for (var i = 1; i < taskData.length; i++) {
+      var row = taskData[i];
+      if (row[taskStoreIdx] === '電商部') {
+        var completedVal = row[taskCompIdx];
+        var isCompleted = (completedVal === true || completedVal === 'true' || completedVal === '是');
+        if (!isCompleted) {
+          pendingTasks.push(row[taskTextIdx]);
+        }
+      }
+    }
+  }
+  
+  // 3. 組裝推播文字 (繁體中文台灣用語)
+  var timeStr = Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd HH:mm");
+  var msg = "";
+  
+  if (isTest) {
+    msg += "🔔【馬尼門市系統 - LINE 電商群推播測試】\n";
+  } else {
+    msg += "📢【馬尼電商部每日調貨與店務進度提醒】\n";
+  }
+  msg += "統計時間：" + timeStr + "\n";
+  msg += "========================\n\n";
+  
+  // 逾期未完成調貨
+  msg += "🚨 逾期未完成調貨 (" + overdueOrders.length + " 筆)：\n";
+  if (overdueOrders.length > 0) {
+    overdueOrders.forEach(function(o, idx) {
+      msg += (idx + 1) + ". [" + o.store + "] " + o.customer + " - " + o.product + " (預計交期: " + o.promiseStr + ")\n";
+    });
+  } else {
+    msg += "👉 目前無逾期調貨項目，大家太棒了！\n";
+  }
+  msg += "\n";
+  
+  // 今日預計交貨
+  msg += "⏰ 今日預計交貨 (" + todayOrders.length + " 筆)：\n";
+  if (todayOrders.length > 0) {
+    todayOrders.forEach(function(o, idx) {
+      msg += (idx + 1) + ". [" + o.store + "] " + o.customer + " - " + o.product + " (今日交貨)\n";
+    });
+  } else {
+    msg += "👉 今日無預計交貨項目。\n";
+  }
+  msg += "\n";
+  
+  // 已到貨待驗機交單
+  msg += "🟢 已到貨待驗機交單 (" + arrivedOrders.length + " 筆)：\n";
+  if (arrivedOrders.length > 0) {
+    arrivedOrders.forEach(function(o, idx) {
+      msg += (idx + 1) + ". [" + o.store + "] " + o.customer + " - " + o.product + "\n";
+    });
+  } else {
+    msg += "👉 目前無待驗機項目。\n";
+  }
+  msg += "\n";
+  
+  // 今日待辦店務任務
+  msg += "📋 今日待辦日常任務 (" + pendingTasks.length + " 項)：\n";
+  if (pendingTasks.length > 0) {
+    pendingTasks.forEach(function(t, idx) {
+      msg += (idx + 1) + ". " + t + "\n";
+    });
+  } else {
+    msg += "🎉 電商部今日日常任務已全部完成！辛苦了！\n";
+  }
+  msg += "\n========================\n";
+  msg += "請點選系統連結確認細節，加油！";
+  
+  // 4. 發送 LINE
+  var success = sendLineMessageInternal(msg);
+  if (success) {
+    return { status: 'success', message: '推播成功', count: overdueOrders.length + todayOrders.length + arrivedOrders.length };
+  } else {
+    return { status: 'error', message: '推播失敗，請檢查 Token 與 GroupID 設定' };
+  }
 }
