@@ -67,10 +67,8 @@ export default function OrderList({ orders, currentUser, onOpenSettings, onOpenA
       if (selectedStore === 'ALL') return orders;
       return orders.filter(o => o.store === selectedStore);
     }
-    if (currentUser.role === 'STORE_MANAGER') {
-      return orders.filter(o => o.store === currentUser.store);
-    }
-    return orders.filter(o => o.creator === currentUser.name);
+    // 非管理人員之一般同仁與電商人員，僅顯示同屬其分店/部門的訂單
+    return orders.filter(o => o.store === currentUser.store);
   };
 
   // 2. 根據搜尋、RWD分店及 8 大狀態過濾資料

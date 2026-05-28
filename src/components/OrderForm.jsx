@@ -110,6 +110,19 @@ const LOCAL_RATES = [
 ];
 
 export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, editOrder }) {
+  const isECommerceUser = currentUser.store === '電商部';
+  const hasAllStoresPerm = currentUser.permissions && currentUser.permissions.includes('view_all_stores');
+  
+  // 取得初始建單模式 ('store': 門市建單, 'ecommerce': 電商建單)
+  const getInitialBuildMode = () => {
+    if (editOrder) {
+      return editOrder.store === '電商部' ? 'ecommerce' : 'store';
+    }
+    if (isECommerceUser) return 'ecommerce';
+    return 'store';
+  };
+
+  const [buildMode, setBuildMode] = useState(getInitialBuildMode());
   const [activeTab, setActiveTab] = useState('single'); // 'single' 或 'batch'
   const [formData, setFormData] = useState({
     id: '',
@@ -151,6 +164,8 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
   useEffect(() => {
     if (editOrder) {
       setActiveTab('single');
+      const mode = editOrder.store === '電商部' ? 'ecommerce' : 'store';
+      setBuildMode(mode);
       setFormData({
         id: editOrder.id || '',
         platform: editOrder.platform || '門市',
@@ -164,20 +179,31 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
       });
     } else {
       // 新增模式：預設承諾日期為今天
+      const mode = isECommerceUser ? 'ecommerce' : 'store';
+      setBuildMode(mode);
+      setActiveTab('single');
+      
       const today = new Date();
       const yyyy = today.getFullYear();
       const mm = String(today.getMonth() + 1).padStart(2, '0');
       const dd = String(today.getDate()).padStart(2, '0');
       const todayStr = `${yyyy}-${mm}-${dd}`;
-      const isECommerce = currentUser.store === '電商部';
+      const isECommerce = mode === 'ecommerce';
       const randomId = isECommerce ? '' : `ord_${Math.random().toString(36).substr(2, 9)}`;
       const defaultPlatform = isECommerce ? '蝦商 長期免運' : '門市';
-      setFormData(prev => ({ 
-        ...prev, 
+      const defaultStore = isECommerce ? '電商部' : (currentUser.store !== '全分店' ? currentUser.store : '東門店');
+      
+      setFormData({
         id: randomId,
         platform: defaultPlatform,
-        promiseDate: todayStr 
-      }));
+        customerName: '',
+        customerPhone: '',
+        store: defaultStore,
+        productName: '',
+        promiseDate: todayStr,
+        price: 0,
+        cost: 0
+      });
       
       // 預設批次的統一交期為 3 天後
       const defaultDate = new Date();
@@ -208,17 +234,49 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
     fetchRates();
   }, []);
 
+  const handleBuildModeChange = (newMode) => {
+    if (newMode === buildMode) return;
+    
+    setBuildMode(newMode);
+    
+    // 如果是新增模式，切換時重新給定預設值
+    if (!editOrder) {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+      
+      const isECommerce = newMode === 'ecommerce';
+      const randomId = isECommerce ? '' : `ord_${Math.random().toString(36).substr(2, 9)}`;
+      const defaultPlatform = isECommerce ? '蝦商 長期免運' : '門市';
+      const defaultStore = isECommerce ? '電商部' : (currentUser.store !== '全分店' ? currentUser.store : '東門店');
+      
+      setFormData({
+        id: randomId,
+        platform: defaultPlatform,
+        store: defaultStore,
+        customerName: '',
+        customerPhone: '',
+        productName: '',
+        promiseDate: todayStr,
+        price: 0,
+        cost: 0
+      });
+    }
+  };
+
   // 單筆新增送出
   const handleSingleSubmit = (e) => {
     e.preventDefault();
     
-    const isEcommerceUser = currentUser.store === '電商部';
+    const isEcommerceMode = buildMode === 'ecommerce';
     
-    // 如果是電商人員，客戶姓名帶入訂單平台，聯絡電話帶入訂單編號
-    const nameVal = isEcommerceUser ? formData.platform : formData.customerName.trim();
-    const phoneVal = isEcommerceUser ? formData.id.trim() : formData.customerPhone.trim();
+    // 如果是電商模式，客戶姓名帶入訂單平台，聯絡電話帶入訂單編號
+    const nameVal = isEcommerceMode ? formData.platform : formData.customerName.trim();
+    const phoneVal = isEcommerceMode ? formData.id.trim() : formData.customerPhone.trim();
 
-    if (!isEcommerceUser) {
+    if (!isEcommerceMode) {
       if (!formData.customerName.trim()) {
         alert('請填寫客戶姓名');
         return;
@@ -932,9 +990,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
       parsedOrders.forEach(o => onSave(o));
     }
   };
-
-  const hasAllStoresPerm = currentUser.permissions && currentUser.permissions.includes('view_all_stores');
-  const canShowCalculator = currentUser && (currentUser.role === 'SUPER_ADMIN' || currentUser.store === '電商部');
+  const canShowCalculator = buildMode === 'ecommerce';
 
   // 取得當前使用者的縮寫
   const getUserInitials = () => {
@@ -972,8 +1028,42 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
           </p>
         </div>
 
-        {/* Tab 切換 (非編輯模式才顯示) */}
-        {!editOrder && (
+        {/* 管理人員專用模式切換 Toggle */}
+        {hasAllStoresPerm && !editOrder && (
+          <div className="bg-white rounded-2xl p-2.5 shadow-[0_4px_20px_rgb(0,0,0,0.02)] border border-slate-100/80 flex items-center justify-between animate-fade-in">
+            <div className="pl-1">
+              <span className="text-xs font-black text-slate-800 block">🏢 建單模式切換</span>
+              <span className="text-[9px] text-slate-400 font-bold block">依模式自動調整欄位與防呆規則</span>
+            </div>
+            <div className="flex bg-slate-105 p-1 rounded-xl border border-slate-250 text-[11px] font-black">
+              <button
+                type="button"
+                onClick={() => handleBuildModeChange('store')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center space-x-1.5 ${
+                  buildMode === 'store'
+                    ? 'bg-blue-600 text-white shadow-sm scale-98'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span>🏢 門市建單</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBuildModeChange('ecommerce')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center space-x-1.5 ${
+                  buildMode === 'ecommerce'
+                    ? 'bg-blue-600 text-white shadow-sm scale-98'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span>🌐 電商建單</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 切換 (非編輯模式且為電商模式才顯示) */}
+        {!editOrder && buildMode === 'ecommerce' && (
           <div className="flex space-x-1 bg-slate-200/50 p-1.5 rounded-2xl w-full border border-slate-200 text-xs font-black shadow-inner">
             <button
               type="button"
@@ -1054,12 +1144,20 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                     }}
                     className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-700 bg-slate-50/50 cursor-pointer"
                   >
-                    <option value="門市">🏪 門市</option>
-                    <option value="蝦商 長期免運">🛍️ 蝦商 長期免運</option>
-                    <option value="蝦拍10倍館">🎟️ 蝦拍10倍館</option>
-                    <option value="蝦拍5倍館">🎟️ 蝦拍5倍館</option>
-                    <option value="蝦皮直送">🚚 蝦皮直送</option>
-                    <option value="其他">🌐 其他</option>
+                    {buildMode === 'store' ? (
+                      <>
+                        <option value="門市">🏪 門市</option>
+                        <option value="其他">🌐 其他</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="蝦商 長期免運">🛍️ 蝦商 長期免運</option>
+                        <option value="蝦拍10倍館">🎟️ 蝦拍10倍館</option>
+                        <option value="蝦拍5倍館">🎟️ 蝦拍5倍館</option>
+                        <option value="蝦皮直送">🚚 蝦皮直送</option>
+                        <option value="其他">🌐 其他</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -1068,7 +1166,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                   <input
                     type="text"
                     placeholder={
-                      formData.platform !== '門市' && formData.platform !== '其他'
+                      buildMode === 'ecommerce'
                         ? "請輸入平台真實訂單編號 (必填)"
                         : "請輸入訂單編號 (選填)"
                     }
@@ -1080,8 +1178,8 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
               </div>
 
               {/* 1. 客戶姓名 */}
-              {currentUser.store !== '電商部' && (
-                <div className="space-y-1">
+              {buildMode === 'store' && (
+                <div className="space-y-1 animate-fade-in">
                   <label className="text-xs text-slate-700 font-black block">客戶姓名 *</label>
                   <input
                     type="text"
@@ -1095,8 +1193,8 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
               )}
 
               {/* 2. 聯絡電話 */}
-              {currentUser.store !== '電商部' && (
-                <div className="space-y-1">
+              {buildMode === 'store' && (
+                <div className="space-y-1 animate-fade-in">
                   <label className="text-xs text-slate-700 font-black block">聯絡電話 *</label>
                   <input
                     type="tel"
@@ -1115,11 +1213,13 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                 <select
                   value={formData.store}
                   onChange={(e) => setFormData({ ...formData, store: e.target.value })}
-                  disabled={!hasAllStoresPerm}
+                  disabled={buildMode === 'ecommerce' ? true : !hasAllStoresPerm}
                   className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-700 bg-slate-50/50 cursor-pointer disabled:bg-slate-100 disabled:text-slate-400"
                 >
-                  {hasAllStoresPerm ? (
-                    STORES.map(s => <option key={s} value={s}>{s}</option>)
+                  {buildMode === 'ecommerce' ? (
+                    <option value="電商部">電商部</option>
+                  ) : hasAllStoresPerm ? (
+                    STORES.filter(s => s !== '電商部').map(s => <option key={s} value={s}>{s}</option>)
                   ) : (
                     <option value={currentUser.store}>{currentUser.store}</option>
                   )}
@@ -1286,9 +1386,10 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                     <select
                       value={batchSettings.globalStore}
                       onChange={(e) => handleGlobalStoreChange(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-slate-200 bg-white rounded-lg font-bold text-slate-700 focus:outline-none"
+                      disabled={true}
+                      className="w-full px-2 py-1.5 border border-slate-200 bg-slate-100 rounded-lg font-bold text-slate-400 focus:outline-none cursor-not-allowed"
                     >
-                      {STORES.map(s => <option key={s} value={s}>{s}</option>)}
+                      <option value="電商部">電商部</option>
                     </select>
                   </div>
                 </div>
