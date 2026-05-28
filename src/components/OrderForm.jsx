@@ -3,6 +3,112 @@ import { ArrowLeft, Check, Calendar, Trash2, Edit2, FileText, Plus, AlertCircle,
 import { STORES } from '../mockData';
 import { getECommerceRates } from '../services/googleSheetsService';
 
+// 1. 本地預設費率表 (以防雲端載入失敗時作降級防呆)
+const LOCAL_RATES = [
+  // 蝦商 長期免運2+5%回饋 (mall) - 31 筆
+  { platform: 'mall', category: 'phone', categoryName: '📱 手機 (一般5.5% / 商城3.8%)', commissionRate: 0.038, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'tablet', categoryName: '📟 平板電腦 (一般5.5% / 商城4.0%)', commissionRate: 0.040, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'wearable', categoryName: '⌚ 穿戴裝置 (一般5.5% / 商城4.5%)', commissionRate: 0.045, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'earphone', categoryName: '🎧 耳機/耳麥/藍牙耳機 (一般5.5% / 商城6.5%)', commissionRate: 0.065, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'audio_amp', categoryName: '🎛️ 擴大機/混音器 (一般4.0% / 商城6.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'speaker_audio_player', categoryName: '🔊 音響/喇叭/麥克風/播放器 (一般6.0% / 商城7.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'audio_cable_other', categoryName: '🔌 視聽線材/轉換器/其他音訊 (一般6.0% / 商城8.0%)', commissionRate: 0.080, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'camera_lens', categoryName: '🔍 相機鏡頭 (一般5.0% / 商城5.0%)', commissionRate: 0.050, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'camera', categoryName: '📷 相機 (一般6.0% / 商城6.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'drone', categoryName: '🛸 空拍機 (一般6.0% / 商城6.5%)', commissionRate: 0.065, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'camera_acc', categoryName: '🎒 相機保養/周邊配件 (一般6.0% / 商城7.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'camera_security_lens_acc', categoryName: '🚨 安全監控/鏡頭與空拍周邊 (一般6.0% / 商城8.0%)', commissionRate: 0.080, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'camera_other', categoryName: '📦 其他相機周邊與分類 (一般6.0% / 商城8.5%)', commissionRate: 0.085, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'laptop', categoryName: '💻 筆記型電腦 (一般5.0% / 商城4.0%)', commissionRate: 0.040, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'desktop', categoryName: '🖥️ 桌上型電腦 (一般5.5% / 商城5.0%)', commissionRate: 0.050, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'monitor_storage', categoryName: '🖥️ 螢幕顯示器/儲存裝置 (一般5.5% / 商城5.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'computer_component', categoryName: '💾 電腦零組件 (一般6.0% / 商城6.5%)', commissionRate: 0.065, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'keyboard_mouse', categoryName: '⌨️ 鍵盤/滑鼠 (一般6.0% / 商城7.0%)', commissionRate: 0.070, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'computer_acc_network', categoryName: '🔌 電腦周邊/辦公設備/網路與線材 (一般6.0% / 商城7.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'software_printer_scanner', categoryName: '💿 軟體/印表機/掃描機 (一般6.0% / 商城8.0%)', commissionRate: 0.080, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'pc_other', categoryName: '📁 其他電腦周邊 (一般6.0% / 商城8.7%)', commissionRate: 0.087, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'large_appliances', categoryName: '📺 大型家電 (一般5.3% / 商城5.8%)', commissionRate: 0.058, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'life_appliances', categoryName: '🍳 生活/廚房/電視家電 (一般5.5% / 商城6.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'home_parts', categoryName: '🔋 家用零件/電池/遙控器 (一般6.0% / 商城8.0%)', commissionRate: 0.080, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'projector_other_appliances', categoryName: '📹 投影機與周邊/其他家電 (一般7.5% / 商城8.5%)', commissionRate: 0.085, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'walkie_talkie', categoryName: '📟 對講機 (一般6.5% / 商城9.5%)', commissionRate: 0.095, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'phone_acc_other', categoryName: '🔌 手機周邊配件/儲值卡/其他 (一般7.5% / 商城9.5%)', commissionRate: 0.095, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'game_console', categoryName: '🎮 電玩主機 (一般5.5% / 商城3.5%)', commissionRate: 0.035, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'game_software', categoryName: '💿 主機遊戲 (一般5.5% / 商城6.5%)', commissionRate: 0.065, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'game_acc', categoryName: '🕹️ 主機周邊 (一般6.0% / 商城7.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  { platform: 'mall', category: 'healthcare_beauty', categoryName: '🥗 保健食品/醫療/美妝保養 (一般6% / 商城9%)', commissionRate: 0.090, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
+  
+  // 蝦拍10倍館 (auction_10) - 31 筆
+  { platform: 'auction_10', category: 'phone', categoryName: '📱 手機 (一般5.5% / 商城3.8%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'tablet', categoryName: '📟 平板電腦 (一般5.5% / 商城4.0%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'wearable', categoryName: '⌚ 穿戴裝置 (一般5.5% / 商城4.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'earphone', categoryName: '🎧 耳機/耳麥/藍牙耳機 (一般5.5% / 商城6.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'audio_amp', categoryName: '🎛️ 擴大機/混音器 (一般4.0% / 商城6.0%)', commissionRate: 0.040, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'speaker_audio_player', categoryName: '🔊 音響/喇叭/麥克風/播放器 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'audio_cable_other', categoryName: '🔌 視聽線材/轉換器/其他音訊 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'camera_lens', categoryName: '🔍 相機鏡頭 (一般5.0% / 商城5.0%)', commissionRate: 0.050, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'camera', categoryName: '📷 相機 (一般6.0% / 商城6.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'drone', categoryName: '🛸 空拍機 (一般6.0% / 商城6.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'camera_acc', categoryName: '🎒 相機保養/周邊配件 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'camera_security_lens_acc', categoryName: '🚨 安全監控/鏡頭與空拍周邊 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'camera_other', categoryName: '📦 其他相機周邊與分類 (一般6.0% / 商城8.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'laptop', categoryName: '💻 筆記型電腦 (一般5.0% / 商城4.0%)', commissionRate: 0.050, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'desktop', categoryName: '🖥️ 桌上型電腦 (一般5.5% / 商城5.0%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'monitor_storage', categoryName: '🖥️ 螢幕顯示器/儲存裝置 (一般5.5% / 商城5.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'computer_component', categoryName: '💾 電腦零組件 (一般6.0% / 商城6.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'keyboard_mouse', categoryName: '⌨️ 鍵盤/滑鼠 (一般6.0% / 商城7.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'computer_acc_network', categoryName: '🔌 電腦周邊/辦公設備/網路與線材 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'software_printer_scanner', categoryName: '💿 軟體/印表機/掃描機 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'pc_other', categoryName: '📁 其他電腦周邊 (一般6.0% / 商城8.7%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'large_appliances', categoryName: '📺 大型家電 (一般5.3% / 商城5.8%)', commissionRate: 0.053, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'life_appliances', categoryName: '🍳 生活/廚房/電視家電 (一般5.5% / 商城6.0%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'home_parts', categoryName: '🔋 家用零件/電池/遙控器 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'projector_other_appliances', categoryName: '📹 投影機與周邊/其他家電 (一般7.5% / 商城8.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'walkie_talkie', categoryName: '📟 對講機 (一般6.5% / 商城9.5%)', commissionRate: 0.065, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'phone_acc_other', categoryName: '🔌 手機周邊配件/儲值卡/其他 (一般7.5% / 商城9.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'game_console', categoryName: '🎮 電玩主機 (一般5.5% / 商城3.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'game_software', categoryName: '💿 主機遊戲 (一般5.5% / 商城6.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'game_acc', categoryName: '🕹️ 主機周邊 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_10', category: 'healthcare_beauty', categoryName: '🥗 保健食品/醫療/美妝保養 (一般6% / 商城9%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  
+  // 蝦拍5倍館 (auction_5) - 31 筆
+  { platform: 'auction_5', category: 'phone', categoryName: '📱 手機 (一般5.5% / 商城3.8%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'tablet', categoryName: '📟 平板電腦 (一般5.5% / 商城4.0%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'wearable', categoryName: '⌚ 穿戴裝置 (一般5.5% / 商城4.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'earphone', categoryName: '🎧 耳機/耳麥/藍牙耳機 (一般5.5% / 商城6.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'audio_amp', categoryName: '🎛️ 擴大機/混音器 (一般4.0% / 商城6.0%)', commissionRate: 0.040, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'speaker_audio_player', categoryName: '🔊 音響/喇叭/麥克風/播放器 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'audio_cable_other', categoryName: '🔌 視聽線材/轉換器/其他音訊 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'camera_lens', categoryName: '🔍 相機鏡頭 (一般5.0% / 商城5.0%)', commissionRate: 0.050, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'camera', categoryName: '📷 相機 (一般6.0% / 商城6.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'drone', categoryName: '🛸 空拍機 (一般6.0% / 商城6.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'camera_acc', categoryName: '🎒 相機保養/周邊配件 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'camera_security_lens_acc', categoryName: '🚨 安全監控/鏡頭與空拍周邊 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'camera_other', categoryName: '📦 其他相機周邊與分類 (一般6.0% / 商城8.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'laptop', categoryName: '💻 筆記型電腦 (一般5.0% / 商城4.0%)', commissionRate: 0.050, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'desktop', categoryName: '🖥️ 桌上型電腦 (一般5.5% / 商城5.0%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'monitor_storage', categoryName: '🖥️ 螢幕顯示器/儲存裝置 (一般5.5% / 商城5.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'computer_component', categoryName: '💾 電腦零組件 (一般6.0% / 商城6.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'keyboard_mouse', categoryName: '⌨️ 鍵盤/滑鼠 (一般6.0% / 商城7.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'computer_acc_network', categoryName: '🔌 電腦周邊/辦公設備/網路與線材 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'software_printer_scanner', categoryName: '💿 軟體/印表機/掃描機 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'pc_other', categoryName: '📁 其他電腦周邊 (一般6.0% / 商城8.7%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'large_appliances', categoryName: '📺 大型家電 (一般5.3% / 商城5.8%)', commissionRate: 0.053, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'life_appliances', categoryName: '🍳 生活/廚房/電視家電 (一般5.5% / 商城6.0%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'home_parts', categoryName: '🔋 家用零件/電池/遙控器 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'projector_other_appliances', categoryName: '📹 投影機與周邊/其他家電 (一般7.5% / 商城8.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'walkie_talkie', categoryName: '📟 對講機 (一般6.5% / 商城9.5%)', commissionRate: 0.065, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'phone_acc_other', categoryName: '🔌 手機周邊配件/儲值卡/其他 (一般7.5% / 商城9.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  { platform: 'auction_5', category: 'game_console', categoryName: '🎮 電玩主機 (一般5.5% / 商城3.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
+  // 蝦皮直送
+  { platform: 'direct', category: 'phone', categoryName: '📱 直送手機 (前毛5.5% + 後毛2%)', commissionRate: 0.055, transactionRate: 0, coinRate: 0, shippingRate: 0, flatFee: 0, backProfitRate: 0.02, hasCap: false, promoRate: 0 },
+  { platform: 'direct', category: 'tablet', categoryName: '📟 直送平板 / 筆電 / 穿戴 / 週邊 (前毛6.5% + 後毛2%)', commissionRate: 0.065, transactionRate: 0, coinRate: 0, shippingRate: 0, flatFee: 0, backProfitRate: 0.02, hasCap: false, promoRate: 0 },
+  { platform: 'direct', category: 'earphone', categoryName: '🎧 直送耳機 - 手機品牌 (前毛10% + 後毛2%)', commissionRate: 0.10, transactionRate: 0, coinRate: 0, shippingRate: 0, flatFee: 0, backProfitRate: 0.02, hasCap: false, promoRate: 0 },
+  { platform: 'direct', category: 'speaker', categoryName: '🔊 直送耳機 - 其他品牌 / 音響 (前毛12% + 後毛2%)', commissionRate: 0.12, transactionRate: 0, coinRate: 0, shippingRate: 0, flatFee: 0, backProfitRate: 0.02, hasCap: false, promoRate: 0 },
+  { platform: 'direct', category: 'appliances', categoryName: '📺 直送家用電器 (前毛10% + 後毛2%)', commissionRate: 0.10, transactionRate: 0, coinRate: 0, shippingRate: 0, flatFee: 0, backProfitRate: 0.02, hasCap: false, promoRate: 0 },
+  { platform: 'direct', category: 'accessories', categoryName: '🔌 直送手機配件 / 其他 (前毛12% + 後毛2%)', commissionRate: 0.12, transactionRate: 0, coinRate: 0, shippingRate: 0, flatFee: 0, backProfitRate: 0.02, hasCap: false, promoRate: 0 }
+];
+
 export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, editOrder }) {
   const [activeTab, setActiveTab] = useState('single'); // 'single' 或 'batch'
   const [formData, setFormData] = useState({
@@ -103,14 +209,24 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
   // 單筆新增送出
   const handleSingleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.customerName.trim()) {
-      alert('請填寫客戶姓名');
-      return;
+    
+    const isEcommerceUser = currentUser.store === '電商部';
+    
+    // 如果是電商人員，客戶姓名帶入訂單平台，聯絡電話帶入訂單編號
+    const nameVal = isEcommerceUser ? formData.platform : formData.customerName.trim();
+    const phoneVal = isEcommerceUser ? formData.id.trim() : formData.customerPhone.trim();
+
+    if (!isEcommerceUser) {
+      if (!formData.customerName.trim()) {
+        alert('請填寫客戶姓名');
+        return;
+      }
+      if (!formData.customerPhone.trim()) {
+        alert('請填寫聯絡電話');
+        return;
+      }
     }
-    if (!formData.customerPhone.trim()) {
-      alert('請填寫聯絡電話');
-      return;
-    }
+
     if (!formData.productName.trim()) {
       alert('請填寫訂購商品與承諾詳情');
       return;
@@ -141,8 +257,8 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
       const updatedOrder = {
         ...editOrder,
         platform: formData.platform,
-        customerName: formData.customerName.trim(),
-        customerPhone: formData.customerPhone.trim(),
+        customerName: nameVal,
+        customerPhone: phoneVal,
         store: formData.store,
         productName: formData.productName.trim(),
         promiseDate: formData.promiseDate,
@@ -156,8 +272,8 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
       const newOrder = {
         id: orderId,
         platform: formData.platform,
-        customerName: formData.customerName.trim(),
-        customerPhone: formData.customerPhone.trim(),
+        customerName: nameVal,
+        customerPhone: phoneVal,
         productName: formData.productName.trim(),
         type: '訂貨',
         store: formData.store,
@@ -609,117 +725,10 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
     
     // 是否參加了蝦幣回饋專案 (用來判斷是否免收活動日加收手續費)
     const hasCoinCampaign = p === 'mall' || p === 'auction_10' || p === 'auction_5';
-    
-    // 1. 本地預設費率表 (以防雲端載入失敗時作降級防呆)
-    const localRates = [
-      // 蝦商 長期免運2+5%回饋 (mall) - 31 筆
-      { platform: 'mall', category: 'phone', categoryName: '📱 手機 (一般5.5% / 商城3.8%)', commissionRate: 0.038, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'tablet', categoryName: '📟 平板電腦 (一般5.5% / 商城4.0%)', commissionRate: 0.040, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'wearable', categoryName: '⌚ 穿戴裝置 (一般5.5% / 商城4.5%)', commissionRate: 0.045, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'earphone', categoryName: '🎧 耳機/耳麥/藍牙耳機 (一般5.5% / 商城6.5%)', commissionRate: 0.065, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'audio_amp', categoryName: '🎛️ 擴大機/混音器 (一般4.0% / 商城6.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'speaker_audio_player', categoryName: '🔊 音響/喇叭/麥克風/播放器 (一般6.0% / 商城7.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'audio_cable_other', categoryName: '🔌 視聽線材/轉換器/其他音訊 (一般6.0% / 商城8.0%)', commissionRate: 0.080, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'camera_lens', categoryName: '🔍 相機鏡頭 (一般5.0% / 商城5.0%)', commissionRate: 0.050, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'camera', categoryName: '📷 相機 (一般6.0% / 商城6.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'drone', categoryName: '🛸 空拍機 (一般6.0% / 商城6.5%)', commissionRate: 0.065, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'camera_acc', categoryName: '🎒 相機保養/周邊配件 (一般6.0% / 商城7.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'camera_security_lens_acc', categoryName: '🚨 安全監控/鏡頭與空拍周邊 (一般6.0% / 商城8.0%)', commissionRate: 0.080, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'camera_other', categoryName: '📦 其他相機周邊與分類 (一般6.0% / 商城8.5%)', commissionRate: 0.085, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'laptop', categoryName: '💻 筆記型電腦 (一般5.0% / 商城4.0%)', commissionRate: 0.040, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'desktop', categoryName: '🖥️ 桌上型電腦 (一般5.5% / 商城5.0%)', commissionRate: 0.050, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'monitor_storage', categoryName: '🖥️ 螢幕顯示器/儲存裝置 (一般5.5% / 商城5.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'computer_component', categoryName: '💾 電腦零組件 (一般6.0% / 商城6.5%)', commissionRate: 0.065, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'keyboard_mouse', categoryName: '⌨️ 鍵盤/滑鼠 (一般6.0% / 商城7.0%)', commissionRate: 0.070, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'computer_acc_network', categoryName: '🔌 電腦周邊/辦公設備/網路與線材 (一般6.0% / 商城7.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'software_printer_scanner', categoryName: '💿 軟體/印表機/掃描機 (一般6.0% / 商城8.0%)', commissionRate: 0.080, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'pc_other', categoryName: '📁 其他電腦周邊 (一般6.0% / 商城8.7%)', commissionRate: 0.087, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'large_appliances', categoryName: '📺 大型家電 (一般5.3% / 商城5.8%)', commissionRate: 0.058, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'life_appliances', categoryName: '🍳 生活/廚房/電視家電 (一般5.5% / 商城6.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'home_parts', categoryName: '🔋 家用零件/電池/遙控器 (一般6.0% / 商城8.0%)', commissionRate: 0.080, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'projector_other_appliances', categoryName: '📹 投影機與周邊/其他家電 (一般7.5% / 商城8.5%)', commissionRate: 0.085, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'walkie_talkie', categoryName: '📟 對講機 (一般6.5% / 商城9.5%)', commissionRate: 0.095, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'phone_acc_other', categoryName: '🔌 手機周邊配件/儲值卡/其他 (一般7.5% / 商城9.5%)', commissionRate: 0.095, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'game_console', categoryName: '🎮 電玩主機 (一般5.5% / 商城3.5%)', commissionRate: 0.035, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'game_software', categoryName: '💿 主機遊戲 (一般5.5% / 商城6.5%)', commissionRate: 0.065, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'game_acc', categoryName: '🕹️ 主機周邊 (一般6.0% / 商城7.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      { platform: 'mall', category: 'healthcare_beauty', categoryName: '🥗 保健食品/醫療/美妝保養 (一般6% / 商城9%)', commissionRate: 0.090, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: false, promoRate: 0.03 },
-      
-      // 蝦拍10倍館 (auction_10) - 31 筆
-      { platform: 'auction_10', category: 'phone', categoryName: '📱 手機 (一般5.5% / 商城3.8%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'tablet', categoryName: '📟 平板電腦 (一般5.5% / 商城4.0%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'wearable', categoryName: '⌚ 穿戴裝置 (一般5.5% / 商城4.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'earphone', categoryName: '🎧 耳機/耳麥/藍牙耳機 (一般5.5% / 商城6.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'audio_amp', categoryName: '🎛️ 擴大機/混音器 (一般4.0% / 商城6.0%)', commissionRate: 0.040, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'speaker_audio_player', categoryName: '🔊 音響/喇叭/麥克風/播放器 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'audio_cable_other', categoryName: '🔌 視聽線材/轉換器/其他音訊 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'camera_lens', categoryName: '🔍 相機鏡頭 (一般5.0% / 商城5.0%)', commissionRate: 0.050, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'camera', categoryName: '📷 相機 (一般6.0% / 商城6.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'drone', categoryName: '🛸 空拍機 (一般6.0% / 商城6.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'camera_acc', categoryName: '🎒 相機保養/周邊配件 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'camera_security_lens_acc', categoryName: '🚨 安全監控/鏡頭與空拍周邊 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'camera_other', categoryName: '📦 其他相機周邊與分類 (一般6.0% / 商城8.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'laptop', categoryName: '💻 筆記型電腦 (一般5.0% / 商城4.0%)', commissionRate: 0.050, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'desktop', categoryName: '🖥️ 桌上型電腦 (一般5.5% / 商城5.0%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'monitor_storage', categoryName: '🖥️ 螢幕顯示器/儲存裝置 (一般5.5% / 商城5.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'computer_component', categoryName: '💾 電腦零組件 (一般6.0% / 商城6.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'keyboard_mouse', categoryName: '⌨️ 鍵盤/滑鼠 (一般6.0% / 商城7.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'computer_acc_network', categoryName: '🔌 電腦周邊/辦公設備/網路與線材 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'software_printer_scanner', categoryName: '💿 軟體/印表機/掃描機 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'pc_other', categoryName: '📁 其他電腦周邊 (一般6.0% / 商城8.7%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'large_appliances', categoryName: '📺 大型家電 (一般5.3% / 商城5.8%)', commissionRate: 0.053, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'life_appliances', categoryName: '🍳 生活/廚房/電視家電 (一般5.5% / 商城6.0%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'home_parts', categoryName: '🔋 家用零件/電池/遙控器 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'projector_other_appliances', categoryName: '📹 投影機與周邊/其他家電 (一般7.5% / 商城8.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'walkie_talkie', categoryName: '📟 對講機 (一般6.5% / 商城9.5%)', commissionRate: 0.065, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'phone_acc_other', categoryName: '🔌 手機周邊配件/儲值卡/其他 (一般7.5% / 商城9.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'game_console', categoryName: '🎮 電玩主機 (一般5.5% / 商城3.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'game_software', categoryName: '💿 主機遊戲 (一般5.5% / 商城6.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'game_acc', categoryName: '🕹️ 主機周邊 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_10', category: 'healthcare_beauty', categoryName: '🥗 保健食品/醫療/美妝保養 (一般6% / 商城9%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.025, shippingRate: 0, flatFee: 60, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      
-      // 蝦拍5倍館 (auction_5) - 31 筆
-      { platform: 'auction_5', category: 'phone', categoryName: '📱 手機 (一般5.5% / 商城3.8%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'tablet', categoryName: '📟 平板電腦 (一般5.5% / 商城4.0%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'wearable', categoryName: '⌚ 穿戴裝置 (一般5.5% / 商城4.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'earphone', categoryName: '🎧 耳機/耳麥/藍牙耳機 (一般5.5% / 商城6.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'audio_amp', categoryName: '🎛️ 擴大機/混音器 (一般4.0% / 商城6.0%)', commissionRate: 0.040, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'speaker_audio_player', categoryName: '🔊 音響/喇叭/麥克風/播放器 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'audio_cable_other', categoryName: '🔌 視聽線材/轉換器/其他音訊 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'camera_lens', categoryName: '🔍 相機鏡頭 (一般5.0% / 商城5.0%)', commissionRate: 0.050, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'camera', categoryName: '📷 相機 (一般6.0% / 商城6.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'drone', categoryName: '🛸 空拍機 (一般6.0% / 商城6.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'camera_acc', categoryName: '🎒 相機保養/周邊配件 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'camera_security_lens_acc', categoryName: '🚨 安全監控/鏡頭與空拍周邊 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'camera_other', categoryName: '📦 其他相機周邊與分類 (一般6.0% / 商城8.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'laptop', categoryName: '💻 筆記型電腦 (一般5.0% / 商城4.0%)', commissionRate: 0.050, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'desktop', categoryName: '🖥️ 桌上型電腦 (一般5.5% / 商城5.0%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'monitor_storage', categoryName: '🖥️ 螢幕顯示器/儲存裝置 (一般5.5% / 商城5.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'computer_component', categoryName: '💾 電腦零組件 (一般6.0% / 商城6.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'keyboard_mouse', categoryName: '⌨️ 鍵盤/滑鼠 (一般6.0% / 商城7.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'computer_acc_network', categoryName: '🔌 電腦周邊/辦公設備/網路與線材 (一般6.0% / 商城7.5%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'software_printer_scanner', categoryName: '💿 軟體/印表機/掃描機 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'pc_other', categoryName: '📁 其他電腦周邊 (一般6.0% / 商城8.7%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'large_appliances', categoryName: '📺 大型家電 (一般5.3% / 商城5.8%)', commissionRate: 0.053, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'life_appliances', categoryName: '🍳 生活/廚房/電視家電 (一般5.5% / 商城6.0%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'home_parts', categoryName: '🔋 家用零件/電池/遙控器 (一般6.0% / 商城8.0%)', commissionRate: 0.060, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'projector_other_appliances', categoryName: '📹 投影機與周邊/其他家電 (一般7.5% / 商城8.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'walkie_talkie', categoryName: '📟 對講機 (一般6.5% / 商城9.5%)', commissionRate: 0.065, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'phone_acc_other', categoryName: '🔌 手機周邊配件/儲值卡/其他 (一般7.5% / 商城9.5%)', commissionRate: 0.075, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      { platform: 'auction_5', category: 'game_console', categoryName: '🎮 電玩主機 (一般5.5% / 商城3.5%)', commissionRate: 0.055, transactionRate: 0.025, coinRate: 0.015, shippingRate: 0.06, flatFee: 0, backProfitRate: 0, hasCap: true, promoRate: 0.02 },
-      // 蝦皮直送
-      { platform: 'direct', category: 'phone', categoryName: '📱 直送手機 (前毛5.5% + 後毛2%)', commissionRate: 0.055, transactionRate: 0, coinRate: 0, shippingRate: 0, flatFee: 0, backProfitRate: 0.02, hasCap: false, promoRate: 0 },
-      { platform: 'direct', category: 'tablet', categoryName: '📟 直送平板 / 筆電 / 穿戴 / 週邊 (前毛6.5% + 後毛2%)', commissionRate: 0.065, transactionRate: 0, coinRate: 0, shippingRate: 0, flatFee: 0, backProfitRate: 0.02, hasCap: false, promoRate: 0 },
-      { platform: 'direct', category: 'earphone', categoryName: '🎧 直送耳機 - 手機品牌 (前毛10% + 後毛2%)', commissionRate: 0.10, transactionRate: 0, coinRate: 0, shippingRate: 0, flatFee: 0, backProfitRate: 0.02, hasCap: false, promoRate: 0 },
-      { platform: 'direct', category: 'speaker', categoryName: '🔊 直送耳機 - 其他品牌 / 音響 (前毛12% + 後毛2%)', commissionRate: 0.12, transactionRate: 0, coinRate: 0, shippingRate: 0, flatFee: 0, backProfitRate: 0.02, hasCap: false, promoRate: 0 },
-      { platform: 'direct', category: 'appliances', categoryName: '📺 直送家用電器 (前毛10% + 後毛2%)', commissionRate: 0.10, transactionRate: 0, coinRate: 0, shippingRate: 0, flatFee: 0, backProfitRate: 0.02, hasCap: false, promoRate: 0 },
-      { platform: 'direct', category: 'accessories', categoryName: '🔌 直送手機配件 / 其他 (前毛12% + 後毛2%)', commissionRate: 0.12, transactionRate: 0, coinRate: 0, shippingRate: 0, flatFee: 0, backProfitRate: 0.02, hasCap: false, promoRate: 0 }
-    ];
-    
-    // 2. 從雲端費率或本地預設費率中尋找
-    const activeRates = cloudRates.length > 0 ? cloudRates : localRates;
+        // 2. 從雲端費率或本地預設費率中尋找
+    const activeRates = cloudRates.length > 0 ? cloudRates : LOCAL_RATES;
     const rateSetting = activeRates.find(r => r.platform === p && r.category === cat) || 
-                        localRates.find(r => r.platform === p && r.category === cat);
+                        LOCAL_RATES.find(r => r.platform === p && r.category === cat);
     
     // 3. 取得費率參數
     const baseCommissionRate = rateSetting ? rateSetting.commissionRate : 0.055;
@@ -834,7 +843,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
     else if (formData.platform === '蝦拍5倍館') calcPlatform = 'auction_5';
     else if (formData.platform === '蝦皮直送') calcPlatform = 'direct';
     
-    const activeRates = cloudRates.length > 0 ? cloudRates : localRates;
+    const activeRates = cloudRates.length > 0 ? cloudRates : LOCAL_RATES;
     const defaultCat = activeRates.find(r => r.platform === calcPlatform)?.category || 'phone';
     
     setCalcData({
@@ -1023,7 +1032,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                       else if (platVal === '蝦皮直送') calcPlatform = 'direct';
                       
                       if (platVal !== '門市' && platVal !== '其他') {
-                        const activeRates = cloudRates.length > 0 ? cloudRates : localRates;
+                        const activeRates = cloudRates.length > 0 ? cloudRates : LOCAL_RATES;
                         const defaultCat = activeRates.find(r => r.platform === calcPlatform)?.category || 'phone';
                         setCalcData(prev => ({
                           ...prev,
@@ -1061,30 +1070,34 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
               </div>
 
               {/* 1. 客戶姓名 */}
-              <div className="space-y-1">
-                <label className="text-xs text-slate-700 font-black block">客戶姓名 *</label>
-                <input
-                  type="text"
-                  placeholder="請輸入客戶姓名 (例如: 王大同)"
-                  value={formData.customerName}
-                  onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                  className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-800"
-                  required
-                />
-              </div>
+              {currentUser.store !== '電商部' && (
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-700 font-black block">客戶姓名 *</label>
+                  <input
+                    type="text"
+                    placeholder="請輸入客戶姓名 (例如: 王大同)"
+                    value={formData.customerName}
+                    onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                    className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-800"
+                    required
+                  />
+                </div>
+              )}
 
               {/* 2. 聯絡電話 */}
-              <div className="space-y-1">
-                <label className="text-xs text-slate-700 font-black block">聯絡電話 *</label>
-                <input
-                  type="tel"
-                  placeholder="請輸入手機號碼 (例如: 0912-345-678)"
-                  value={formData.customerPhone}
-                  onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                  className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-850 font-mono"
-                  required
-                />
-              </div>
+              {currentUser.store !== '電商部' && (
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-700 font-black block">聯絡電話 *</label>
+                  <input
+                    type="tel"
+                    placeholder="請輸入手機號碼 (例如: 0912-345-678)"
+                    value={formData.customerPhone}
+                    onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                    className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-850 font-mono"
+                    required
+                  />
+                </div>
+              )}
 
               {/* 3. 分店門市 */}
               <div className="space-y-1">
@@ -1141,11 +1154,11 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                       <button
                         type="button"
                         onClick={handleOpenCalculator}
-                        className="text-[10px] text-blue-600 font-black flex items-center space-x-0.5 hover:underline"
+                        className="px-2 py-0.5 text-[10px] text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-lg flex items-center space-x-1 shadow-sm transition-all duration-150 active:scale-95 hover:scale-105"
                         title="開啟蝦皮手續費毛利試算"
                       >
                         <Calculator size={11} />
-                        <span>平台計算器</span>
+                        <span>🧮 平台計算器</span>
                       </button>
                     )}
                   </div>
