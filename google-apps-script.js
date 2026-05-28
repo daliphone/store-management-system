@@ -160,6 +160,151 @@ function initializeSystemSheets() {
     configSheet.setColumnWidth(3, 240);
   } catch(e) {}
 
+  // 3.6. 初始化 ECommerceRates (蝦皮費率工作表)
+  var ratesSheet = ss.getSheetByName("ECommerceRates");
+  var cnRatesHeaders = ['平台代碼', '品類代碼', '品類名稱', '成交手續費率', '金流費率', '蝦幣費率', '免運費率', '免運固定費', '直送後毛率', '成交上限標記', '大促日加收率'];
+  var defaultRatesRows = [
+    // 蝦商 長期免運2+5%回饋 (mall) - 31 筆
+    ['mall', 'phone', '📱 手機 (一般5.5% / 商城3.8%)', 0.038, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'tablet', '📟 平板電腦 (一般5.5% / 商城4.0%)', 0.040, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'wearable', '⌚ 穿戴裝置 (一般5.5% / 商城4.5%)', 0.045, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'earphone', '🎧 耳機/耳麥/藍牙耳機 (一般5.5% / 商城6.5%)', 0.065, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'audio_amp', '🎛️ 擴大機/混音器 (一般4.0% / 商城6.0%)', 0.060, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'speaker_audio_player', '🔊 音響/喇叭/麥克風/播放器 (一般6.0% / 商城7.5%)', 0.075, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'audio_cable_other', '🔌 視聽線材/轉換器/其他音訊 (一般6.0% / 商城8.0%)', 0.080, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'camera_lens', '🔍 相機鏡頭 (一般5.0% / 商城5.0%)', 0.050, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'camera', '📷 相機 (一般6.0% / 商城6.0%)', 0.060, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'drone', '🛸 空拍機 (一般6.0% / 商城6.5%)', 0.065, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'camera_acc', '🎒 相機保養/周邊配件 (一般6.0% / 商城7.5%)', 0.075, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'camera_security_lens_acc', '🚨 安全監控/鏡頭與空拍周邊 (一般6.0% / 商城8.0%)', 0.080, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'camera_other', '📦 其他相機周邊與分類 (一般6.0% / 商城8.5%)', 0.085, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'laptop', '💻 筆記型電腦 (一般5.0% / 商城4.0%)', 0.040, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'desktop', '🖥️ 桌上型電腦 (一般5.5% / 商城5.0%)', 0.050, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'monitor_storage', '🖥️ 螢幕顯示器/儲存裝置 (一般5.5% / 商城5.5%)', 0.055, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'computer_component', '💾 電腦零組件 (一般6.0% / 商城6.5%)', 0.065, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'keyboard_mouse', '⌨️ 鍵盤/滑鼠 (一般6.0% / 商城7.0%)', 0.070, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'computer_acc_network', '🔌 電腦周邊/辦公設備/網路與線材 (一般6.0% / 商城7.5%)', 0.075, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'software_printer_scanner', '💿 軟體/印表機/掃描機 (一般6.0% / 商城8.0%)', 0.080, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'pc_other', '📁 其他電腦周邊 (一般6.0% / 商城8.7%)', 0.087, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'large_appliances', '📺 大型家電 (一般5.3% / 商城5.8%)', 0.058, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'life_appliances', '🍳 生活/廚房/電視家電 (一般5.5% / 商城6.0%)', 0.060, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'home_parts', '🔋 家用零件/電池/遙控器 (一般6.0% / 商城8.0%)', 0.080, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'projector_other_appliances', '📹 投影機與周邊/其他家電 (一般7.5% / 商城8.5%)', 0.085, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'walkie_talkie', '📟 對講機 (一般6.5% / 商城9.5%)', 0.095, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'phone_acc_other', '🔌 手機周邊配件/儲值卡/其他 (一般7.5% / 商城9.5%)', 0.095, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'game_console', '🎮 電玩主機 (一般5.5% / 商城3.5%)', 0.035, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'game_software', '💿 主機遊戲 (一般5.5% / 商城6.5%)', 0.065, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'game_acc', '🕹️ 主機周邊 (一般6.0% / 商城7.5%)', 0.075, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    ['mall', 'healthcare_beauty', '🥗 保健食品/醫療/美妝保養 (一般6% / 商城9%)', 0.090, 0.025, 0.015, 0, 60, 0, '否', 0.03],
+    
+    // 蝦拍10倍館(綁免運2+10%回饋) (auction_10) - 31 筆
+    ['auction_10', 'phone', '📱 手機 (一般5.5% / 商城3.8%)', 0.055, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'tablet', '📟 平板電腦 (一般5.5% / 商城4.0%)', 0.055, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'wearable', '⌚ 穿戴裝置 (一般5.5% / 商城4.5%)', 0.055, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'earphone', '🎧 耳機/耳麥/藍牙耳機 (一般5.5% / 商城6.5%)', 0.055, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'audio_amp', '🎛️ 擴大機/混音器 (一般4.0% / 商城6.0%)', 0.040, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'speaker_audio_player', '🔊 音響/喇叭/麥克風/播放器 (一般6.0% / 商城7.5%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'audio_cable_other', '🔌 視聽線材/轉換器/其他音訊 (一般6.0% / 商城8.0%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'camera_lens', '🔍 相機鏡頭 (一般5.0% / 商城5.0%)', 0.050, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'camera', '📷 相機 (一般6.0% / 商城6.0%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'drone', '🛸 空拍機 (一般6.0% / 商城6.5%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'camera_acc', '🎒 相機保養/周邊配件 (一般6.0% / 商城7.5%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'camera_security_lens_acc', '🚨 安全監控/鏡頭與空拍周邊 (一般6.0% / 商城8.0%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'camera_other', '📦 其他相機周邊與分類 (一般6.0% / 商城8.5%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'laptop', '💻 筆記型電腦 (一般5.0% / 商城4.0%)', 0.050, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'desktop', '🖥️ 桌上型電腦 (一般5.5% / 商城5.0%)', 0.055, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'monitor_storage', '🖥️ 螢幕顯示器/儲存裝置 (一般5.5% / 商城5.5%)', 0.055, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'computer_component', '💾 電腦零組件 (一般6.0% / 商城6.5%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'keyboard_mouse', '⌨️ 鍵盤/滑鼠 (一般6.0% / 商城7.0%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'computer_acc_network', '🔌 電腦周邊/辦公設備/網路與線材 (一般6.0% / 商城7.5%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'software_printer_scanner', '💿 軟體/印表機/掃描機 (一般6.0% / 商城8.0%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'pc_other', '📁 其他電腦周邊 (一般6.0% / 商城8.7%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'large_appliances', '📺 大型家電 (一般5.3% / 商城5.8%)', 0.053, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'life_appliances', '🍳 生活/廚房/電視家電 (一般5.5% / 商城6.0%)', 0.055, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'home_parts', '🔋 家用零件/電池/遙控器 (一般6.0% / 商城8.0%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'projector_other_appliances', '📹 投影機與周邊/其他家電 (一般7.5% / 商城8.5%)', 0.075, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'walkie_talkie', '📟 對講機 (一般6.5% / 商城9.5%)', 0.065, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'phone_acc_other', '🔌 手機周邊配件/儲值卡/其他 (一般7.5% / 商城9.5%)', 0.075, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'game_console', '🎮 電玩主機 (一般5.5% / 商城3.5%)', 0.055, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'game_software', '💿 主機遊戲 (一般5.5% / 商城6.5%)', 0.055, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'game_acc', '🕹️ 主機周邊 (一般6.0% / 商城7.5%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    ['auction_10', 'healthcare_beauty', '🥗 保健食品/醫療/美妝保養 (一般6% / 商城9%)', 0.060, 0.025, 0.025, 0, 60, 0, '是', 0.02],
+    
+    // 蝦拍5倍館(綁免運1+5%回饋) (auction_5) - 31 筆
+    ['auction_5', 'phone', '📱 手機 (一般5.5% / 商城3.8%)', 0.055, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'tablet', '📟 平板電腦 (一般5.5% / 商城4.0%)', 0.055, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'wearable', '⌚ 穿戴裝置 (一般5.5% / 商城4.5%)', 0.055, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'earphone', '🎧 耳機/耳麥/藍牙耳機 (一般5.5% / 商城6.5%)', 0.055, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'audio_amp', '🎛️ 擴大機/混音器 (一般4.0% / 商城6.0%)', 0.040, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'speaker_audio_player', '🔊 音響/喇叭/麥克風/播放器 (一般6.0% / 商城7.5%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'audio_cable_other', '🔌 視聽線材/轉換器/其他音訊 (一般6.0% / 商城8.0%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'camera_lens', '🔍 相機鏡頭 (一般5.0% / 商城5.0%)', 0.050, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'camera', '📷 相機 (一般6.0% / 商城6.0%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'drone', '🛸 空拍機 (一般6.0% / 商城6.5%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'camera_acc', '🎒 相機保養/周邊配件 (一般6.0% / 商城7.5%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'camera_security_lens_acc', '🚨 安全監控/鏡頭與空拍周邊 (一般6.0% / 商城8.0%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'camera_other', '📦 其他相機周邊與分類 (一般6.0% / 商城8.5%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'laptop', '💻 筆記型電腦 (一般5.0% / 商城4.0%)', 0.050, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'desktop', '🖥️ 桌上型電腦 (一般5.5% / 商城5.0%)', 0.055, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'monitor_storage', '🖥️ 螢幕顯示器/儲存裝置 (一般5.5% / 商城5.5%)', 0.055, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'computer_component', '💾 電腦零組件 (一般6.0% / 商城6.5%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'keyboard_mouse', '⌨️ 鍵盤/滑鼠 (一般6.0% / 商城7.0%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'computer_acc_network', '🔌 電腦周邊/辦公設備/網路與線材 (一般6.0% / 商城7.5%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'software_printer_scanner', '💿 軟體/印表機/掃描機 (一般6.0% / 商城8.0%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'pc_other', '📁 其他電腦周邊 (一般6.0% / 商城8.7%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'large_appliances', '📺 大型家電 (一般5.3% / 商城5.8%)', 0.053, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'life_appliances', '🍳 生活/廚房/電視家電 (一般5.5% / 商城6.0%)', 0.055, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'home_parts', '🔋 家用零件/電池/遙控器 (一般6.0% / 商城8.0%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'projector_other_appliances', '📹 投影機與周邊/其他家電 (一般7.5% / 商城8.5%)', 0.075, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'walkie_talkie', '📟 對講機 (一般6.5% / 商城9.5%)', 0.065, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'phone_acc_other', '🔌 手機周邊配件/儲值卡/其他 (一般7.5% / 商城9.5%)', 0.075, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'game_console', '🎮 電玩主機 (一般5.5% / 商城3.5%)', 0.055, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'game_software', '💿 主機遊戲 (一般5.5% / 商城6.5%)', 0.055, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'game_acc', '🕹️ 主機周邊 (一般6.0% / 商城7.5%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    ['auction_5', 'healthcare_beauty', '🥗 保健食品/醫療/美妝保養 (一般6% / 商城9%)', 0.060, 0.025, 0.015, 0.06, 0, 0, '是', 0.02],
+    
+    // 蝦皮直送 (direct) - 6 筆
+    ['direct', 'phone', '📱 直送手機 (前毛5.5% + 後毛2%)', 0.055, 0, 0, 0, 0, 0.02, '否', 0],
+    ['direct', 'tablet', '📟 直送平板/筆電/穿戴/週邊 (前毛6.5% + 後毛2%)', 0.065, 0, 0, 0, 0, 0.02, '否', 0],
+    ['direct', 'earphone', '🎧 直送耳機 - 手機品牌 (前毛10% + 後毛2%)', 0.10, 0, 0, 0, 0, 0.02, '否', 0],
+    ['direct', 'speaker', '🔊 直送耳機 - 其他品牌/音響 (前毛12% + 後毛2%)', 0.12, 0, 0, 0, 0, 0.02, '否', 0],
+    ['direct', 'appliances', '📺 直送家用電器 (前毛10% + 後毛2%)', 0.10, 0, 0, 0, 0, 0.02, '否', 0],
+    ['direct', 'accessories', '🔌 直送手機配件/其他 (前毛12% + 後毛2%)', 0.12, 0, 0, 0, 0, 0.02, '否', 0]
+  ];
+  
+  if (!ratesSheet) {
+    ratesSheet = ss.insertSheet("ECommerceRates");
+    ratesSheet.appendRow(cnRatesHeaders);
+    ratesSheet.getRange(1, 1, 1, cnRatesHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    defaultRatesRows.forEach(function(row) {
+      ratesSheet.appendRow(row);
+    });
+    ratesSheet.setFrozenRows(1);
+  } else {
+    if (ratesSheet.getLastRow() === 0) {
+      ratesSheet.appendRow(cnRatesHeaders);
+      ratesSheet.getRange(1, 1, 1, cnRatesHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+      defaultRatesRows.forEach(function(row) {
+        ratesSheet.appendRow(row);
+      });
+    }
+  }
+
+  // 3.7. 初始化 ECommerceDetails (扣費明細工作表)
+  var detailsSheet = ss.getSheetByName("ECommerceDetails");
+  var cnDetailsHeaders = ['訂單編號', '計算時間', '賣場方案', '商品品類', '原始賣價', '商品成本', '成交手續費', '金流服務費', '免運服務費', '蝦幣服務費', '物流隱碼費', '直送後毛費', '抽成總計', '實拿金額', '預估毛利', '預估毛利率'];
+  if (!detailsSheet) {
+    detailsSheet = ss.insertSheet("ECommerceDetails");
+    detailsSheet.appendRow(cnDetailsHeaders);
+    detailsSheet.getRange(1, 1, 1, cnDetailsHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    detailsSheet.setFrozenRows(1);
+  } else {
+    if (detailsSheet.getLastRow() === 0) {
+      detailsSheet.appendRow(cnDetailsHeaders);
+      detailsSheet.getRange(1, 1, 1, cnDetailsHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    }
+  }
+
   // 4. 套用條件式格式設定 (顏色提示連動)
   try {
     applyConditionalFormatting(orderSheet);
@@ -178,6 +323,8 @@ function initializeSystemSheets() {
     formatOrderSheet(orderSheet);
     formatTaskSheet(taskSheet);
     formatStatusSheet(statusSheet);
+    formatRatesSheet(ratesSheet);
+    formatDetailsSheet(detailsSheet);
   } catch(e) {}
 
   // 清除預設空白 Sheet1
@@ -401,6 +548,8 @@ function doGet(e) {
     return handleReadAll();
   } else if (action === 'getLineConfig') {
     return handleGetLineConfig();
+  } else if (action === 'getECommerceRates') {
+    return handleGetECommerceRates();
   }
   
   return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '未知的 Action' }))
@@ -416,7 +565,7 @@ function doPost(e) {
     var action = postData.action;
     
     if (action === 'addOrder') {
-      result = handleAddOrder(postData.order);
+      result = handleAddOrder(postData.order, postData.calcResult);
     } else if (action === 'updateTask') {
       result = handleUpdateTask(postData.taskId, postData.completed, postData.completedBy, postData.completedAt, postData.photo, postData.notes);
     } else if (action === 'syncAll') {
@@ -424,7 +573,7 @@ function doPost(e) {
     } else if (action === 'updateOrderStatus') {
       result = handleUpdateOrderStatus(postData.orderId, postData.newStatus, postData.signature, postData.operator);
     } else if (action === 'saveEditedOrder') {
-      result = handleSaveEditedOrder(postData.order, postData.operator);
+      result = handleSaveEditedOrder(postData.order, postData.calcResult, postData.operator);
     } else if (action === 'addOrdersBatch') {
       result = handleAddOrdersBatch(postData.orders);
     } else if (action === 'saveLineConfig') {
@@ -502,8 +651,8 @@ function handleReadAll() {
     .setHeader("Access-Control-Allow-Origin", "*");
 }
 
-// 新增訂單 (寫入試算表動態逾期公式，並記錄到 OrderStatus)
-function handleAddOrder(order) {
+// 新增訂單 (寫入試算表動態逾期公式，並記錄到 OrderStatus 與 ECommerceDetails)
+function handleAddOrder(order, calcResult) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Orders");
   if (!sheet) return { status: 'error', message: '找不到 Orders 工作表' };
@@ -527,6 +676,13 @@ function handleAddOrder(order) {
   }
   
   sheet.appendRow(newRow);
+  
+  // 寫入計算明細到 ECommerceDetails
+  if (calcResult) {
+    try {
+      writeECommerceDetailInternal(ss, order.id, calcResult);
+    } catch(e) {}
+  }
   
   try {
     logStatusChangeInternal(ss, order.id, order, "(新建)", order.status || '訂貨需求', order.creator, "新建訂單");
@@ -634,8 +790,8 @@ function handleUpdateOrderStatus(orderId, newStatus, signature, operator) {
   return { status: 'error', message: '找不到該訂單 ID' };
 }
 
-// 儲存編輯修改後的訂單，若狀態改變則寫入 OrderStatus
-function handleSaveEditedOrder(order, operator) {
+// 儲存編輯修改後的訂單，若狀態改變則寫入 OrderStatus 與 ECommerceDetails
+function handleSaveEditedOrder(order, calcResult, operator) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Orders");
   if (!sheet) return { status: 'error', message: '找不到 Orders 工作表' };
@@ -667,6 +823,13 @@ function handleSaveEditedOrder(order, operator) {
           var val = order[engKey];
           sheet.getRange(rowNum, colIdx + 1).setValue(val !== undefined ? val : '');
         }
+      }
+      
+      // 寫入或更新計算明細
+      if (calcResult) {
+        try {
+          writeECommerceDetailInternal(ss, order.id, calcResult);
+        } catch(e) {}
       }
       
       // 檢查狀態是否有變
@@ -1124,4 +1287,158 @@ function sendECommerceDailyReminder(isTest) {
   } else {
     return { status: 'error', message: '推播失敗，請檢查 Token 與 GroupID 設定' };
   }
+}
+
+// 取得蝦皮雲端費率設定表
+function handleGetECommerceRates() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("ECommerceRates");
+  if (!sheet) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '找不到 ECommerceRates 工作表' }))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeader("Access-Control-Allow-Origin", "*");
+  }
+  
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var rates = [];
+  
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var item = {};
+    for (var j = 0; j < headers.length; j++) {
+      var header = headers[j];
+      var key = header;
+      if (header === '平台代碼') key = 'platform';
+      else if (header === '品類代碼') key = 'category';
+      else if (header === '品類名稱') key = 'categoryName';
+      else if (header === '成交手續費率') key = 'commissionRate';
+      else if (header === '金流費率') key = 'transactionRate';
+      else if (header === '蝦幣費率') key = 'coinRate';
+      else if (header === '免運費率') key = 'shippingRate';
+      else if (header === '免運固定費') key = 'flatFee';
+      else if (header === '直送後毛率') key = 'backProfitRate';
+      else if (header === '成交上限標記') key = 'hasCap';
+      else if (header === '大促日加收率') key = 'promoRate';
+      
+      var val = row[j];
+      if (key === 'hasCap') {
+        item[key] = (val === '是' || val === true || val === 'true');
+      } else if (key === 'platform' || key === 'category' || key === 'categoryName') {
+        item[key] = val;
+      } else {
+        item[key] = Number(val) || 0;
+      }
+    }
+    rates.push(item);
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify({ status: 'success', rates: rates }))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader("Access-Control-Allow-Origin", "*");
+}
+
+// 寫入詳細扣費明細到 ECommerceDetails 工作表
+function writeECommerceDetailInternal(ss, orderId, calcResult) {
+  var sheet = ss.getSheetByName("ECommerceDetails");
+  if (!sheet) return;
+  
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  
+  var idColIndex = headers.indexOf('訂單編號');
+  if (idColIndex === -1) return;
+  
+  var targetRow = -1;
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][idColIndex].toString() === orderId.toString()) {
+      targetRow = i + 1;
+      break;
+    }
+  }
+  
+  var timeStr = Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd HH:mm:ss");
+  
+  var newRow = [];
+  for (var i = 0; i < headers.length; i++) {
+    var header = headers[i];
+    switch(header) {
+      case '訂單編號': newRow.push(orderId); break;
+      case '計算時間': newRow.push(timeStr); break;
+      case '賣場方案': newRow.push(calcResult.platformName || ''); break;
+      case '商品品類': newRow.push(calcResult.categoryName || ''); break;
+      case '原始賣價': newRow.push(Number(calcResult.price) || 0); break;
+      case '商品成本': newRow.push(Number(calcResult.cost) || 0); break;
+      case '成交手續費': newRow.push(Number(calcResult.commissionFee) || 0); break;
+      case '金流服務費': newRow.push(Number(calcResult.transactionFee) || 0); break;
+      case '免運服務費': newRow.push(Number(calcResult.shippingCampaignFee) || 0); break;
+      case '蝦幣服務費': newRow.push(Number(calcResult.coinCampaignFee) || 0); break;
+      case '物流隱碼費': newRow.push(Number(calcResult.cryptoFee) || 0); break;
+      case '直送後毛費': newRow.push(Number(calcResult.backProfitFee) || 0); break;
+      case '抽成總計': newRow.push(Number(calcResult.totalFees) || 0); break;
+      case '實拿金額': newRow.push(Number(calcResult.payout) || 0); break;
+      case '預估毛利': newRow.push(Number(calcResult.profit) || 0); break;
+      case '預估毛利率': newRow.push(Number(calcResult.profitMargin) / 100 || 0); break;
+      default: newRow.push('');
+    }
+  }
+  
+  if (targetRow !== -1) {
+    sheet.getRange(targetRow, 1, 1, headers.length).setValues([newRow]);
+  } else {
+    sheet.appendRow(newRow);
+  }
+  
+  try {
+    formatDetailsSheet(sheet);
+  } catch(e) {}
+}
+
+// ECommerceRates 工作表排版
+function formatRatesSheet(sheet) {
+  if (!sheet) return;
+  var lastRow = sheet.getLastRow();
+  var maxRows = Math.max(lastRow, 1000);
+  
+  try {
+    sheet.autoResizeColumns(1, 11);
+  } catch(e) {}
+  
+  try {
+    sheet.getRange(2, 4, maxRows - 1, 4).setNumberFormat("0.00%");
+    sheet.getRange(2, 9, maxRows - 1, 1).setNumberFormat("0.00%");
+    sheet.getRange(2, 11, maxRows - 1, 1).setNumberFormat("0.00%");
+  } catch(e) {}
+}
+
+// ECommerceDetails 工作表排版
+function formatDetailsSheet(sheet) {
+  if (!sheet) return;
+  var lastRow = sheet.getLastRow();
+  var maxRows = Math.max(lastRow, 1000);
+  
+  try {
+    sheet.autoResizeColumns(1, 16);
+  } catch(e) {}
+  
+  var minWidths = {
+    1: 130, // 訂單編號
+    2: 140, // 計算時間
+    3: 180, // 賣場方案
+    4: 180, // 商品品類
+  };
+  
+  for (var col in minWidths) {
+    var colNum = parseInt(col);
+    try {
+      if (sheet.getColumnWidth(colNum) < minWidths[col]) {
+        sheet.setColumnWidth(colNum, minWidths[col]);
+      }
+    } catch(e) {}
+  }
+  
+  try {
+    sheet.getRange(2, 16, maxRows - 1, 1).setNumberFormat("0.00%");
+    sheet.getRange(2, 5, maxRows - 1, 11).setNumberFormat("$#,##0");
+  } catch(e) {}
 }

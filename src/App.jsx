@@ -268,10 +268,10 @@ export default function App() {
   };
 
   // 新增訂單
-  const handleSaveOrder = async (newOrder) => {
+  const handleSaveOrder = async (newOrder, calcResult = null) => {
     setIsLoading(true);
     try {
-      await addOrder(newOrder);
+      await addOrder(newOrder, calcResult);
       await fetchData();
       setAddOrderOpen(false);
     } catch (error) {
@@ -335,11 +335,11 @@ export default function App() {
   };
 
   // 編輯修改訂單存檔 (帶入操作同仁)
-  const handleSaveEditOrder = async (updatedOrder) => {
+  const handleSaveEditOrder = async (updatedOrder, calcResult = null) => {
     setIsLoading(true);
     try {
       const operatorName = currentUser ? currentUser.name : '';
-      const result = await saveEditedOrder(updatedOrder, operatorName);
+      const result = await saveEditedOrder(updatedOrder, calcResult, operatorName);
       if (result.success) {
         setOrders(result.orders);
         setDataSource(result.source);

@@ -83,7 +83,7 @@ export const loadData = async () => {
 };
 
 // 新增訂單 (自動偵測 API 或 LocalStorage)
-export const addOrder = async (newOrder) => {
+export const addOrder = async (newOrder, calcResult = null) => {
   const apiUrl = getApiUrl();
   const local = loadLocalData();
   const updatedOrders = [newOrder, ...local.orders];
@@ -104,7 +104,8 @@ export const addOrder = async (newOrder) => {
       },
       body: JSON.stringify({
         action: 'addOrder',
-        order: newOrder
+        order: newOrder,
+        calcResult
       })
     });
 
@@ -257,7 +258,7 @@ export const updateOrderStatus = async (orderId, newStatus, signature = null, op
 };
 
 // 儲存編輯修改後的訂單 (改為單筆精細更新，並記錄操作人員與變更歷史)
-export const saveEditedOrder = async (updatedOrder, operator = '') => {
+export const saveEditedOrder = async (updatedOrder, calcResult = null, operator = '') => {
   const apiUrl = getApiUrl();
   const local = loadLocalData();
 
@@ -285,6 +286,7 @@ export const saveEditedOrder = async (updatedOrder, operator = '') => {
       body: JSON.stringify({
         action: 'saveEditedOrder',
         order: updatedOrder,
+        calcResult,
         operator
       })
     });
@@ -432,6 +434,33 @@ export const testLinePush = async () => {
   } catch (error) {
     console.error('測試推播失敗:', error);
     throw error;
+  }
+};
+
+// 取得蝦皮雲端費率設定表
+export const getECommerceRates = async () => {
+  const apiUrl = getApiUrl();
+  const localRates = localStorage.getItem('store_mgmt_ecommerce_rates');
+  
+  if (!apiUrl) {
+    return localRates ? JSON.parse(localRates) : null;
+  }
+  
+  try {
+    const response = await fetch(`${apiUrl}?action=getECommerceRates`, {
+      method: 'GET',
+      mode: 'cors',
+    });
+    if (!response.ok) throw new Error('讀取費率設定失敗');
+    const data = await response.json();
+    if (data.status === 'success') {
+      localStorage.setItem('store_mgmt_ecommerce_rates', JSON.stringify(data.rates));
+      return data.rates;
+    }
+    return localRates ? JSON.parse(localRates) : null;
+  } catch (error) {
+    console.warn('讀取試算表電商費率設定失敗，使用本地快取:', error);
+    return localRates ? JSON.parse(localRates) : null;
   }
 };
 
