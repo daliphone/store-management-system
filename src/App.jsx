@@ -137,6 +137,9 @@ export default function App() {
   const [orders, setOrders] = useState([]);
   const [tasks, setTasks] = useState([]);
   
+  // 用於控制任務頁面選中的分店篩選 (首頁跳轉連動)
+  const [tasksStoreFilter, setTasksStoreFilter] = useState('');
+
   // 動態人員編制分店與部門清單
   const [stores, setStores] = useState(() => {
     const cached = localStorage.getItem('store_mgmt_stores');
@@ -481,6 +484,8 @@ export default function App() {
             setActiveTab={setActiveTab}
             setOrderStatusFilter={setOrderStatusFilter}
             onLogout={handleLogout}
+            stores={stores}
+            setTasksStoreFilter={setTasksStoreFilter}
           />
         );
       case 'orders':
@@ -506,6 +511,8 @@ export default function App() {
             onToggleTask={handleToggleTask}
             onUpdateTasks={handleUpdateTasks} // 傳遞 CRUD 回呼
             onOpenSettings={() => setSettingsOpen(true)}
+            tasksStoreFilter={tasksStoreFilter}
+            setTasksStoreFilter={setTasksStoreFilter}
           />
         );
       case 'customers':

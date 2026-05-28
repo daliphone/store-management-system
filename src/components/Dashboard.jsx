@@ -9,7 +9,9 @@ export default function Dashboard({
   onOpenSettings, 
   setActiveTab, 
   setOrderStatusFilter, 
-  onLogout 
+  onLogout,
+  stores,
+  setTasksStoreFilter
 }) {
   const [activeSubTab, setActiveSubTab] = useState('quote'); // 'quote' 或 'shortcut'
   const [quoteIndex, setQuoteIndex] = useState(0);
@@ -17,6 +19,33 @@ export default function Dashboard({
   const [isBouncing, setIsBouncing] = useState(false);
   const [alertSettings, setAlertSettings] = useState({ warningDays: 2, criticalDays: 7 });
   const [greetingText, setGreetingText] = useState('');
+  const [isStoreTasksModalOpen, setIsStoreTasksModalOpen] = useState(false);
+
+  // 統計各分店的未完成任務數 (對齊 TaskList 邏輯)
+  const getStorePendingTasksMap = () => {
+    const map = {};
+    const activeStores = stores ? stores.filter(s => s !== '全分店') : [];
+    activeStores.forEach(s => {
+      map[s] = 0;
+    });
+
+    tasks.forEach(t => {
+      if (!t.completed && map[t.store] !== undefined) {
+        // 電商部排除五大項常規店務任務
+        if (t.store === '電商部') {
+          const isFiveDefaultTask = 
+            (t.text && t.text.startsWith('開店-儀容自檢')) || 
+            t.text === '開店-環境清掃' || 
+            t.text === '營業-零用金確認' || 
+            t.text === '營業-隨機盤點庫存' || 
+            t.text === '閉店-庫存表上傳';
+          if (isFiveDefaultTask) return;
+        }
+        map[t.store] = (map[t.store] || 0) + 1;
+      }
+    });
+    return map;
+  };
 
   // 載入時效設定與隨機初始化
   useEffect(() => {
@@ -352,7 +381,12 @@ export default function Dashboard({
           {/* 全店待辦 */}
           <div 
             onClick={() => {
-              setActiveTab('tasks');
+              const canShowDetails = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR' || currentUser.store === '全分店';
+              if (canShowDetails) {
+                setIsStoreTasksModalOpen(true);
+              } else {
+                setActiveTab('tasks');
+              }
             }}
             className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[inset_0_2px_10px_rgba(0,0,0,0.01),0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between h-24 active:scale-95 transition-all cursor-pointer hover:shadow-md"
           >
@@ -543,6 +577,74 @@ export default function Dashboard({
           </div>
         </div>
       </div>
+      {/* 各分店待辦明細彈窗 */}
+      {isStoreTasksModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setIsStoreTasksModalOpen(false)}>
+          <div className="bg-white border border-slate-100 rounded-[28px] p-6 shadow-2xl max-w-sm w-full animate-scale-in max-h-[80vh] flex flex-col text-slate-705" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
+              <div className="flex items-center space-x-2">
+                <span className="text-lg">📊</span>
+                <span className="font-black text-sm text-slate-800">各單位待辦任務明細</span>
+              </div>
+              <button onClick={() => setIsStoreTasksModalOpen(false)} className="text-slate-400 p-1 border rounded-full bg-white hover:bg-slate-100 transition-colors border-none">
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto no-scrollbar py-3 space-y-2">
+              {(() => {
+                const pendingMap = getStorePendingTasksMap();
+                const activeStores = stores ? stores.filter(s => s !== '全分店') : [];
+                
+                return activeStores.map(storeName => {
+                  const taskCount = pendingMap[storeName] || 0;
+                  return (
+                    <button
+                      key={storeName}
+                      onClick={() => {
+                        if (setTasksStoreFilter) {
+                          setTasksStoreFilter(storeName);
+                        }
+                        setActiveTab('tasks');
+                        setIsStoreTasksModalOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-purple-50/40 hover:border-purple-200 transition-all active:scale-98 text-left border-none"
+                    >
+                      <span className="text-xs font-black text-slate-700">{storeName}</span>
+                      <div className="flex items-center space-x-1.5">
+                        <span className={`text-xs font-black px-2 py-0.5 rounded-full font-mono ${
+                          taskCount > 0 
+                            ? 'bg-rose-100 text-rose-600 animate-pulse-subtle' 
+                            : 'bg-slate-150 text-slate-400'
+                        }`}>
+                          {taskCount} 件
+                        </span>
+                        <span className="text-[10px] text-slate-350">➔</span>
+                      </div>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 shrink-0">
+              <button
+                onClick={() => {
+                  if (setTasksStoreFilter) {
+                    setTasksStoreFilter(currentUser.store !== '全分店' ? currentUser.store : (stores && stores[0]) || '東門店');
+                  }
+                  setActiveTab('tasks');
+                  setIsStoreTasksModalOpen(false);
+                }}
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-3 rounded-xl text-xs active:scale-95 transition-all flex items-center justify-center space-x-1.5 border-none"
+              >
+                <span>直接檢視全店任務清單 ➔</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

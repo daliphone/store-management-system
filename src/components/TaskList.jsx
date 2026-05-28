@@ -4,7 +4,16 @@ import Modal from './Modal';
 import ManieIcon from './ManieIcon';
 import { STORES } from '../mockData';
 
-export default function TaskList({ tasks, currentUser, users, onToggleTask, onUpdateTasks, onOpenSettings }) {
+export default function TaskList({ 
+  tasks, 
+  currentUser, 
+  users, 
+  onToggleTask, 
+  onUpdateTasks, 
+  onOpenSettings,
+  tasksStoreFilter,
+  setTasksStoreFilter
+}) {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [pendingCancelTaskId, setPendingCancelTaskId] = useState(null);
   
@@ -21,6 +30,16 @@ export default function TaskList({ tasks, currentUser, users, onToggleTask, onUp
   const [selectedStore, setSelectedStore] = useState(() => {
     return currentUser.store !== '全分店' ? currentUser.store : '東門店';
   });
+
+  // 監聽來自首頁的跳轉分店過濾請求，更新完畢後自動重置以利之後自由切換分店
+  React.useEffect(() => {
+    if (tasksStoreFilter) {
+      setSelectedStore(tasksStoreFilter);
+      if (setTasksStoreFilter) {
+        setTasksStoreFilter('');
+      }
+    }
+  }, [tasksStoreFilter, setTasksStoreFilter]);
 
   // 新增與編輯日常任務狀態
   const [isAdding, setIsAdding] = useState(false);
