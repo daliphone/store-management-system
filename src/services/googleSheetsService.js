@@ -3,6 +3,15 @@ import { INITIAL_ORDERS, INITIAL_TASKS } from '../mockData';
 const API_URL_KEY = 'store_mgmt_api_url';
 const LOCAL_ORDERS_KEY = 'store_mgmt_orders';
 const LOCAL_TASKS_KEY = 'store_mgmt_tasks';
+const LOCAL_CUSTOMERS_KEY = 'store_mgmt_customers';
+
+// 預設客戶 (新增建立者 creator 欄位與最後跟進 lastFollowUp 欄位以作保護期判斷)
+const DEFAULT_CUSTOMERS = [
+  { id: 'cust_1', name: '林大經', phone: '0929-341-060', lineId: 'dajing929', notes: '台南六甲店熟客', creator: '1074', createdAt: '2026-05-06', lastFollowUp: '2026-05-06' },
+  { id: 'cust_2', name: '陳育德', phone: '0938-677-206', lineId: 'yude938', notes: '合約續約客戶', creator: '1074', createdAt: '2026-05-10', lastFollowUp: '2026-05-10' },
+  { id: 'cust_3', name: '詹政良', phone: '0915-055-209', lineId: 'zhengliang915', notes: '喜好紅米系列產品', creator: 'admin', createdAt: '2026-05-15', lastFollowUp: '2026-05-15' },
+  { id: 'cust_4', name: '游小姐', phone: '0915-556-589', lineId: 'missyou', notes: '調貨機型通知', creator: 'admin', createdAt: '2026-05-17', lastFollowUp: '2026-05-17' }
+];
 
 // 取得設定的 Google Sheets API 網址
 export const getApiUrl = () => {
@@ -22,6 +31,7 @@ export const saveApiUrl = (url) => {
 const loadLocalData = () => {
   let orders = localStorage.getItem(LOCAL_ORDERS_KEY);
   let tasks = localStorage.getItem(LOCAL_TASKS_KEY);
+  let customers = localStorage.getItem(LOCAL_CUSTOMERS_KEY);
 
   if (!orders) {
     localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(INITIAL_ORDERS));
@@ -31,17 +41,23 @@ const loadLocalData = () => {
     localStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(INITIAL_TASKS));
     tasks = JSON.stringify(INITIAL_TASKS);
   }
+  if (!customers) {
+    localStorage.setItem(LOCAL_CUSTOMERS_KEY, JSON.stringify(DEFAULT_CUSTOMERS));
+    customers = JSON.stringify(DEFAULT_CUSTOMERS);
+  }
 
   return {
     orders: JSON.parse(orders),
-    tasks: JSON.parse(tasks)
+    tasks: JSON.parse(tasks),
+    customers: JSON.parse(customers)
   };
 };
 
 // 儲存資料到本地
-const saveLocalData = (orders, tasks) => {
+const saveLocalData = (orders, tasks, customers = null) => {
   if (orders) localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(orders));
   if (tasks) localStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(tasks));
+  if (customers) localStorage.setItem(LOCAL_CUSTOMERS_KEY, JSON.stringify(customers));
 };
 
 // 載入所有資料 (自動偵測 API 或 LocalStorage)
@@ -64,10 +80,11 @@ export const loadData = async () => {
     const data = await response.json();
     if (data.status === 'success') {
       // 同步更新本地快取，以便離線時使用
-      saveLocalData(data.orders, data.tasks);
+      saveLocalData(data.orders, data.tasks, data.customers);
       return {
         orders: data.orders,
         tasks: data.tasks,
+        customers: data.customers || local.customers,
         source: 'Google Sheets'
       };
     } else {
@@ -462,6 +479,65 @@ export const getECommerceRates = async () => {
     console.warn('讀取試算表電商費率設定失敗，使用本地快取:', error);
     return localRates ? JSON.parse(localRates) : null;
   }
+};
+
+// 同步客戶資料到 Google Sheets
+export const syncCustomers = async (customers) => {
+  const apiUrl = getApiUrl();
+  // 先更新本地快取
+  saveLocalData(null, null, customers);
+
+  if (!apiUrl) {
+    return { success: true, source: 'LocalStorage' };
+  }
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      body: JSON.stringify({
+        action: 'syncCustomers',
+        customers
+      })
+    });
+
+    const data = await response.json();
+    if (data.status === 'success') {
+      return { success: true, source: 'Google Sheets' };
+    } else {
+      throw new Error(data.message || 'API 同步客戶失敗');
+    }
+  } catch (error) {
+    console.error('Google Sheets 同步客戶失敗，已儲存在本地快取:', error);
+    return { success: true, source: 'LocalStorage (API 寫入失敗)' };
+  }
+};
+
+// 寫入系統操作稽核日誌 (非同步發送，不阻礙前端)
+export const writeSystemLog = (operator, role, actionType, targetModule, description) => {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) return;
+
+  fetch(apiUrl, {
+    method: 'POST',
+    mode: 'cors',
+    headers: {
+      'Content-Type': 'text/plain',
+    },
+    body: JSON.stringify({
+      action: 'writeLog',
+      operator,
+      role,
+      actionType,
+      targetModule,
+      description
+    })
+  }).catch(error => {
+    console.warn('系統日誌寫入雲端失敗：', error);
+  });
 };
 
 

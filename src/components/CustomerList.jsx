@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { UserPlus, Search, Phone, MessageSquare, Calendar, Trash2, X, Plus } from 'lucide-react';
+import { UserPlus, Search, Phone, MessageSquare, Calendar, Trash2, X, Plus, Lock } from 'lucide-react';
 
-export default function CustomerList({ customers, onAddCustomer, onDeleteCustomer, currentUser }) {
+export default function CustomerList({ customers, onAddCustomer, onDeleteCustomer, currentUser, writeSystemLog }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [unlockedCustomers, setUnlockedCustomers] = useState({});
+  const [clickTracker, setClickTracker] = useState({});
   const [isAdding, setIsAdding] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
     name: '',
@@ -10,6 +12,75 @@ export default function CustomerList({ customers, onAddCustomer, onDeleteCustome
     lineId: '',
     notes: ''
   });
+
+  // 判斷該客戶資料對於當前同仁是否可見完整版 (自己建立的，或是管理員，或是已解鎖)
+  const isSensitiveDataVisible = (customer) => {
+    if (!currentUser) return false;
+    
+    // 1. 若當前同仁是建立者，直接解鎖 (支援 creator 與當前同仁 ID 或姓名比對)
+    const isCreator = customer.creator === currentUser.id || 
+                      customer.creator === currentUser.name ||
+                      customer.creator === currentUser.username;
+    if (isCreator) return true;
+
+    // 2. 若為系統管理員，直接解鎖
+    if (currentUser.role === 'SUPER_ADMIN') return true;
+
+    // 3. 若為此瀏覽器此會話手動解鎖，直接解鎖
+    if (unlockedCustomers[customer.id]) return true;
+
+    return false;
+  };
+
+  // 連續點擊 8 次以解鎖檢視敏感資料 (Friction Design)
+  const handleUnlockClick = (customer) => {
+    const currentCount = clickTracker[customer.id] || 0;
+    const nextCount = currentCount + 1;
+    
+    if (nextCount >= 8) {
+      setUnlockedCustomers(prev => ({
+        ...prev,
+        [customer.id]: true
+      }));
+      
+      // 清理點擊次數計數
+      setClickTracker(prev => {
+        const updated = { ...prev };
+        delete updated[customer.id];
+        return updated;
+      });
+
+      // 發送日誌到雲端
+      if (writeSystemLog) {
+        const operatorName = currentUser ? currentUser.name : '未知人員';
+        const operatorRole = currentUser ? currentUser.role : 'GUEST';
+        writeSystemLog(
+          operatorName,
+          operatorRole,
+          'VIEW_CUSTOMER_SENSITIVE',
+          'Customers',
+          `連續點擊8次解鎖檢視非自己建立的客戶敏感資訊: ${customer.name} (${customer.id})`
+        );
+      }
+    } else {
+      setClickTracker(prev => ({
+        ...prev,
+        [customer.id]: nextCount
+      }));
+    }
+  };
+
+  // 將聯絡電話遮蔽中間四碼 (0912-345-678 -> 0912-***-678)
+  const getMaskedPhone = (phone) => {
+    if (!phone) return '';
+    const clean = phone.replace(/-/g, '');
+    if (clean.length >= 8) {
+      const p1 = clean.substring(0, 4);
+      const p3 = clean.substring(clean.length - 3);
+      return `${p1}-***-${p3}`;
+    }
+    return '****-***';
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -163,6 +234,9 @@ export default function CustomerList({ customers, onAddCustomer, onDeleteCustome
           ) : (
             filteredCustomers.map(customer => {
               const sidebarColor = getSidebarColor(customer.name);
+              const isVisible = isSensitiveDataVisible(customer);
+              const clickCount = clickTracker[customer.id] || 0;
+              const remaining = 8 - clickCount;
               return (
                 <div 
                   key={customer.id}
@@ -182,8 +256,13 @@ export default function CustomerList({ customers, onAddCustomer, onDeleteCustome
                           </span>
                         </div>
                         <div>
-                          <h4 className="font-black text-slate-800 text-sm">{customer.name}</h4>
-                          <p className="text-[9px] text-slate-400 font-mono">編號: {customer.id}</p>
+                          <div className="flex items-center space-x-1.5">
+                            <h4 className="font-black text-slate-800 text-sm">{customer.name}</h4>
+                            {!isVisible && (
+                              <span className="px-1.5 py-0.5 rounded text-[8px] bg-slate-100 text-slate-500 font-bold border border-slate-200">去敏感</span>
+                            )}
+                          </div>
+                          <p className="text-[9px] text-slate-400 font-mono">編號: {customer.id} | 建立者: {customer.creator || '系統'}</p>
                         </div>
                       </div>
                       
@@ -204,13 +283,13 @@ export default function CustomerList({ customers, onAddCustomer, onDeleteCustome
                       <div className="space-y-1.5">
                         <div className="flex items-center space-x-1.5">
                           <Phone size={12} className="text-slate-400" />
-                          <span className="font-mono">{customer.phone}</span>
+                          <span className="font-mono">{isVisible ? customer.phone : getMaskedPhone(customer.phone)}</span>
                         </div>
                         {customer.lineId && (
                           <div className="flex items-center space-x-1.5">
                             <MessageSquare size={12} className="text-slate-400" />
                             <span className="px-2 py-0.5 rounded-md bg-[#EFF6FF] text-[#2563EB] border border-blue-50 font-mono">
-                              LINE: {customer.lineId}
+                              LINE: {isVisible ? customer.lineId : '****** (已遮蔽)'}
                             </span>
                           </div>
                         )}
@@ -220,29 +299,50 @@ export default function CustomerList({ customers, onAddCustomer, onDeleteCustome
                         </div>
                       </div>
 
-                      {/* 電話、簡訊快捷撥號與發送 */}
-                      <div className="flex items-center space-x-2 shrink-0">
-                        <a 
-                          href={`tel:${customer.phone}`}
-                          className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 active:scale-90 transition-all shadow-sm border border-blue-100"
-                          title="撥打電話"
+                      {/* 電話、簡訊快捷撥號與發送 / 解鎖按鈕 */}
+                      {isVisible ? (
+                        <div className="flex items-center space-x-2 shrink-0">
+                          <a 
+                            href={`tel:${customer.phone}`}
+                            className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 active:scale-90 transition-all shadow-sm border border-blue-100"
+                            title="撥打電話"
+                          >
+                            <Phone size={12} strokeWidth={2.5} />
+                          </a>
+                          <a 
+                            href={`sms:${customer.phone}`}
+                            className="w-8 h-8 flex items-center justify-center bg-rose-50 text-rose-600 rounded-full hover:bg-rose-100 active:scale-90 transition-all shadow-sm border border-rose-100"
+                            title="發送簡訊"
+                          >
+                            <MessageSquare size={12} strokeWidth={2.5} />
+                          </a>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleUnlockClick(customer)}
+                          className={`px-2.5 py-1.5 rounded-xl text-[9px] flex items-center space-x-1.5 active:scale-90 transition-all duration-100 font-black cursor-pointer shrink-0 ${
+                            remaining <= 4 
+                              ? 'bg-rose-500 hover:bg-rose-600 text-white border border-rose-400 shadow-sm animate-pulse'
+                              : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100'
+                          }`}
+                          title="連續點擊 8 次以解鎖檢視客戶聯絡資訊與備註"
                         >
-                          <Phone size={12} strokeWidth={2.5} />
-                        </a>
-                        <a 
-                          href={`sms:${customer.phone}`}
-                          className="w-8 h-8 flex items-center justify-center bg-rose-50 text-rose-600 rounded-full hover:bg-rose-100 active:scale-90 transition-all shadow-sm border border-rose-100"
-                          title="發送簡訊"
-                        >
-                          <MessageSquare size={12} strokeWidth={2.5} />
-                        </a>
-                      </div>
+                          <Lock size={10} className={remaining <= 4 ? 'text-white' : 'text-rose-500'} />
+                          <span>
+                            {remaining === 4 && '🔒 還需點擊 4 次'}
+                            {remaining === 3 && '💥 還需點擊 3 次'}
+                            {remaining === 2 && '⚡ 還需點擊 2 次'}
+                            {remaining === 1 && '🔥 最後 1 下解鎖'}
+                            {remaining > 4 && '🔒 解鎖檢視'}
+                          </span>
+                        </button>
+                      )}
                     </div>
 
                     {/* 顧客專屬備註 */}
                     {customer.notes && (
                       <div className="bg-slate-50/50 p-2.5 rounded-xl text-[10px] text-slate-600 border border-slate-100 font-semibold italic">
-                        📝 備註：{customer.notes}
+                        📝 備註：{isVisible ? customer.notes : '[非建立者已隱藏客戶跟進情資]'}
                       </div>
                     )}
                   </div>

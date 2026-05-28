@@ -13,6 +13,17 @@
  * 7. 部署完成後，複製產生的「網頁應用程式 URL」並填入本系統網頁的「設定」中即可！
  */
 
+// 工作表分頁中文化名稱常數
+var SHEET_ORDERS = "訂單總表";
+var SHEET_TASKS = "待辦任務";
+var SHEET_ORDER_STATUS = "訂單狀態異動";
+var SHEET_CONFIG = "系統設定";
+var SHEET_ECOMMERCE_RATES = "電商費率參數";
+var SHEET_ECOMMERCE_DETAILS = "電商扣費明細";
+var SHEET_CUSTOMERS = "客戶資料";
+var SHEET_SYSTEM_LOGS = "系統操作日誌";
+var SHEET_SYSTEM_LOGS_BACKUP = "操作日誌封存";
+
 // 欄位雙向對照表
 var ORDER_MAPPING = {
   'id': '編號',
@@ -51,6 +62,19 @@ var TASK_MAPPING = {
 var REVERSE_ORDER_MAPPING = getReverseMapping(ORDER_MAPPING);
 var REVERSE_TASK_MAPPING = getReverseMapping(TASK_MAPPING);
 
+var CUSTOMER_MAPPING = {
+  'id': '客戶編號',
+  'name': '姓名',
+  'phone': '聯絡電話',
+  'lineId': 'LINE ID',
+  'notes': '備註說明',
+  'creator': '建立者',
+  'createdAt': '建立日期',
+  'lastFollowUp': '最後跟進日期'
+};
+
+var REVERSE_CUSTOMER_MAPPING = getReverseMapping(CUSTOMER_MAPPING);
+
 function getReverseMapping(mapping) {
   var rev = {};
   for (var key in mapping) {
@@ -64,6 +88,7 @@ function onOpen() {
   var ui = SpreadsheetApp.getUi();
   ui.createMenu('馬尼門市系統')
     .addItem('一鍵初始化系統工作表 (自動建立與連動格式)', 'initializeSystemSheets')
+    .addItem('手動整理與封存 30 天前日誌', 'archiveOldLogs')
     .addToUi();
 }
 
@@ -72,11 +97,11 @@ function initializeSystemSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
   // 1. 初始化 Orders
-  var orderSheet = ss.getSheetByName("Orders");
+  var orderSheet = ss.getSheetByName(SHEET_ORDERS);
   var cnOrderHeaders = ['編號', '客戶姓名', '客戶電話', '商品與承諾內容', '類型', '分店', '提單人員', '客戶來源', '客戶標籤', '數量', '商品單價', '商品成本', '到貨狀態', '建單日期', '預計交貨日', '逾期天數', '客戶簽名', '備註', '訂單平台'];
   
   if (!orderSheet) {
-    orderSheet = ss.insertSheet("Orders");
+    orderSheet = ss.insertSheet(SHEET_ORDERS);
     orderSheet.appendRow(cnOrderHeaders);
     orderSheet.getRange(1, 1, 1, cnOrderHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
     orderSheet.setFrozenRows(1);
@@ -88,11 +113,11 @@ function initializeSystemSheets() {
   }
 
   // 2. 初始化 Tasks (配合無時段、無櫃台之新店務)
-  var taskSheet = ss.getSheetByName("Tasks");
+  var taskSheet = ss.getSheetByName(SHEET_TASKS);
   var cnTaskHeaders = ['任務編號', '分店', '任務內容', '分數', '是否完成', '完成時間', '完成人員', '現場照片', '備註'];
   
   if (!taskSheet) {
-    taskSheet = ss.insertSheet("Tasks");
+    taskSheet = ss.insertSheet(SHEET_TASKS);
     taskSheet.appendRow(cnTaskHeaders);
     taskSheet.getRange(1, 1, 1, cnTaskHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
     taskSheet.setFrozenRows(1);
@@ -104,11 +129,11 @@ function initializeSystemSheets() {
   }
 
   // 3. 初始化 OrderStatus (訂單狀態異動歷史紀錄)
-  var statusSheet = ss.getSheetByName("OrderStatus");
+  var statusSheet = ss.getSheetByName(SHEET_ORDER_STATUS);
   var cnStatusHeaders = ['紀錄編號', '變更時間', '訂單編號', '客戶姓名', '客戶電話', '商品名稱', '異動前狀態', '異動後狀態', '經辦同仁', '所屬分店', '備註'];
   
   if (!statusSheet) {
-    statusSheet = ss.insertSheet("OrderStatus");
+    statusSheet = ss.insertSheet(SHEET_ORDER_STATUS);
     statusSheet.appendRow(cnStatusHeaders);
     statusSheet.getRange(1, 1, 1, cnStatusHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
     statusSheet.setFrozenRows(1);
@@ -120,7 +145,7 @@ function initializeSystemSheets() {
   }
 
   // 3.5. 初始化 Config (系統設定參數表，主要存放 LINE Token 等)
-  var configSheet = ss.getSheetByName("Config");
+  var configSheet = ss.getSheetByName(SHEET_CONFIG);
   var cnConfigHeaders = ['設定鍵', '設定值', '說明'];
   var defaultConfigRows = [
     ['LINE_ACCESS_TOKEN', '', 'LINE Channel Access Token (主動推播用)'],
@@ -129,7 +154,7 @@ function initializeSystemSheets() {
   ];
   
   if (!configSheet) {
-    configSheet = ss.insertSheet("Config");
+    configSheet = ss.insertSheet(SHEET_CONFIG);
     configSheet.appendRow(cnConfigHeaders);
     configSheet.getRange(1, 1, 1, cnConfigHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
     defaultConfigRows.forEach(function(row) {
@@ -162,7 +187,7 @@ function initializeSystemSheets() {
   } catch(e) {}
 
   // 3.6. 初始化 ECommerceRates (蝦皮費率工作表)
-  var ratesSheet = ss.getSheetByName("ECommerceRates");
+  var ratesSheet = ss.getSheetByName(SHEET_ECOMMERCE_RATES);
   var cnRatesHeaders = ['平台代碼', '品類代碼', '品類名稱', '成交手續費率', '金流費率', '蝦幣費率', '免運費率', '免運固定費', '直送後毛率', '成交上限標記', '大促日加收率'];
   var defaultRatesRows = [
     // 蝦商 長期免運2+5%回饋 (mall) - 31 筆
@@ -274,7 +299,7 @@ function initializeSystemSheets() {
   ];
   
   if (!ratesSheet) {
-    ratesSheet = ss.insertSheet("ECommerceRates");
+    ratesSheet = ss.insertSheet(SHEET_ECOMMERCE_RATES);
     ratesSheet.appendRow(cnRatesHeaders);
     ratesSheet.getRange(1, 1, 1, cnRatesHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
     defaultRatesRows.forEach(function(row) {
@@ -292,10 +317,10 @@ function initializeSystemSheets() {
   }
 
   // 3.7. 初始化 ECommerceDetails (扣費明細工作表)
-  var detailsSheet = ss.getSheetByName("ECommerceDetails");
+  var detailsSheet = ss.getSheetByName(SHEET_ECOMMERCE_DETAILS);
   var cnDetailsHeaders = ['訂單編號', '計算時間', '賣場方案', '商品品類', '原始賣價', '商品成本', '成交手續費', '金流服務費', '免運服務費', '蝦幣服務費', '物流隱碼費', '直送後毛費', '抽成總計', '實拿金額', '預估毛利', '預估毛利率'];
   if (!detailsSheet) {
-    detailsSheet = ss.insertSheet("ECommerceDetails");
+    detailsSheet = ss.insertSheet(SHEET_ECOMMERCE_DETAILS);
     detailsSheet.appendRow(cnDetailsHeaders);
     detailsSheet.getRange(1, 1, 1, cnDetailsHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
     detailsSheet.setFrozenRows(1);
@@ -303,6 +328,60 @@ function initializeSystemSheets() {
     if (detailsSheet.getLastRow() === 0) {
       detailsSheet.appendRow(cnDetailsHeaders);
       detailsSheet.getRange(1, 1, 1, cnDetailsHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    }
+  }
+
+  // 3.8. 初始化 Customers (客戶資料表)
+  var customerSheet = ss.getSheetByName(SHEET_CUSTOMERS);
+  var cnCustomerHeaders = ['客戶編號', '姓名', '聯絡電話', 'LINE ID', '備註說明', '建立者', '建立日期', '最後跟進日期'];
+  if (!customerSheet) {
+    customerSheet = ss.insertSheet(SHEET_CUSTOMERS);
+    customerSheet.appendRow(cnCustomerHeaders);
+    customerSheet.getRange(1, 1, 1, cnCustomerHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    customerSheet.setFrozenRows(1);
+    // 寫入初始預設客戶資料
+    var defaultCustomerRows = [
+      ['cust_1', '林大經', '0929-341-060', 'dajing929', '台南六甲店熟客', '1074', '2026-05-06', '2026-05-06'],
+      ['cust_2', '陳育德', '0938-677-206', 'yude938', '合約續約客戶', '1074', '2026-05-10', '2026-05-10'],
+      ['cust_3', '詹政良', '0915-055-209', 'zhengliang915', '喜好紅米系列產品', 'admin', '2026-05-15', '2026-05-15'],
+      ['cust_4', '游小姐', '0915-556-589', 'missyou', '調貨機型通知', 'admin', '2026-05-17', '2026-05-17']
+    ];
+    defaultCustomerRows.forEach(function(row) {
+      customerSheet.appendRow(row);
+    });
+  } else {
+    if (customerSheet.getLastRow() === 0) {
+      customerSheet.appendRow(cnCustomerHeaders);
+      customerSheet.getRange(1, 1, 1, cnCustomerHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    }
+  }
+
+  // 3.9. 初始化 SystemLogs (系統操作日誌表)
+  var logSheet = ss.getSheetByName(SHEET_SYSTEM_LOGS);
+  var cnLogHeaders = ['紀錄時間', '操作人員', '角色權限', '動作類型', '受影響模組', '詳細描述'];
+  if (!logSheet) {
+    logSheet = ss.insertSheet(SHEET_SYSTEM_LOGS);
+    logSheet.appendRow(cnLogHeaders);
+    logSheet.getRange(1, 1, 1, cnLogHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    logSheet.setFrozenRows(1);
+  } else {
+    if (logSheet.getLastRow() === 0) {
+      logSheet.appendRow(cnLogHeaders);
+      logSheet.getRange(1, 1, 1, cnLogHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    }
+  }
+
+  // 3.10. 初始化 SystemLogs_Backup (操作日誌封存表)
+  var backupSheet = ss.getSheetByName(SHEET_SYSTEM_LOGS_BACKUP);
+  if (!backupSheet) {
+    backupSheet = ss.insertSheet(SHEET_SYSTEM_LOGS_BACKUP);
+    backupSheet.appendRow(cnLogHeaders);
+    backupSheet.getRange(1, 1, 1, cnLogHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    backupSheet.setFrozenRows(1);
+  } else {
+    if (backupSheet.getLastRow() === 0) {
+      backupSheet.appendRow(cnLogHeaders);
+      backupSheet.getRange(1, 1, 1, cnLogHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
     }
   }
 
@@ -326,6 +405,14 @@ function initializeSystemSheets() {
     formatStatusSheet(statusSheet);
     formatRatesSheet(ratesSheet);
     formatDetailsSheet(detailsSheet);
+    formatCustomerSheet(customerSheet);
+    formatLogSheet(logSheet);
+    formatLogSheet(backupSheet);
+  } catch(e) {}
+
+  // 註冊自動按月封存日誌定時器 (每月 1 號凌晨 3 點自動執行)
+  try {
+    setupArchiveTrigger();
   } catch(e) {}
 
   // 清除預設空白 Sheet1
@@ -338,10 +425,52 @@ function initializeSystemSheets() {
 
   // 彈出成功提示
   try {
-    SpreadsheetApp.getUi().alert('🎉 馬尼門市系統初始化成功！\n\n1. 已自動建立「Orders」、「Tasks」、「OrderStatus」與「Config」分頁。\n2. 已自動防止簽名與照片欄位撐爆版面。\n3. 已套用「時效警示條件式格式」與公式自動連動！');
+    SpreadsheetApp.getUi().alert('🎉 馬尼門市系統初始化成功！\n\n1. 已自動建立「' + SHEET_ORDERS + '」、「' + SHEET_TASKS + '」、「' + SHEET_ORDER_STATUS + '」、「' + SHEET_CONFIG + '」分頁。\n2. 新增「' + SHEET_CUSTOMERS + '」（客戶表）與「' + SHEET_SYSTEM_LOGS + '」（操作日誌表）。\n3. 新增「' + SHEET_SYSTEM_LOGS_BACKUP + '」（日誌封存表）並自動設定「每月自動封存舊日誌」定時排程！\n4. 套用欄位格式優化與時效警示格式！');
   } catch(e) {}
   
   return { status: 'success', message: '工作表初始化建立成功' };
+}
+
+// 自動註冊按月封存舊日誌的定時器
+function setupArchiveTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var triggerExists = false;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'archiveOldLogs') {
+      triggerExists = true;
+      break;
+    }
+  }
+  if (!triggerExists) {
+    // 建立每個月 1 號凌晨 3 點執行的定時器
+    ScriptApp.newTrigger('archiveOldLogs')
+      .timeBased()
+      .onMonthDay(1)
+      .atHour(3)
+      .create();
+  }
+}
+
+// 細部排版與寬度設定 (Customers)
+function formatCustomerSheet(sheet) {
+  if (!sheet) return;
+  try {
+    sheet.autoResizeColumns(1, 8);
+    sheet.setColumnWidth(5, 180); // 備註說明固定寬度
+  } catch(e) {}
+}
+
+// 細部排版與寬度設定 (SystemLogs)
+function formatLogSheet(sheet) {
+  if (!sheet) return;
+  try {
+    sheet.setColumnWidth(1, 145); // 紀錄時間
+    sheet.setColumnWidth(2, 85);  // 操作人員
+    sheet.setColumnWidth(3, 95);  // 角色權限
+    sheet.setColumnWidth(4, 130); // 動作類型
+    sheet.setColumnWidth(5, 100); // 受影響模組
+    sheet.setColumnWidth(6, 280); // 詳細描述
+  } catch(e) {}
 }
 
 // 細部排版與寬度設定 (OrderStatus)
@@ -537,10 +666,12 @@ function applyConditionalFormatting(sheet) {
 // 防呆安全檢查：在每次 API 操作前，確保分頁與標題必定存在
 function ensureSheetsExist() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var orderSheet = ss.getSheetByName("Orders");
-  var taskSheet = ss.getSheetByName("Tasks");
-  var statusSheet = ss.getSheetByName("OrderStatus");
-  if (!orderSheet || !taskSheet || !statusSheet) {
+  var orderSheet = ss.getSheetByName(SHEET_ORDERS);
+  var taskSheet = ss.getSheetByName(SHEET_TASKS);
+  var statusSheet = ss.getSheetByName(SHEET_ORDER_STATUS);
+  var customerSheet = ss.getSheetByName(SHEET_CUSTOMERS);
+  var logSheet = ss.getSheetByName(SHEET_SYSTEM_LOGS);
+  if (!orderSheet || !taskSheet || !statusSheet || !customerSheet || !logSheet) {
     initializeSystemSheets();
   }
 }
@@ -585,6 +716,10 @@ function doPost(e) {
       result = handleSaveLineConfig(postData.accessToken, postData.groupId, postData.reminderTime);
     } else if (action === 'testLinePush') {
       result = handleTestLinePush();
+    } else if (action === 'syncCustomers') {
+      result = handleSyncCustomers(postData.customers);
+    } else if (action === 'writeLog') {
+      result = handleWriteLog(postData.operator, postData.role, postData.actionType, postData.targetModule, postData.description);
     }
   } catch (err) {
     result = { status: 'error', message: err.toString() };
@@ -599,7 +734,7 @@ function doPost(e) {
 function handleReadAll() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  var orderSheet = ss.getSheetByName("Orders");
+  var orderSheet = ss.getSheetByName(SHEET_ORDERS);
   var orders = [];
   if (orderSheet) {
     var orderData = orderSheet.getDataRange().getValues();
@@ -626,7 +761,7 @@ function handleReadAll() {
     }
   }
   
-  var taskSheet = ss.getSheetByName("Tasks");
+  var taskSheet = ss.getSheetByName(SHEET_TASKS);
   var tasks = [];
   if (taskSheet) {
     var taskData = taskSheet.getDataRange().getValues();
@@ -651,7 +786,24 @@ function handleReadAll() {
     }
   }
   
-  return ContentService.createTextOutput(JSON.stringify({ status: 'success', orders: orders, tasks: tasks }))
+  var customerSheet = ss.getSheetByName(SHEET_CUSTOMERS);
+  var customers = [];
+  if (customerSheet) {
+    var customerData = customerSheet.getDataRange().getValues();
+    var customerHeaders = customerData[0];
+    for (var i = 1; i < customerData.length; i++) {
+      var row = customerData[i];
+      var customer = {};
+      for (var j = 0; j < customerHeaders.length; j++) {
+        var cnHeader = customerHeaders[j];
+        var engKey = REVERSE_CUSTOMER_MAPPING[cnHeader] || cnHeader;
+        customer[engKey] = row[j];
+      }
+      customers.push(customer);
+    }
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify({ status: 'success', orders: orders, tasks: tasks, customers: customers }))
     .setMimeType(ContentService.MimeType.JSON)
     .setHeader("Access-Control-Allow-Origin", "*");
 }
@@ -659,7 +811,7 @@ function handleReadAll() {
 // 新增訂單 (寫入試算表動態逾期公式，並記錄到 OrderStatus 與 ECommerceDetails)
 function handleAddOrder(order, calcResult) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Orders");
+  var sheet = ss.getSheetByName(SHEET_ORDERS);
   if (!sheet) return { status: 'error', message: '找不到 Orders 工作表' };
   
   var headers = sheet.getDataRange().getValues()[0];
@@ -703,7 +855,7 @@ function handleAddOrder(order, calcResult) {
 
 // 內部狀態變更歷程紀錄寫入輔助函數
 function logStatusChangeInternal(ss, orderId, orderData, oldStatus, newStatus, operator, notes) {
-  var statusSheet = ss.getSheetByName("OrderStatus");
+  var statusSheet = ss.getSheetByName(SHEET_ORDER_STATUS);
   if (!statusSheet) return;
   
   var logId = "log_" + Math.random().toString(36).substr(2, 9) + "_" + new Date().getTime();
@@ -739,7 +891,7 @@ function logStatusChangeInternal(ss, orderId, orderData, oldStatus, newStatus, o
 // 更新單筆訂單狀態，並在 OrderStatus 中寫入變更歷史
 function handleUpdateOrderStatus(orderId, newStatus, signature, operator) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Orders");
+  var sheet = ss.getSheetByName(SHEET_ORDERS);
   if (!sheet) return { status: 'error', message: '找不到 Orders 工作表' };
   
   var data = sheet.getDataRange().getValues();
@@ -798,7 +950,7 @@ function handleUpdateOrderStatus(orderId, newStatus, signature, operator) {
 // 儲存編輯修改後的訂單，若狀態改變則寫入 OrderStatus 與 ECommerceDetails
 function handleSaveEditedOrder(order, calcResult, operator) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Orders");
+  var sheet = ss.getSheetByName(SHEET_ORDERS);
   if (!sheet) return { status: 'error', message: '找不到 Orders 工作表' };
   
   var data = sheet.getDataRange().getValues();
@@ -859,7 +1011,7 @@ function handleSaveEditedOrder(order, calcResult, operator) {
 // 批次匯入訂單，並記錄到 OrderStatus
 function handleAddOrdersBatch(orders) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Orders");
+  var sheet = ss.getSheetByName(SHEET_ORDERS);
   if (!sheet) return { status: 'error', message: '找不到 Orders 工作表' };
   
   var headers = sheet.getDataRange().getValues()[0];
@@ -906,7 +1058,7 @@ function handleAddOrdersBatch(orders) {
 // 更新任務狀態 (支援照片與備註回報)
 function handleUpdateTask(taskId, completed, completedBy, completedAt, photo, notes) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Tasks");
+  var sheet = ss.getSheetByName(SHEET_TASKS);
   if (!sheet) return { status: 'error', message: '找不到 Tasks 工作表' };
   
   var data = sheet.getDataRange().getValues();
@@ -946,7 +1098,7 @@ function handleUpdateTask(taskId, completed, completedBy, completedAt, photo, no
 function handleSyncAll(orders, tasks) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  var orderSheet = ss.getSheetByName("Orders");
+  var orderSheet = ss.getSheetByName(SHEET_ORDERS);
   if (orderSheet) {
     orderSheet.clearContents();
     var cnOrderHeaders = ['編號', '客戶姓名', '客戶電話', '商品與承諾內容', '類型', '分店', '提單人員', '客戶來源', '客戶標籤', '數量', '商品單價', '商品成本', '到貨狀態', '建單日期', '預計交貨日', '逾期天數', '客戶簽名', '備註', '訂單平台'];
@@ -976,7 +1128,7 @@ function handleSyncAll(orders, tasks) {
     } catch(e) {}
   }
   
-  var taskSheet = ss.getSheetByName("Tasks");
+  var taskSheet = ss.getSheetByName(SHEET_TASKS);
   if (taskSheet) {
     taskSheet.clearContents();
     var cnTaskHeaders = ['任務編號', '分店', '任務內容', '分數', '是否完成', '完成時間', '完成人員', '現場照片', '備註'];
@@ -1008,7 +1160,7 @@ function handleSyncAll(orders, tasks) {
 // 取得 LINE 設定鍵值
 function handleGetLineConfig() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Config");
+  var sheet = ss.getSheetByName(SHEET_CONFIG);
   var config = { accessToken: '', groupId: '', reminderTime: '09:00' };
   
   if (sheet) {
@@ -1030,7 +1182,7 @@ function handleGetLineConfig() {
 // 儲存 LINE 設定並更新觸發器
 function handleSaveLineConfig(accessToken, groupId, reminderTime) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Config");
+  var sheet = ss.getSheetByName(SHEET_CONFIG);
   if (!sheet) return { status: 'error', message: '找不到 Config 工作表' };
   
   var data = sheet.getDataRange().getValues();
@@ -1099,7 +1251,7 @@ function updateDailyReminderTrigger(timeStr) {
 // 內部通用 LINE Push 發送函數
 function sendLineMessageInternal(message) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Config");
+  var sheet = ss.getSheetByName(SHEET_CONFIG);
   if (!sheet) return false;
   
   var data = sheet.getDataRange().getValues();
@@ -1143,7 +1295,7 @@ function sendECommerceDailyReminder(isTest) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
   // 1. 取得電商與調貨訂單
-  var orderSheet = ss.getSheetByName("Orders");
+  var orderSheet = ss.getSheetByName(SHEET_ORDERS);
   var overdueOrders = [];
   var todayOrders = [];
   var arrivedOrders = [];
@@ -1206,7 +1358,7 @@ function sendECommerceDailyReminder(isTest) {
   }
   
   // 2. 取得今日電商部待辦日常任務
-  var taskSheet = ss.getSheetByName("Tasks");
+  var taskSheet = ss.getSheetByName(SHEET_TASKS);
   var pendingTasks = [];
   if (taskSheet) {
     var taskData = taskSheet.getDataRange().getValues();
@@ -1297,7 +1449,7 @@ function sendECommerceDailyReminder(isTest) {
 // 取得蝦皮雲端費率設定表
 function handleGetECommerceRates() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("ECommerceRates");
+  var sheet = ss.getSheetByName(SHEET_ECOMMERCE_RATES);
   if (!sheet) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '找不到 ECommerceRates 工作表' }))
       .setMimeType(ContentService.MimeType.JSON)
@@ -1345,7 +1497,7 @@ function handleGetECommerceRates() {
 
 // 寫入詳細扣費明細到 ECommerceDetails 工作表
 function writeECommerceDetailInternal(ss, orderId, calcResult) {
-  var sheet = ss.getSheetByName("ECommerceDetails");
+  var sheet = ss.getSheetByName(SHEET_ECOMMERCE_DETAILS);
   if (!sheet) return;
   
   var data = sheet.getDataRange().getValues();
@@ -1446,4 +1598,126 @@ function formatDetailsSheet(sheet) {
     sheet.getRange(2, 16, maxRows - 1, 1).setNumberFormat("0.00%");
     sheet.getRange(2, 5, maxRows - 1, 11).setNumberFormat("$#,##0");
   } catch(e) {}
+}
+
+// 批次全量同步客戶資料
+function handleSyncCustomers(customers) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var customerSheet = ss.getSheetByName(SHEET_CUSTOMERS);
+  if (!customerSheet) return { status: 'error', message: '找不到 Customers 工作表' };
+  
+  customerSheet.clearContents();
+  var cnCustomerHeaders = ['客戶編號', '姓名', '聯絡電話', 'LINE ID', '備註說明', '建立者', '建立日期', '最後跟進日期'];
+  customerSheet.appendRow(cnCustomerHeaders);
+  customerSheet.getRange(1, 1, 1, cnCustomerHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+  
+  customers.forEach(function(cust) {
+    var row = cnCustomerHeaders.map(function(cnHeader) {
+      var engKey = REVERSE_CUSTOMER_MAPPING[cnHeader] || cnHeader;
+      var val = cust[engKey];
+      return val !== undefined ? val : '';
+    });
+    customerSheet.appendRow(row);
+  });
+  
+  try {
+    customerSheet.getRange(1, 1, 1000, cnCustomerHeaders.length).setHorizontalAlignment("left");
+    customerSheet.getRange(1, 1, 1, cnCustomerHeaders.length).setHorizontalAlignment("center");
+    formatCustomerSheet(customerSheet);
+  } catch(e) {}
+  
+  return { status: 'success', message: '客戶資料同步成功' };
+}
+
+// 寫入系統操作稽核日誌
+function handleWriteLog(operator, role, actionType, targetModule, description) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var logSheet = ss.getSheetByName(SHEET_SYSTEM_LOGS);
+  if (!logSheet) return { status: 'error', message: '找不到 SystemLogs 工作表' };
+  
+  var timeStr = Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd HH:mm:ss");
+  logSheet.appendRow([timeStr, operator || '', role || '', actionType || '', targetModule || '', description || '']);
+  
+  try {
+    formatLogSheet(logSheet);
+  } catch(e) {}
+  
+  return { status: 'success', message: '日誌紀錄成功' };
+}
+
+// 整理並自動/手動封存 30 天前的舊日誌
+function archiveOldLogs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var logSheet = ss.getSheetByName(SHEET_SYSTEM_LOGS);
+  if (!logSheet) {
+    return { status: 'error', message: '找不到 SystemLogs 工作表' };
+  }
+
+  // 1. 自動偵測與建立封存工作表 SystemLogs_Backup
+  var backupSheet = ss.getSheetByName(SHEET_SYSTEM_LOGS_BACKUP);
+  var cnLogHeaders = ['紀錄時間', '操作人員', '角色權限', '動作類型', '受影響模組', '詳細描述'];
+  if (!backupSheet) {
+    backupSheet = ss.insertSheet(SHEET_SYSTEM_LOGS_BACKUP);
+    backupSheet.appendRow(cnLogHeaders);
+    backupSheet.getRange(1, 1, 1, cnLogHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    backupSheet.setFrozenRows(1);
+  }
+
+  var data = logSheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    return { status: 'success', message: '目前尚無任何日誌可供封存。' };
+  }
+
+  // 2. 計算 30 天前的日期時間點
+  var now = new Date();
+  var threshold = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 天前
+
+  var logsToKeep = [data[0]]; // 保留標題列
+  var logsToArchive = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var logTimeStr = row[0];
+    var logDate = new Date(logTimeStr);
+    
+    // 如果日期格式無法正確解析，或是屬於 30 天內，則保留
+    if (isNaN(logDate.getTime()) || logDate >= threshold) {
+      logsToKeep.push(row);
+    } else {
+      // 超過 30 天的舊日誌，準備封存
+      if (row[0] instanceof Date) {
+        row[0] = Utilities.formatDate(row[0], "GMT+8", "yyyy-MM-dd HH:mm:ss");
+      }
+      logsToArchive.push(row);
+    }
+  }
+
+  // 3. 執行封存寫入與原表清理
+  if (logsToArchive.length > 0) {
+    // 寫入備份工作表
+    var startRow = backupSheet.getLastRow() + 1;
+    backupSheet.getRange(startRow, 1, logsToArchive.length, cnLogHeaders.length).setValues(logsToArchive);
+    
+    // 清空並覆寫原日誌表
+    logSheet.clearContents();
+    logSheet.getRange(1, 1, logsToKeep.length, cnLogHeaders.length).setValues(logsToKeep);
+    logSheet.getRange(1, 1, 1, cnLogHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    
+    try {
+      formatLogSheet(logSheet);
+      formatLogSheet(backupSheet);
+    } catch(e) {}
+
+    var msg = '🎉 成功封存 ' + logsToArchive.length + ' 筆超過 30 天的舊日誌至 SystemLogs_Backup 工作表！';
+    try {
+      SpreadsheetApp.getUi().alert(msg);
+    } catch(e) {}
+    return { status: 'success', message: msg, archivedCount: logsToArchive.length };
+  } else {
+    var msg = 'ℹ️ 目前無任何超過 30 天的舊日誌需要整理封存。';
+    try {
+      SpreadsheetApp.getUi().alert(msg);
+    } catch(e) {}
+    return { status: 'success', message: msg, archivedCount: 0 };
+  }
 }

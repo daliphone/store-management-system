@@ -8,7 +8,7 @@ import Settings from './components/Settings';
 import Login from './components/Login';
 import CustomerList from './components/CustomerList';
 import AdminConsole from './components/AdminConsole';
-import { loadData, addOrder, updateTaskStatus, updateOrderStatus, saveEditedOrder, addOrdersBatch } from './services/googleSheetsService';
+import { loadData, addOrder, updateTaskStatus, updateOrderStatus, saveEditedOrder, addOrdersBatch, syncCustomers, writeSystemLog } from './services/googleSheetsService';
 import { USERS } from './mockData';
 import { Loader2, AlertCircle, Database, Check } from 'lucide-react';
 import OrderDetails from './components/OrderDetails';
@@ -191,10 +191,10 @@ export default function App() {
     
     // 預設客戶
     const defaultCusts = [
-      { id: 'cust_1', name: '林大經', phone: '0929-341-060', lineId: 'dajing929', notes: '台南六甲店熟客', createdAt: '2026-05-06' },
-      { id: 'cust_2', name: '陳育德', phone: '0938-677-206', lineId: 'yude938', notes: '合約續約客戶', createdAt: '2026-05-10' },
-      { id: 'cust_3', name: '詹政良', phone: '0915-055-209', lineId: 'zhengliang915', notes: '喜好紅米系列產品', createdAt: '2026-05-15' },
-      { id: 'cust_4', name: '游小姐', phone: '0915-556-589', lineId: 'missyou', notes: '調貨機型通知', createdAt: '2026-05-17' }
+      { id: 'cust_1', name: '林大經', phone: '0929-341-060', lineId: 'dajing929', notes: '台南六甲店熟客', creator: '1074', createdAt: '2026-05-06', lastFollowUp: '2026-05-06' },
+      { id: 'cust_2', name: '陳育德', phone: '0938-677-206', lineId: 'yude938', notes: '合約續約客戶', creator: '1074', createdAt: '2026-05-10', lastFollowUp: '2026-05-10' },
+      { id: 'cust_3', name: '詹政良', phone: '0915-055-209', lineId: 'zhengliang915', notes: '喜好紅米系列產品', creator: 'admin', createdAt: '2026-05-15', lastFollowUp: '2026-05-15' },
+      { id: 'cust_4', name: '游小姐', phone: '0915-556-589', lineId: 'missyou', notes: '調貨機型通知', creator: 'admin', createdAt: '2026-05-17', lastFollowUp: '2026-05-17' }
     ];
     localStorage.setItem('store_mgmt_customers', JSON.stringify(defaultCusts));
     return defaultCusts;
@@ -273,6 +273,9 @@ export default function App() {
       // 動態同步個人自檢任務
       const syncedTasks = syncPersonalTasks(data.tasks, users);
       setTasks(syncedTasks);
+      if (data.customers) {
+        setCustomers(data.customers);
+      }
       setDataSource(data.source);
       
       // 若有新增或移除個人任務，悄悄同步回本地
@@ -291,10 +294,14 @@ export default function App() {
     localStorage.setItem(LOGGED_USER_KEY, JSON.stringify(user));
     setCurrentUser(user);
     setIsLoggedIn(true);
+    writeSystemLog(user.name, user.role, 'LOGIN', 'System', '登入系統成功');
   };
 
   // 登出處理
   const handleLogout = () => {
+    if (currentUser) {
+      writeSystemLog(currentUser.name, currentUser.role, 'LOGOUT', 'System', '登出系統');
+    }
     localStorage.removeItem(LOGGED_USER_KEY);
     setCurrentUser(null);
     setIsLoggedIn(false);
@@ -445,17 +452,43 @@ export default function App() {
   };
 
   // 客戶資料新增與刪除
-  const handleAddCustomer = (newCustomer) => {
-    const updated = [newCustomer, ...customers];
+  const handleAddCustomer = async (newCustomer) => {
+    // 自動將建立者設為當前登入同仁的帳號/ID，並同步設定最後跟進日
+    const customerWithCreator = {
+      ...newCustomer,
+      creator: currentUser ? currentUser.id || currentUser.name : 'unknown',
+      lastFollowUp: newCustomer.createdAt
+    };
+    const updated = [customerWithCreator, ...customers];
     setCustomers(updated);
-    localStorage.setItem('store_mgmt_customers', JSON.stringify(updated));
+    
+    const operatorName = currentUser ? currentUser.name : '未知人員';
+    const operatorRole = currentUser ? currentUser.role : 'GUEST';
+    
+    try {
+      await syncCustomers(updated);
+      writeSystemLog(operatorName, operatorRole, 'CREATE_CUSTOMER', 'Customers', `新增客戶: ${customerWithCreator.name} (${customerWithCreator.id})`);
+    } catch (error) {
+      console.error('同步新增客戶失敗：', error);
+    }
   };
 
-  const handleDeleteCustomer = (id) => {
-    if (window.confirm('確定要刪除此客戶的資料嗎？')) {
+  const handleDeleteCustomer = async (id) => {
+    const targetCust = customers.find(c => c.id === id);
+    const custName = targetCust ? targetCust.name : '';
+    if (window.confirm(`確定要刪除客戶「${custName || id}」的資料嗎？`)) {
       const updated = customers.filter(c => c.id !== id);
       setCustomers(updated);
-      localStorage.setItem('store_mgmt_customers', JSON.stringify(updated));
+      
+      const operatorName = currentUser ? currentUser.name : '未知人員';
+      const operatorRole = currentUser ? currentUser.role : 'GUEST';
+      
+      try {
+        await syncCustomers(updated);
+        writeSystemLog(operatorName, operatorRole, 'DELETE_CUSTOMER', 'Customers', `刪除客戶: ${custName || id} (${id})`);
+      } catch (error) {
+        console.error('同步刪除客戶失敗：', error);
+      }
     }
   };
 
@@ -522,6 +555,7 @@ export default function App() {
             onAddCustomer={handleAddCustomer}
             onDeleteCustomer={handleDeleteCustomer}
             currentUser={currentUser}
+            writeSystemLog={writeSystemLog}
           />
         );
       case 'query':
