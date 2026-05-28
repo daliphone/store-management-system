@@ -7,6 +7,7 @@ import TaskList from './components/TaskList';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import CustomerList from './components/CustomerList';
+import AdminConsole from './components/AdminConsole';
 import { loadData, addOrder, updateTaskStatus, updateOrderStatus, saveEditedOrder, addOrdersBatch } from './services/googleSheetsService';
 import { USERS } from './mockData';
 import { Loader2, AlertCircle, Database, Check } from 'lucide-react';
@@ -135,6 +136,46 @@ export default function App() {
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
   const [orders, setOrders] = useState([]);
   const [tasks, setTasks] = useState([]);
+  
+  // 動態人員編制分店與部門清單
+  const [stores, setStores] = useState(() => {
+    const cached = localStorage.getItem('store_mgmt_stores');
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return [
+      '東門店',
+      '小西門店',
+      '文賢店',
+      '永康店',
+      '歸仁店',
+      '安中店',
+      '鹽行店',
+      '五甲店',
+      '遠傳延平店',
+      '電商部'
+    ];
+  });
+
+  const handleUpdateStores = (newStores) => {
+    setStores(newStores);
+    localStorage.setItem('store_mgmt_stores', JSON.stringify(newStores));
+    
+    const apiUrl = localStorage.getItem('store_mgmt_api_url');
+    if (apiUrl) {
+      fetch(apiUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action: 'syncStores',
+          stores: newStores
+        })
+      }).catch(e => console.warn('同步編制至 Google Sheets 失敗：', e));
+    }
+  };
   
   // 客戶狀態管理
   const [customers, setCustomers] = useState(() => {
@@ -494,6 +535,18 @@ export default function App() {
             </div>
           </div>
         );
+      case 'admin':
+        return (
+          <AdminConsole
+            currentUser={currentUser}
+            setCurrentUser={setCurrentUser}
+            onRefreshData={fetchData}
+            users={users}
+            onUpdateUsers={handleUpdateUsers}
+            stores={stores}
+            onUpdateStores={handleUpdateStores}
+          />
+        );
       default:
         return null;
     }
@@ -531,7 +584,7 @@ export default function App() {
       {renderContent()}
 
       {/* 底部導航欄 */}
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} />
 
       {/* 新增訂單 Modal/Page */}
       {addOrderOpen && (

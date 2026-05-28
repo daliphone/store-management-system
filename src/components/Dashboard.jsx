@@ -161,6 +161,16 @@ export default function Dashboard({
   // 與我相關 (一般店員是自己提單的，店長是自己店的，管理員是全部)
   const myRelatedCount = baseOrdersForStats.filter(o => o.creator === currentUser.name).length;
 
+  const getTasksCardTitle = () => {
+    if (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR' || currentUser.store === '全分店') {
+      return '全店待辦';
+    }
+    if (currentUser.store === '電商部') {
+      return '部門待辦';
+    }
+    return '門市待辦';
+  };
+
   // 全店待辦 (依據店過濾的任務數)
   const filteredTasks = tasks.filter(t => {
     // 1. 同一分店/部門過濾
@@ -350,7 +360,7 @@ export default function Dashboard({
               <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-xs">
                 📋
               </div>
-              <span className="text-xs font-bold text-gray-500">全店待辦</span>
+              <span className="text-xs font-bold text-gray-500">{getTasksCardTitle()}</span>
             </div>
             <div className="flex items-baseline space-x-1">
               <span className="text-3xl font-black text-purple-600 font-['Outfit']">{pendingTasksCount}</span>
@@ -516,7 +526,7 @@ export default function Dashboard({
                         onClick={() => setActiveTab('tasks')}
                         className="w-full flex items-center justify-between text-left text-blue-600 hover:bg-blue-50 p-1 rounded-md transition-colors"
                       >
-                        <span>📋 有 {pendingTasksCount} 個店務任務未完成</span>
+                        <span>📋 有 {pendingTasksCount} 個{currentUser.store === '電商部' ? '部門' : '店務'}任務未完成</span>
                         <span className="text-[9px] bg-blue-100 px-1.5 rounded font-mono font-extrabold">GO</span>
                       </button>
                     ) : null}

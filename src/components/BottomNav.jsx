@@ -1,20 +1,20 @@
 import React from 'react';
-import { Home, Package, ClipboardCheck, CheckSquare, Users, Search } from 'lucide-react';
+import { Home, Package, ClipboardCheck, CheckSquare, Users, Search, Settings } from 'lucide-react';
 
-export default function BottomNav({ activeTab, setActiveTab }) {
+export default function BottomNav({ activeTab, setActiveTab, currentUser }) {
+  const canManage = currentUser && currentUser.permissions && currentUser.permissions.includes('manage_accounts');
+  
   const tabs = [
     { id: 'home', label: '首頁', icon: Home },
     { id: 'orders', label: '訂單', icon: Package },
     { id: 'tasks', label: '任務', icon: ClipboardCheck },
-    /* { 
-      id: 'checkin', 
-      label: '打卡', 
-      icon: CheckSquare,
-      customStyle: 'text-green-500'
-    }, */
     { id: 'customers', label: '客戶', icon: Users },
     { id: 'query', label: '查詢', icon: Search }
   ];
+
+  if (canManage) {
+    tabs.push({ id: 'admin', label: '管理', icon: Settings });
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto bg-white border-t border-slate-100 py-2 px-3 flex justify-around items-center z-50 shadow-lg rounded-t-2xl">
@@ -26,7 +26,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className="flex flex-col items-center justify-center w-12 py-1 relative focus:outline-none transition-all duration-200 active:scale-95"
+            className={`flex flex-col items-center justify-center py-1 relative focus:outline-none transition-all duration-200 active:scale-95 ${tabs.length > 5 ? 'w-10' : 'w-12'}`}
           >
             <div className={`p-1 rounded-xl transition-all duration-300 ${
               isActive 
