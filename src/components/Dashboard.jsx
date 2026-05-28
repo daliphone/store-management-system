@@ -16,8 +16,9 @@ export default function Dashboard({
   const [maniePose, setManiePose] = useState('idle');
   const [isBouncing, setIsBouncing] = useState(false);
   const [alertSettings, setAlertSettings] = useState({ warningDays: 2, criticalDays: 7 });
+  const [greetingText, setGreetingText] = useState('');
 
-  // 載入時效設定
+  // 載入時效設定與隨機初始化
   useEffect(() => {
     const cached = localStorage.getItem('store_mgmt_alert_settings');
     if (cached) {
@@ -25,20 +26,69 @@ export default function Dashboard({
         setAlertSettings(JSON.parse(cached));
       } catch (e) {}
     }
-  }, []);
+
+    // 隨機選取金句
+    setQuoteIndex(Math.floor(Math.random() * SALES_QUOTES.length));
+
+    // 隨機選取招呼語 (結合時間問候與活潑語氣)
+    const storeName = currentUser?.store || '門市';
+    const storeSuffix = (storeName.endsWith('部') || storeName.endsWith('處') || storeName.includes('門市')) ? '' : '門市';
+    const displayName = `${storeName}${storeSuffix}`;
+    const timeGreeting = getGreeting();
+    
+    const greetings = [
+      `${displayName}同仁，${timeGreeting}！今天也是業績長紅、活力滿滿的一天！💪`,
+      `${displayName}同仁，${timeGreeting}！讓我們以最熱情的笑容迎接每位客人吧！✨`,
+      `${displayName}同仁，${timeGreeting}！祝您今天出單順利、事事順心，一起加油！🚀`,
+      `${displayName}同仁，${timeGreeting}！今天手氣超旺，主力搭配銷售大有斬獲！🏆`,
+      `${displayName}同仁，${timeGreeting}！今天細心服務、顧客滿意，創造美好的一天！🌟`,
+      `${displayName}同仁，${timeGreeting}！今天也是元氣滿滿，讓我們一起突破目標！🔥`,
+      `${displayName}同仁，${timeGreeting}！關關難過關關過，今天也要保持愉快的心情喔！🌈`,
+      `${displayName}同仁，${timeGreeting}！多一點貼心，多一點貼切，今天業績一定飛高高！📈`,
+      `${displayName}同仁，${timeGreeting}！今天也要把最溫馨的服務帶給每一位顧客！❤️`,
+      `${displayName}同仁，${timeGreeting}！今天就讓我們攜手創造新的銷售紀錄吧！🎯`,
+      `${displayName}同仁，${timeGreeting}！保持專注與熱情，今天肯定能收穫滿滿的成果！🌟`,
+      `${displayName}同仁，${timeGreeting}！您就是門市最強的招財星，今天也祝您開單連連！💰`
+    ];
+    const randomIdx = Math.floor(Math.random() * greetings.length);
+    setGreetingText(greetings[randomIdx]);
+  }, [currentUser?.store]);
 
   // 門市銷售激勵金句資料庫
   const SALES_QUOTES = [
     "客戶買的不是商品，是您專業又貼心的服務！😊",
     "今天攜碼客戶是主力，配件搭配與加購大有機會喔！🏆",
     "服務好一位熟客，勝過辛苦尋找十位新客人！💪",
-    "續約客人的二度開發，是創造門市額外業績的秘訣喔！",
+    "續約客人的二度開發，是創造門市額外業績的秘訣喔！📱",
     "笑容是門市最好的名片，今天也給客人一個微笑吧！✨",
     "主動詢問舊機折抵，能有效提升客戶的購機意願！📱",
     "把簡單的事情重複做好就是專業，日常任務一起加油！",
     "細心核對切結書與合約細項，展現我們最專業的一面！",
     "今天的努力，是明天業績的基石，今天也要元氣滿滿！⚡",
-    "多做一個貼心動作，成交機率就能多增加一倍！🥤"
+    "多做一個貼心動作，成交機率就能多增加一倍！🥤",
+    "魔鬼藏在細節裡，細心確認每一筆訂單，才不會白忙一場喔！🔍",
+    "成功不是將來才有的，而是從決定去做的那一刻起，持續累積而成的！",
+    "每一位踏進店裡的顧客，都是一次建立長久信任的起點！🤝",
+    "主動推薦熱銷配件，不僅提升客單價，還能讓客人覺得我們超貼心！🎧",
+    "不要害怕被拒絕，每一次的溝通都是磨練銷售技巧的最好機會！⚡",
+    "電商出單快又準，門市服務暖人心，大家分工合作，創造最棒的業績！🚀",
+    "用真誠傾聽客戶需求，比強行推銷更能打動客人的心！❤️",
+    "把每一次的挑戰當作學習，今天我們一定能做得比昨天更好！🌈",
+    "完美的交機體驗是客戶回流的關鍵，讓我們把關好最後一步！📱",
+    "只要每天進步一點點，累積起來就是驚人的成就，一起衝刺吧！🎯",
+    "真誠的關懷能融化冰山，用暖心對待每一位顧客吧！☕",
+    "相信自己能做到，你就已經成功了一半，今天也要全力以赴！🔥",
+    "每一次的成交，都源於我們對專業的堅持與客人的信任！🌟",
+    "把每個客人的抱怨當成改進的契機，我們的服務就會越來越完美！📈",
+    "團結就是力量，分店的夥伴們互相支援，就是我們最大的底氣！🤝",
+    "把小事做到極致，就是我們的品牌價值，今天也細心做好每一件事！✨",
+    "主動多問一句「今天還有其他需要的嗎？」，可能就會多一件配件出單喔！🎧",
+    "熱情是會傳染的，當您對工作充滿熱情，顧客也能深深感受到！🚀",
+    "用汗水澆灌的種子，終會開出業績的繁花，大家一起衝刺！🏆",
+    "堅持品質、堅持微笑，您就是門市最閃亮的明星！🌟",
+    "不要為昨天的遺憾買單，用今天的活力創造全新的成交紀錄！⚡",
+    "細心確認合約、合約再確認，保護顧客也是保護我們自己！🛡️",
+    "多給同仁一個讚美，團隊的氛圍會更加融洽，大家一起加油！❤️"
   ];
 
   // 取得今天的日期字串 (YYYY-MM-DD)
@@ -138,7 +188,12 @@ export default function Dashboard({
     setTimeout(() => setIsBouncing(false), 500);
 
     if (activeSubTab === 'quote') {
-      const nextIndex = (quoteIndex + 1) % SALES_QUOTES.length;
+      let nextIndex = quoteIndex;
+      if (SALES_QUOTES.length > 1) {
+        while (nextIndex === quoteIndex) {
+          nextIndex = Math.floor(Math.random() * SALES_QUOTES.length);
+        }
+      }
       setQuoteIndex(nextIndex);
       
       const poses = ['welcome', 'thinking', 'idle', 'gold'];
@@ -185,12 +240,12 @@ export default function Dashboard({
       <div className="p-4 space-y-4">
         {/* 歡迎區塊 */}
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 shadow-sm border border-blue-100/60 flex items-center justify-between">
-          <div className="space-y-1">
-            <h2 className="text-xl font-black text-blue-900 font-['Outfit']">
-              {getGreeting()}，{currentUser.name}！
+          <div className="space-y-1 flex-1 pr-2">
+            <h2 className="text-base font-black text-blue-955 font-['Outfit'] leading-snug">
+              {greetingText || `${getGreeting()}，${currentUser.name}！`}
             </h2>
             <p className="text-xs font-bold text-blue-700 mt-1">
-              {currentUser.roleLabel} · 今天又是元氣滿滿的一天 🚀
+              {currentUser.roleLabel} · {currentUser.name} 今天又是元氣滿滿的一天 🚀
             </p>
             <p className="text-[10px] text-blue-500/80 font-mono">
               系統日期：{new Date().toLocaleDateString('zh-TW')}

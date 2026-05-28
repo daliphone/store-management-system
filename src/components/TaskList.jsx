@@ -82,6 +82,18 @@ export default function TaskList({ tasks, currentUser, users, onToggleTask, onUp
 
   // 任務過濾與指派對象權限判定
   const displayedTasks = storeFilteredTasks.filter(t => {
+    // 如果是電商部，排除五大項常規店務任務
+    const currentViewStore = hasAllStoresPerm ? selectedStore : currentUser.store;
+    if (currentViewStore === '電商部') {
+      const isFiveDefaultTask = 
+        (t.text && t.text.startsWith('開店-儀容自檢')) || 
+        t.text === '開店-環境清掃' || 
+        t.text === '營業-零用金確認' || 
+        t.text === '營業-隨機盤點庫存' || 
+        t.text === '閉店-庫存表上傳';
+      if (isFiveDefaultTask) return false;
+    }
+
     // 1. 舊有儀容自檢過濾
     if (t.text && t.text.startsWith('開店-儀容自檢 (')) {
       const nameMatch = t.text.match(/開店-儀容自檢 \((.+)\)/);
@@ -116,8 +128,8 @@ export default function TaskList({ tasks, currentUser, users, onToggleTask, onUp
     return a.completed ? 1 : -1;
   });
 
-  // 判斷是否有管理日常任務權限 (店長以上)
-  const canManageTasks = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'STORE_MANAGER';
+  // 判斷是否有管理日常任務權限 (店長以上，或電商部人員)
+  const canManageTasks = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'STORE_MANAGER' || currentUser.store === '電商部';
 
   // 根據任務屬性決定標籤與狀態
   const getTaskMeta = (task) => {
@@ -416,7 +428,7 @@ export default function TaskList({ tasks, currentUser, users, onToggleTask, onUp
             <div>
               <label className="text-xs text-gray-500 font-bold block mb-1.5">任務分類標籤</label>
               <div className="flex space-x-1.5 bg-slate-50 p-1 rounded-xl border border-slate-100">
-                {['每日執行', '交辦事項', '交接事項'].map(t => (
+                {(currentUser.store === '電商部' ? ['交辦事項', '交接事項'] : ['每日執行', '交辦事項', '交接事項']).map(t => (
                   <button
                     key={t}
                     type="button"
@@ -778,7 +790,8 @@ export default function TaskList({ tasks, currentUser, users, onToggleTask, onUp
       {canManageTasks && !isAdding && !editingTask && (
         <button
           onClick={() => {
-            setTaskForm({ text: '', score: 10, tag: '每日執行', assignType: '所有人', assignedTo: '' });
+            const defaultTag = currentUser.store === '電商部' ? '交辦事項' : '每日執行';
+            setTaskForm({ text: '', score: 10, tag: defaultTag, assignType: '所有人', assignedTo: '' });
             setIsAdding(true);
           }}
           className="fixed bottom-24 right-4 w-14 h-14 bg-[#F43F5E] hover:bg-[#E11D48] text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 active:scale-90 z-40 border border-rose-400"

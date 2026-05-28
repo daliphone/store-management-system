@@ -730,15 +730,15 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
     const rateSetting = activeRates.find(r => r.platform === p && r.category === cat) || 
                         LOCAL_RATES.find(r => r.platform === p && r.category === cat);
     
-    // 3. 取得費率參數
-    const baseCommissionRate = rateSetting ? rateSetting.commissionRate : 0.055;
-    const transactionRate = rateSetting ? rateSetting.transactionRate : 0.025;
-    const coinRate = rateSetting ? rateSetting.coinRate : 0;
-    const shippingRate = rateSetting ? rateSetting.shippingRate : 0;
-    const flatFee = rateSetting ? rateSetting.flatFee : 0;
-    const backProfitRate = rateSetting ? rateSetting.backProfitRate : 0;
-    const hasCap = rateSetting ? rateSetting.hasCap : false;
-    const basePromoRate = rateSetting ? rateSetting.promoRate : 0;
+    // 3. 取得費率參數，並進行類型與值防呆
+    const baseCommissionRate = rateSetting && typeof rateSetting.commissionRate === 'number' ? rateSetting.commissionRate : 0.055;
+    const transactionRate = rateSetting && typeof rateSetting.transactionRate === 'number' ? rateSetting.transactionRate : 0.025;
+    const coinRate = rateSetting && typeof rateSetting.coinRate === 'number' ? rateSetting.coinRate : 0;
+    const shippingRate = rateSetting && typeof rateSetting.shippingRate === 'number' ? rateSetting.shippingRate : 0;
+    const flatFee = rateSetting && typeof rateSetting.flatFee === 'number' ? rateSetting.flatFee : 0;
+    const backProfitRate = rateSetting && typeof rateSetting.backProfitRate === 'number' ? rateSetting.backProfitRate : 0;
+    const hasCap = rateSetting ? !!rateSetting.hasCap : false;
+    const basePromoRate = rateSetting && typeof rateSetting.promoRate === 'number' ? rateSetting.promoRate : 0;
     
     // 特殊調整 1：活動促銷日加收 (僅在「未參加蝦幣回饋」時適用)
     let promoRate = 0;
@@ -794,7 +794,9 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
     
     return {
       platformName: platformNames[p] || p,
-      categoryName: rateSetting ? rateSetting.categoryName.replace(/📱\s*|📟\s*|💻\s*|🎧\s*|🔊\s*|⌚\s*|⌨️\s*|📺\s*|🎮\s*|💿\s*|🔌\s*|🥗\s*/g, '') : cat, // 去除 icon
+      categoryName: (rateSetting && typeof rateSetting.categoryName === 'string') 
+        ? rateSetting.categoryName.replace(/📱\s*|📟\s*|💻\s*|🎧\s*|🔊\s*|⌚\s*|⌨️\s*|📺\s*|🎮\s*|💿\s*|🔌\s*|🥗\s*/g, '') 
+        : (rateSetting ? (rateSetting.categoryName || rateSetting.category || cat) : cat),
       commissionFee,
       commissionRate: finalCommissionRate,
       baseCommissionRate,
@@ -1154,11 +1156,11 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                       <button
                         type="button"
                         onClick={handleOpenCalculator}
-                        className="px-2 py-0.5 text-[10px] text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-lg flex items-center space-x-1 shadow-sm transition-all duration-150 active:scale-95 hover:scale-105"
+                        className="px-1.5 py-0.5 text-[10px] text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-md flex items-center space-x-0.5 shadow-sm transition-all duration-150 active:scale-95"
                         title="開啟蝦皮手續費毛利試算"
                       >
-                        <Calculator size={11} />
-                        <span>🧮 平台計算器</span>
+                        <Calculator size={10} />
+                        <span>平台計算器</span>
                       </button>
                     )}
                   </div>
@@ -1441,7 +1443,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                     onChange={(e) => {
                       const nextPlatform = e.target.value;
                       const isPlatformAuction = nextPlatform === 'auction_10' || nextPlatform === 'auction_5';
-                      const activeRates = cloudRates.length > 0 ? cloudRates : localRates;
+                      const activeRates = cloudRates.length > 0 ? cloudRates : LOCAL_RATES;
                       const defaultCat = activeRates.find(r => r.platform === nextPlatform)?.category || 'phone';
                       setCalcData({
                         ...calcData,
@@ -1468,7 +1470,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                     className="block w-full px-2.5 py-2 border border-slate-200 bg-white rounded-lg text-xs font-black text-slate-850"
                   >
                     {(() => {
-                      const activeRates = cloudRates.length > 0 ? cloudRates : localRates;
+                      const activeRates = cloudRates.length > 0 ? cloudRates : LOCAL_RATES;
                       const platformCategories = activeRates.filter(r => r.platform === calcData.platform);
                       return platformCategories.map(cat => (
                         <option key={cat.category} value={cat.category}>
