@@ -6,6 +6,8 @@ import { getECommerceRates } from '../services/googleSheetsService';
 export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, editOrder }) {
   const [activeTab, setActiveTab] = useState('single'); // 'single' 或 'batch'
   const [formData, setFormData] = useState({
+    id: '',
+    platform: '門市',
     customerName: '',
     customerPhone: '',
     store: currentUser.store !== '全分店' ? currentUser.store : '東門店',
@@ -44,6 +46,8 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
     if (editOrder) {
       setActiveTab('single');
       setFormData({
+        id: editOrder.id || '',
+        platform: editOrder.platform || '門市',
         customerName: editOrder.customerName || '',
         customerPhone: editOrder.customerPhone || '',
         store: editOrder.store || currentUser.store,
@@ -59,7 +63,13 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
       const mm = String(today.getMonth() + 1).padStart(2, '0');
       const dd = String(today.getDate()).padStart(2, '0');
       const todayStr = `${yyyy}-${mm}-${dd}`;
-      setFormData(prev => ({ ...prev, promiseDate: todayStr }));
+      const randomId = `ord_${Math.random().toString(36).substr(2, 9)}`;
+      setFormData(prev => ({ 
+        ...prev, 
+        id: randomId,
+        platform: '門市',
+        promiseDate: todayStr 
+      }));
       
       // 預設批次的統一交期為 3 天後
       const defaultDate = new Date();
@@ -117,6 +127,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
       // 編輯保存模式
       const updatedOrder = {
         ...editOrder,
+        platform: formData.platform,
         customerName: formData.customerName.trim(),
         customerPhone: formData.customerPhone.trim(),
         store: formData.store,
@@ -128,8 +139,10 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
       onSave(updatedOrder, lastCalculationResult);
     } else {
       // 全新新增模式
+      const orderId = formData.id.trim() || `ord_${Math.random().toString(36).substr(2, 9)}`;
       const newOrder = {
-        id: `ord_${Math.random().toString(36).substr(2, 9)}`,
+        id: orderId,
+        platform: formData.platform,
         customerName: formData.customerName.trim(),
         customerPhone: formData.customerPhone.trim(),
         productName: formData.productName.trim(),
@@ -782,24 +795,43 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
   // 代入計算結果
   const handleApplyCalc = () => {
     const result = calculateShopeeFees();
+    
+    // 計算器平台反向連動訂單平台，極致體驗！
+    let platName = '門市';
+    if (calcData.platform === 'mall') platName = '蝦商 長期免運';
+    else if (calcData.platform === 'auction_10') platName = '蝦拍10倍館';
+    else if (calcData.platform === 'auction_5') platName = '蝦拍5倍館';
+    else if (calcData.platform === 'direct') platName = '蝦皮直送';
+    
     setFormData(prev => ({
       ...prev,
       price: result.payout,
-      cost: parseFloat(calcData.cost) || 0
+      cost: parseFloat(calcData.cost) || 0,
+      platform: platName
     }));
     setLastCalculationResult(result); // 暫存抽成明細，等候與訂單一併送出
     setIsCalcOpen(false);
   };
 
   const handleOpenCalculator = () => {
+    // 依據訂單平台，自動預選計算器的平台
+    let calcPlatform = 'mall';
+    if (formData.platform === '蝦商 長期免運') calcPlatform = 'mall';
+    else if (formData.platform === '蝦拍10倍館') calcPlatform = 'auction_10';
+    else if (formData.platform === '蝦拍5倍館') calcPlatform = 'auction_5';
+    else if (formData.platform === '蝦皮直送') calcPlatform = 'direct';
+    
+    const activeRates = cloudRates.length > 0 ? cloudRates : localRates;
+    const defaultCat = activeRates.find(r => r.platform === calcPlatform)?.category || 'phone';
+    
     setCalcData({
       price: formData.price || '',
       cost: formData.cost || '',
-      platform: 'mall',
-      category: 'phone',
+      platform: calcPlatform,
+      category: defaultCat,
       isPromoDay: false,
       isPreOrder: false,
-      hasCryptoFee: true
+      hasCryptoFee: calcPlatform === 'auction_10' || calcPlatform === 'auction_5'
     });
     setIsCalcOpen(true);
   };
@@ -870,6 +902,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
   };
 
   const hasAllStoresPerm = currentUser.permissions && currentUser.permissions.includes('view_all_stores');
+  const canShowCalculator = currentUser && (currentUser.role === 'SUPER_ADMIN' || currentUser.store === '電商部');
 
   // 取得當前使用者的縮寫
   const getUserInitials = () => {
@@ -941,6 +974,57 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
         {activeTab === 'single' && (
           <form onSubmit={handleSingleSubmit} className="bg-white rounded-[28px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80 space-y-4.5">
             <div className="space-y-4">
+              {/* 0. 訂單平台 與 訂單編號 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-700 font-black block">訂單平台</label>
+                  <select
+                    value={formData.platform}
+                    onChange={(e) => {
+                      const platVal = e.target.value;
+                      setFormData({ ...formData, platform: platVal });
+                      
+                      // 智慧聯動：如果選了蝦皮平台，自動設定計算器預設平台
+                      let calcPlatform = 'mall';
+                      if (platVal === '蝦商 長期免運') calcPlatform = 'mall';
+                      else if (platVal === '蝦拍10倍館') calcPlatform = 'auction_10';
+                      else if (platVal === '蝦拍5倍館') calcPlatform = 'auction_5';
+                      else if (platVal === '蝦皮直送') calcPlatform = 'direct';
+                      
+                      if (platVal !== '門市' && platVal !== '其他') {
+                        const activeRates = cloudRates.length > 0 ? cloudRates : localRates;
+                        const defaultCat = activeRates.find(r => r.platform === calcPlatform)?.category || 'phone';
+                        setCalcData(prev => ({
+                          ...prev,
+                          platform: calcPlatform,
+                          category: defaultCat,
+                          hasCryptoFee: calcPlatform === 'auction_10' || calcPlatform === 'auction_5'
+                        }));
+                      }
+                    }}
+                    className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-700 bg-slate-50/50 cursor-pointer"
+                  >
+                    <option value="門市">🏪 門市</option>
+                    <option value="蝦商 長期免運">🛍️ 蝦商 長期免運</option>
+                    <option value="蝦拍10倍館">🎟️ 蝦拍10倍館</option>
+                    <option value="蝦拍5倍館">🎟️ 蝦拍5倍館</option>
+                    <option value="蝦皮直送">🚚 蝦皮直送</option>
+                    <option value="其他">🌐 其他</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-700 font-black block">訂單編號</label>
+                  <input
+                    type="text"
+                    placeholder="請輸入訂單編號"
+                    value={formData.id}
+                    onChange={(e) => setFormData({ ...formData, id: e.target.value })}
+                    className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-xs font-bold text-slate-800 font-mono"
+                  />
+                </div>
+              </div>
+
               {/* 1. 客戶姓名 */}
               <div className="space-y-1">
                 <label className="text-xs text-slate-700 font-black block">客戶姓名 *</label>
@@ -1018,15 +1102,17 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                 <div className="space-y-1">
                   <div className="flex justify-between items-center">
                     <label className="text-xs text-slate-700 font-black block">商品單價 (實拿) *</label>
-                    <button
-                      type="button"
-                      onClick={handleOpenCalculator}
-                      className="text-[10px] text-blue-600 font-black flex items-center space-x-0.5 hover:underline"
-                      title="開啟蝦皮手續費毛利試算"
-                    >
-                      <Calculator size={11} />
-                      <span>平台計算器</span>
-                    </button>
+                    {canShowCalculator && (
+                      <button
+                        type="button"
+                        onClick={handleOpenCalculator}
+                        className="text-[10px] text-blue-600 font-black flex items-center space-x-0.5 hover:underline"
+                        title="開啟蝦皮手續費毛利試算"
+                      >
+                        <Calculator size={11} />
+                        <span>平台計算器</span>
+                      </button>
+                    )}
                   </div>
                   <input
                     type="number"

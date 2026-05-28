@@ -16,6 +16,7 @@
 // 欄位雙向對照表
 var ORDER_MAPPING = {
   'id': '編號',
+  'platform': '訂單平台',
   'customerName': '客戶姓名',
   'customerPhone': '客戶電話',
   'productName': '商品與承諾內容',
@@ -72,7 +73,7 @@ function initializeSystemSheets() {
   
   // 1. 初始化 Orders
   var orderSheet = ss.getSheetByName("Orders");
-  var cnOrderHeaders = ['編號', '客戶姓名', '客戶電話', '商品與承諾內容', '類型', '分店', '提單人員', '客戶來源', '客戶標籤', '數量', '商品單價', '商品成本', '到貨狀態', '建單日期', '預計交貨日', '逾期天數', '客戶簽名', '備註'];
+  var cnOrderHeaders = ['編號', '客戶姓名', '客戶電話', '商品與承諾內容', '類型', '分店', '提單人員', '客戶來源', '客戶標籤', '數量', '商品單價', '商品成本', '到貨狀態', '建單日期', '預計交貨日', '逾期天數', '客戶簽名', '備註', '訂單平台'];
   
   if (!orderSheet) {
     orderSheet = ss.insertSheet("Orders");
@@ -391,10 +392,13 @@ function formatOrderSheet(sheet) {
   sheet.setColumnWidth(17, 80);
   // 設定「備註」(第 18 欄，R 欄) 寬度為固定 160 像素
   sheet.setColumnWidth(18, 160);
+  // 設定「訂單平台」(第 19 欄，S 欄) 寬度為固定 110 像素
+  sheet.setColumnWidth(19, 110);
   
   // 2. 對其他 1 ~ 16 欄進行自動調整欄寬 (避開簽名與備註)
   try {
     sheet.autoResizeColumns(1, 16);
+    sheet.autoResizeColumns(19, 1);
   } catch(e) {}
   
   // 3. 設定合理最小寬度，以防自動調整後欄位擠在一起
@@ -414,7 +418,8 @@ function formatOrderSheet(sheet) {
     13: 85, // 到貨狀態
     14: 95, // 建單日期
     15: 95, // 預計交貨日
-    16: 80  // 逾期天數
+    16: 80, // 逾期天數
+    19: 110 // 訂單平台
   };
   
   for (var col in minWidths) {
@@ -944,7 +949,7 @@ function handleSyncAll(orders, tasks) {
   var orderSheet = ss.getSheetByName("Orders");
   if (orderSheet) {
     orderSheet.clearContents();
-    var cnOrderHeaders = ['編號', '客戶姓名', '客戶電話', '商品與承諾內容', '類型', '分店', '提單人員', '客戶來源', '客戶標籤', '數量', '商品單價', '商品成本', '到貨狀態', '建單日期', '預計交貨日', '逾期天數', '客戶簽名', '備註'];
+    var cnOrderHeaders = ['編號', '客戶姓名', '客戶電話', '商品與承諾內容', '類型', '分店', '提單人員', '客戶來源', '客戶標籤', '數量', '商品單價', '商品成本', '到貨狀態', '建單日期', '預計交貨日', '逾期天數', '客戶簽名', '備註', '訂單平台'];
     orderSheet.appendRow(cnOrderHeaders);
     orderSheet.getRange(1, 1, 1, cnOrderHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
     
