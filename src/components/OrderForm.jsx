@@ -735,7 +735,13 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
     const transactionRate = rateSetting && typeof rateSetting.transactionRate === 'number' ? rateSetting.transactionRate : 0.025;
     const coinRate = rateSetting && typeof rateSetting.coinRate === 'number' ? rateSetting.coinRate : 0;
     const shippingRate = rateSetting && typeof rateSetting.shippingRate === 'number' ? rateSetting.shippingRate : 0;
-    const flatFee = rateSetting && typeof rateSetting.flatFee === 'number' ? rateSetting.flatFee : 0;
+    
+    // 如果是 mall 或 auction_10，且 flatFee 為 0 或未定義，則預設為 60 (解決蝦皮10倍與商城少算 60 元的 Bug)
+    let flatFee = rateSetting && typeof rateSetting.flatFee === 'number' ? rateSetting.flatFee : 0;
+    if ((p === 'mall' || p === 'auction_10') && flatFee === 0) {
+      flatFee = 60;
+    }
+    
     const backProfitRate = rateSetting && typeof rateSetting.backProfitRate === 'number' ? rateSetting.backProfitRate : 0;
     const hasCap = rateSetting ? !!rateSetting.hasCap : false;
     const basePromoRate = rateSetting && typeof rateSetting.promoRate === 'number' ? rateSetting.promoRate : 0;
@@ -1196,6 +1202,264 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
               </div>
             </div>
 
+            {/* 內置折疊式計算機卡片區塊 */}
+            {isCalcOpen && (
+              <div className="bg-orange-50/60 border border-orange-200 rounded-[24px] p-4.5 space-y-4 text-xs font-bold text-slate-700 animate-slide-up shadow-sm">
+                {/* 標題 */}
+                <div className="flex items-center justify-between pb-2 border-b border-orange-200/50">
+                  <div className="flex items-center space-x-1.5 text-orange-700">
+                    <Calculator size={15} />
+                    <span className="font-black text-xs">平台手續費與毛利計算器</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCalcOpen(false)}
+                    className="text-orange-700 hover:text-orange-900 font-extrabold text-[10px] bg-white border border-orange-200 rounded-md px-2 py-1 shadow-sm active:scale-95 transition-all"
+                  >
+                    收起計算器 ✕
+                  </button>
+                </div>
+
+                {/* 1. 賣價與成本 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold block">商品賣價 (賣場售價)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="輸入賣價"
+                      value={calcData.price}
+                      onChange={(e) => setCalcData({ ...calcData, price: e.target.value })}
+                      className="block w-full px-3 py-2 border border-slate-200 bg-white rounded-lg text-xs font-bold text-slate-800 font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold block">商品成本</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="輸入成本"
+                      value={calcData.cost}
+                      onChange={(e) => setCalcData({ ...calcData, cost: e.target.value })}
+                      className="block w-full px-3 py-2 border border-slate-200 bg-white rounded-lg text-xs font-bold text-slate-800 font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* 2. 平台方案 */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold block">平台與賣場方案</label>
+                  <select
+                    value={calcData.platform}
+                    onChange={(e) => {
+                      const nextPlatform = e.target.value;
+                      const isPlatformAuction = nextPlatform === 'auction_10' || nextPlatform === 'auction_5';
+                      const activeRates = cloudRates.length > 0 ? cloudRates : LOCAL_RATES;
+                      const defaultCat = activeRates.find(r => r.platform === nextPlatform)?.category || 'phone';
+                      setCalcData({
+                        ...calcData,
+                        platform: nextPlatform,
+                        category: defaultCat,
+                        hasCryptoFee: isPlatformAuction
+                      });
+                    }}
+                    className="block w-full px-2.5 py-2 border border-slate-200 bg-white rounded-lg text-xs font-black text-slate-855"
+                  >
+                    <option value="mall">蝦商 長期免運2+5%回饋</option>
+                    <option value="direct">蝦皮直送</option>
+                    <option value="auction_10">蝦拍10倍館(綁免運2+10%回饋)</option>
+                    <option value="auction_5">蝦拍5倍館(綁免運1+5%回饋)</option>
+                  </select>
+                </div>
+
+                {/* 3. 商品品類 */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold block">商品品類 (費率不同)</label>
+                  <select
+                    value={calcData.category}
+                    onChange={(e) => setCalcData({ ...calcData, category: e.target.value })}
+                    className="block w-full px-2.5 py-2 border border-slate-200 bg-white rounded-lg text-xs font-black text-slate-855"
+                  >
+                    {(() => {
+                      const activeRates = cloudRates.length > 0 ? cloudRates : LOCAL_RATES;
+                      const platformCategories = activeRates.filter(r => r.platform === calcData.platform);
+                      return platformCategories.map(cat => (
+                        <option key={cat.category} value={cat.category}>
+                          {cat.categoryName}
+                        </option>
+                      ));
+                    })()}
+                  </select>
+                </div>
+
+                {/* 3.5. 特殊條件 (勾選控制) */}
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[10px] text-slate-400 font-bold block">加收與專案服務費控制</span>
+                  <div className="grid grid-cols-1 gap-2 bg-white/80 p-3 rounded-xl border border-slate-150 text-[11px] font-bold text-slate-700">
+                    {/* 物流隱碼 */}
+                    <label className={`flex items-center space-x-2 cursor-pointer select-none ${calcData.platform !== 'auction_10' && calcData.platform !== 'auction_5' ? 'text-slate-400' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={calcData.hasCryptoFee}
+                        disabled={calcData.platform !== 'auction_10' && calcData.platform !== 'auction_5'}
+                        onChange={(e) => setCalcData({ ...calcData, hasCryptoFee: e.target.checked })}
+                        className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-slate-300 disabled:opacity-50"
+                      />
+                      <span className={calcData.platform !== 'auction_10' && calcData.platform !== 'auction_5' ? 'line-through' : ''}>
+                        物流隱碼服務費 (固定 NT$10)
+                      </span>
+                      {(calcData.platform !== 'auction_10' && calcData.platform !== 'auction_5') && (
+                        <span className="text-[9px] bg-green-50 text-green-600 px-1 py-0.2 rounded border border-green-150 scale-90 origin-left">
+                          免收
+                        </span>
+                      )}
+                    </label>
+
+                    {/* 預購訂單 */}
+                    <label className="flex items-center space-x-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={calcData.isPreOrder}
+                        onChange={(e) => setCalcData({ ...calcData, isPreOrder: e.target.checked })}
+                        className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-slate-300"
+                      />
+                      <span>預購訂單 / 較長備貨 (成交費 +3%)</span>
+                    </label>
+
+                    {/* 促銷檔期 */}
+                    <div className="flex flex-col space-y-0.5">
+                      <label className="flex items-center space-x-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={calcData.isPromoDay}
+                          disabled={calcData.platform === 'mall' || calcData.platform === 'auction_10' || calcData.platform === 'auction_5' || calcData.platform === 'direct'}
+                          onChange={(e) => setCalcData({ ...calcData, isPromoDay: e.target.checked })}
+                          className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-slate-300 disabled:opacity-50"
+                        />
+                        <span className={calcData.platform === 'mall' || calcData.platform === 'auction_10' || calcData.platform === 'auction_5' ? 'text-slate-400 line-through' : ''}>
+                          促銷檔期日 (一般 +2% / 商城 +3%)
+                        </span>
+                        {(calcData.platform === 'mall' || calcData.platform === 'auction_10' || calcData.platform === 'auction_5') && (
+                          <span className="text-[9px] bg-green-50 text-green-600 px-1 py-0.2 rounded border border-green-150 scale-90 origin-left">
+                            免收
+                          </span>
+                        )}
+                      </label>
+                      <span className="text-[9px] text-slate-400 pl-5.5 font-sans font-normal leading-tight">
+                        (如每月大促雙雙日 11/11、12/12；月中 18 號；或每週三等)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. 即時計算結果 */}
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2 font-mono">
+                  <div className="font-extrabold text-[11px] text-slate-400 pb-1.5 border-b border-slate-200 flex justify-between items-center font-sans">
+                    <span>明細試算</span>
+                    <span className="text-[9px] bg-blue-50 text-blue-600 border border-blue-150 px-1.5 py-0.2 rounded font-mono">2026 Q1</span>
+                  </div>
+                  
+                  {(() => {
+                    const fees = calculateShopeeFees();
+                    const otherFeesTotal = fees.cryptoFee + fees.shippingCampaignFee + fees.coinCampaignFee;
+                    return (
+                      <div className="space-y-1.5 text-[11px] text-slate-600">
+                        <div className="flex justify-between">
+                          <span>
+                            成交手續費 ({ (fees.commissionRate * 100).toFixed(1) }%)：
+                          </span>
+                          <span className="font-extrabold text-slate-800">-${fees.commissionFee}</span>
+                        </div>
+                        {fees.transactionFee > 0 && (
+                          <div className="flex justify-between">
+                            <span>金流與系統處理費 (2.5%)：</span>
+                            <span className="font-extrabold text-slate-800">-${fees.transactionFee}</span>
+                          </div>
+                        )}
+                        {otherFeesTotal > 0 && (
+                          <div className="border-t border-slate-200/50 pt-1.5 space-y-1">
+                            <div className="flex justify-between font-bold text-slate-700">
+                              <span>其他服務費 (活動服務費)：</span>
+                              <span className="font-extrabold text-slate-800">-${otherFeesTotal}</span>
+                            </div>
+                            <div className="pl-3.5 space-y-0.5 text-[10px] text-slate-500 font-sans">
+                              {fees.cryptoFee > 0 && (
+                                <div className="flex justify-between">
+                                  <span>• 物流隱碼服務費：</span>
+                                  <span>-${fees.cryptoFee}</span>
+                                </div>
+                              )}
+                              {fees.shippingCampaignFee > 0 && (
+                                <div className="flex justify-between">
+                                  <span>
+                                    • 免運及進階賣家專案 [
+                                    {calcData.platform === 'auction_5' ? '方案一 6%' : '方案二'}
+                                    ] 服務費：
+                                  </span>
+                                  <span>-${fees.shippingCampaignFee}</span>
+                                </div>
+                              )}
+                              {fees.coinCampaignFee > 0 && (
+                                <div className="flex justify-between">
+                                  <span>
+                                    • 蝦幣回饋專案服務費 (
+                                    {calcData.platform === 'auction_10' 
+                                      ? '2.5% 已減免0.5%' 
+                                      : '1.5%'
+                                    })：
+                                  </span>
+                                  <span>-${fees.coinCampaignFee}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {fees.backProfitFee > 0 && (
+                          <div className="flex justify-between">
+                            <span>直送後毛手續費 (2%)：</span>
+                            <span className="font-extrabold text-slate-800">-${fees.backProfitFee}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between border-t border-dashed border-slate-200 pt-1.5 font-bold">
+                          <span>平台抽成總計：</span>
+                          <span className="font-extrabold text-red-500">-${fees.totalFees}</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-black pt-1 border-t border-slate-200">
+                          <span className="text-slate-700">實拿金額：</span>
+                          <span className="text-emerald-600">${fees.payout}</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-black">
+                          <span className="text-slate-700">預估毛利：</span>
+                          <span className={`font-extrabold ${fees.profit >= 0 ? 'text-blue-600' : 'text-rose-500'}`}>
+                            ${fees.profit} ({fees.profitMargin.toFixed(1)}%)
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* 底部代入按鈕 */}
+                <div className="flex space-x-2 pt-2 border-t border-orange-200/50">
+                  <button
+                    type="button"
+                    onClick={handleApplyCalc}
+                    disabled={!calcData.price}
+                    className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-extrabold py-2.5 rounded-xl text-xs shadow-md active:scale-95 transition-all disabled:bg-gray-200 disabled:text-gray-400 border-none"
+                  >
+                    代入計算結果至單價
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCalcOpen(false)}
+                    className="px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-extrabold py-2.5 rounded-xl text-xs active:scale-95 transition-all"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* 按鈕 */}
             <div className="pt-3 border-t border-slate-100">
               <button
@@ -1388,268 +1652,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
           </div>
         )}
 
-        {/* 蝦皮毛利計算器 Modal */}
-        {isCalcOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 font-['Outfit',_sans-serif]">
-            <div className="bg-white rounded-[28px] w-full max-w-sm overflow-hidden shadow-2xl border border-slate-100 animate-slide-up flex flex-col max-h-[90vh]">
-              {/* 標題 */}
-              <div className="bg-[#E6EEFF] px-5 py-4 flex items-center justify-between border-b border-blue-100 shrink-0">
-                <div className="flex items-center space-x-2">
-                  <Calculator size={18} className="text-blue-600" />
-                  <span className="text-sm font-black text-blue-900">蝦皮手續費與毛利計算器</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCalcOpen(false)}
-                  className="w-7 h-7 border rounded-full bg-white hover:bg-slate-50 flex items-center justify-center font-bold text-slate-500 active:scale-90 transition-all text-xs"
-                >
-                  ✕
-                </button>
-              </div>
 
-              {/* 內容 */}
-              <div className="p-5 flex-1 overflow-y-auto no-scrollbar space-y-4 text-xs font-bold text-slate-700">
-                {/* 1. 賣價與成本 */}
-                <div className="grid grid-cols-2 gap-3.5">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold block">商品賣價 (賣場售價)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="輸入賣價"
-                      value={calcData.price}
-                      onChange={(e) => setCalcData({ ...calcData, price: e.target.value })}
-                      className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold block">商品成本</label>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="輸入成本"
-                      value={calcData.cost}
-                      onChange={(e) => setCalcData({ ...calcData, cost: e.target.value })}
-                      className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 font-mono"
-                    />
-                  </div>
-                </div>
-
-                {/* 2. 平台方案 */}
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 font-bold block">平台與賣場方案</label>
-                  <select
-                    value={calcData.platform}
-                    onChange={(e) => {
-                      const nextPlatform = e.target.value;
-                      const isPlatformAuction = nextPlatform === 'auction_10' || nextPlatform === 'auction_5';
-                      const activeRates = cloudRates.length > 0 ? cloudRates : LOCAL_RATES;
-                      const defaultCat = activeRates.find(r => r.platform === nextPlatform)?.category || 'phone';
-                      setCalcData({
-                        ...calcData,
-                        platform: nextPlatform,
-                        category: defaultCat,
-                        hasCryptoFee: isPlatformAuction
-                      });
-                    }}
-                    className="block w-full px-2.5 py-2 border border-slate-200 bg-white rounded-lg text-xs font-black text-slate-850"
-                  >
-                    <option value="mall">蝦商 長期免運2+5%回饋</option>
-                    <option value="direct">蝦皮直送</option>
-                    <option value="auction_10">蝦拍10倍館(綁免運2+10%回饋)</option>
-                    <option value="auction_5">蝦拍5倍館(綁免運1+5%回饋)</option>
-                  </select>
-                </div>
-
-                {/* 3. 商品品類 */}
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 font-bold block">商品品類 (費率不同)</label>
-                  <select
-                    value={calcData.category}
-                    onChange={(e) => setCalcData({ ...calcData, category: e.target.value })}
-                    className="block w-full px-2.5 py-2 border border-slate-200 bg-white rounded-lg text-xs font-black text-slate-850"
-                  >
-                    {(() => {
-                      const activeRates = cloudRates.length > 0 ? cloudRates : LOCAL_RATES;
-                      const platformCategories = activeRates.filter(r => r.platform === calcData.platform);
-                      return platformCategories.map(cat => (
-                        <option key={cat.category} value={cat.category}>
-                          {cat.categoryName}
-                        </option>
-                      ));
-                    })()}
-                  </select>
-                </div>
-
-                {/* 3.5. 特殊條件 (勾選控制) */}
-                <div className="space-y-1.5 pt-1">
-                  <span className="text-[10px] text-slate-400 font-bold block">加收與專案服務費控制</span>
-                  <div className="grid grid-cols-1 gap-2 bg-slate-50/60 p-3 rounded-2xl border border-slate-150 text-[11px] font-bold text-slate-700">
-                    {/* 物流隱碼 */}
-                    <label className={`flex items-center space-x-2 cursor-pointer select-none ${calcData.platform !== 'auction_10' && calcData.platform !== 'auction_5' ? 'text-slate-400' : ''}`}>
-                      <input
-                        type="checkbox"
-                        checked={calcData.hasCryptoFee}
-                        disabled={calcData.platform !== 'auction_10' && calcData.platform !== 'auction_5'}
-                        onChange={(e) => setCalcData({ ...calcData, hasCryptoFee: e.target.checked })}
-                        className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-slate-300 disabled:opacity-50"
-                      />
-                      <span className={calcData.platform !== 'auction_10' && calcData.platform !== 'auction_5' ? 'line-through' : ''}>
-                        物流隱碼服務費 (固定 NT$10)
-                      </span>
-                      {(calcData.platform !== 'auction_10' && calcData.platform !== 'auction_5') && (
-                        <span className="text-[9px] bg-green-50 text-green-600 px-1 py-0.2 rounded border border-green-150 scale-90 origin-left">
-                          免收
-                        </span>
-                      )}
-                    </label>
-
-                    {/* 預購訂單 */}
-                    <label className="flex items-center space-x-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={calcData.isPreOrder}
-                        onChange={(e) => setCalcData({ ...calcData, isPreOrder: e.target.checked })}
-                        className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-slate-300"
-                      />
-                      <span>預購訂單 / 較長備貨 (成交費 +3%)</span>
-                    </label>
-
-                    {/* 促銷檔期 */}
-                    <div className="flex flex-col space-y-0.5">
-                      <label className="flex items-center space-x-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={calcData.isPromoDay}
-                          disabled={calcData.platform === 'mall' || calcData.platform === 'auction_10' || calcData.platform === 'auction_5' || calcData.platform === 'direct'}
-                          onChange={(e) => setCalcData({ ...calcData, isPromoDay: e.target.checked })}
-                          className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-slate-300 disabled:opacity-50"
-                        />
-                        <span className={calcData.platform === 'mall' || calcData.platform === 'auction_10' || calcData.platform === 'auction_5' ? 'text-slate-400 line-through' : ''}>
-                          促銷檔期日 (一般 +2% / 商城 +3%)
-                        </span>
-                        {(calcData.platform === 'mall' || calcData.platform === 'auction_10' || calcData.platform === 'auction_5') && (
-                          <span className="text-[9px] bg-green-50 text-green-600 px-1 py-0.2 rounded border border-green-150 scale-90 origin-left">
-                            免收
-                          </span>
-                        )}
-                      </label>
-                      <span className="text-[9px] text-slate-400 pl-5.5 font-sans font-normal leading-tight">
-                        (如每月大促雙雙日 11/11、12/12；月中 18 號；或每週三等)
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. 即時計算結果 */}
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-150 space-y-2 font-mono">
-                  <div className="font-extrabold text-[11px] text-slate-400 pb-1.5 border-b border-slate-200 flex justify-between items-center font-sans">
-                    <span>明細試算</span>
-                    <span className="text-[9px] bg-blue-50 text-blue-600 border border-blue-150 px-1.5 py-0.2 rounded font-mono">2026 Q1</span>
-                  </div>
-                  
-                  {(() => {
-                    const fees = calculateShopeeFees();
-                    const otherFeesTotal = fees.cryptoFee + fees.shippingCampaignFee + fees.coinCampaignFee;
-                    return (
-                      <div className="space-y-1.5 text-[11px] text-slate-600">
-                        <div className="flex justify-between">
-                          <span>
-                            成交手續費 ({ (fees.commissionRate * 100).toFixed(1) }%)：
-                          </span>
-                          <span className="font-extrabold text-slate-800">-${fees.commissionFee}</span>
-                        </div>
-                        {fees.transactionFee > 0 && (
-                          <div className="flex justify-between">
-                            <span>金流與系統處理費 (2.5%)：</span>
-                            <span className="font-extrabold text-slate-800">-${fees.transactionFee}</span>
-                          </div>
-                        )}
-                        {otherFeesTotal > 0 && (
-                          <div className="border-t border-slate-200/50 pt-1.5 space-y-1">
-                            <div className="flex justify-between font-bold text-slate-700">
-                              <span>其他服務費 (活動服務費)：</span>
-                              <span className="font-extrabold text-slate-800">-${otherFeesTotal}</span>
-                            </div>
-                            <div className="pl-3.5 space-y-0.5 text-[10px] text-slate-500 font-sans">
-                              {fees.cryptoFee > 0 && (
-                                <div className="flex justify-between">
-                                  <span>• 物流隱碼服務費：</span>
-                                  <span>-${fees.cryptoFee}</span>
-                                </div>
-                              )}
-                              {fees.shippingCampaignFee > 0 && (
-                                <div className="flex justify-between">
-                                  <span>
-                                    • 免運及進階賣家專案 [
-                                    {calcData.platform === 'auction_5' ? '方案一 6%' : '方案二'}
-                                    ] 服務費：
-                                  </span>
-                                  <span>-${fees.shippingCampaignFee}</span>
-                                </div>
-                              )}
-                              {fees.coinCampaignFee > 0 && (
-                                <div className="flex justify-between">
-                                  <span>
-                                    • 蝦幣回饋專案服務費 (
-                                    {calcData.platform === 'auction_10' 
-                                      ? '2.5% 已減免0.5%' 
-                                      : '1.5%'
-                                    })：
-                                  </span>
-                                  <span>-${fees.coinCampaignFee}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        {fees.backProfitFee > 0 && (
-                          <div className="flex justify-between">
-                            <span>直送後毛手續費 (2%)：</span>
-                            <span className="font-extrabold text-slate-800">-${fees.backProfitFee}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between border-t border-dashed border-slate-200 pt-1.5 font-bold">
-                          <span>平台抽成總計：</span>
-                          <span className="font-extrabold text-red-500">-${fees.totalFees}</span>
-                        </div>
-                        <div className="flex justify-between text-xs font-black pt-1 border-t border-slate-200">
-                          <span className="text-slate-700">實拿金額：</span>
-                          <span className="text-emerald-600">${fees.payout}</span>
-                        </div>
-                        <div className="flex justify-between text-xs font-black">
-                          <span className="text-slate-700">預估毛利：</span>
-                          <span className={`font-extrabold ${fees.profit >= 0 ? 'text-blue-600' : 'text-rose-500'}`}>
-                            ${fees.profit} ({fees.profitMargin.toFixed(1)}%)
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* 底部代入按鈕 */}
-              <div className="bg-slate-50 px-5 py-4 border-t border-slate-100 flex space-x-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleApplyCalc}
-                  disabled={!calcData.price}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3 rounded-xl text-xs shadow-md active:scale-95 transition-all disabled:bg-gray-200 disabled:text-gray-400"
-                >
-                  代入實拿金額至單價
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsCalcOpen(false)}
-                  className="px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-extrabold py-3 rounded-xl text-xs active:scale-95 transition-all"
-                >
-                  取消
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
