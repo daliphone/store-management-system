@@ -224,3 +224,152 @@
 5. 點選部署並授權（若有警告，點選 Advanced -> Go to ... (unsafe) -> Allow）。
 6. 將產生的 **網頁應用程式網址 (Web App URL)** 複製，填入系統設定中。
 7. **關鍵步驟**：部署完成後，請務必點選試算表功能表上的 **「馬尼門市系統」 > 「一鍵初始化系統工作表」**。這會自動建立並安全格式化所有新工作表欄位。
+
+---
+
+## 📊 8. 門市業績與獎金系統 - 保留開發與完整紀錄 (2026年5月)
+
+本章節完整記錄針對「門市業績日報表」與「Cloudflare Workers 獎金公告系統」的數據關聯性、運作機制、換月流程，以及未來的系統重構整合路徑。目前此項目依指示列為「保留開發」狀態。
+
+### A. 系統全局關聯圖 (System Architecture & Data Flows)
+
+本系統是由 **Cloudflare Workers (行動回報前端)**、**Google Sheets & Apps Script (中台運算與中央參數庫)**、以及 **Excel 實體公告 (業務指標來源)** 共同交織而成的架構：
+
+```mermaid
+flowchart TD
+    subgraph Excel ["實體業務輸入 (Excel)"]
+        EX[5月獎金公告.xlsx]
+        EX_T[各店目標分配表]
+        EX_R[獎金%數與團績規則]
+    end
+
+    subgraph Workers ["行動回報前台 (Cloudflare Workers)"]
+        W_URL["https://mani-bonus.a0982585084.workers.dev/"]
+        W_SD["各店目標常數 (SD)"]
+        W_KPIS["加權 KPI 目標 (KPIS)"]
+        W_NOW["現賣現領清單 (NOWITEMS)"]
+        W_VIVO["VIVO台獎成本/售價 (VIVO)"]
+    end
+
+    subgraph Sheets ["系統大腦與中台 (Google Sheets)"]
+        T1["Tier 1: 1_後台_參數設定<br>(中央參數控制腦)"]
+        T2["Tier 2: 各店業績日報表<br>(分店試算表與個人Tab)"]
+        T3["Tier 3: 3_前台_個人儀表板<br>(店內前台大字體呈現)"]
+    end
+
+    subgraph BackEnd ["總部/中台 API (GAS)"]
+        GAS_API["Google Apps Script Web App<br>(APPS_SCRIPT_URL)"]
+    end
+
+    %% 關聯線
+    EX_T -->|手動移植更新常數| W_SD
+    EX_T -->|手動移植更新常數| W_KPIS
+    EX_R -->|公式參照/規則設計| T1
+    
+    W_URL -->|1. GET: action=getPersonData| GAS_API
+    W_URL -->|2. POST: action=submit (含 detailJson)| GAS_API
+    GAS_API -->|寫入/讀取數據| T2
+    
+    T1 -->|命名範圍連動 / 規則派發| T2
+    T2 -->|INDIRECT 跨分頁安全加總| T3
+    
+    classDef excel fill:#fcf8e3,stroke:#8a6d3b,stroke-width:1px;
+    classDef workers fill:#d9edf7,stroke:#31708f,stroke-width:1px;
+    classDef sheets fill:#dff0d8,stroke:#3c763d,stroke-width:1px;
+    classDef backend fill:#f5f5f5,stroke:#333,stroke-width:1px;
+    class Excel,EX,EX_T,EX_R excel;
+    class Workers,W_URL,W_SD,W_KPIS,W_NOW,W_VIVO workers;
+    class Sheets,T1,T2,T3 sheets;
+    class BackEnd,GAS_API backend;
+```
+
+---
+
+### B. 核心關聯點與運作機制解析
+
+1. **實體 Excel 公告 ➔ Workers 程式碼常數對照**：
+   * **各店目標分配 (SD)**：對照 Excel 中「各店目標分配表」的掛績人數與各成數門檻，Workers 代碼的 `SD` 常數定義了各店等級（`g`）、掛績人數（`p`）、高標（`tgt`）與 `t7`/`t8`/`t9` 門檻。
+   * **加權 KPI 目標 (KPIS)**：對照 Excel 中的「本月重點目標」，定義 Google 評論、社群會員、LiTV 等加權比重與門檻。
+   * **現領與 VIVO 台獎 (NOWITEMS / VIVO)**：對照 Excel 內特約機型售價與利潤，提供 Workers 前端計算「當日現領」與「累計台獎」。
+
+2. **Workers 前端 ➔ GAS API ➔ Google Sheets 寫入鏈路**：
+   * **前台回填 (GET)**：人員選定分店與姓名時，Workers 向 GAS API 發送 `action=getPersonData`，自動抓取當月最新一筆回報資料以方便修正。
+   * **資料寫入 (POST)**：送出時發送 `action=submit`，將主要毛利與獎金寫入 Sheets，並將複雜細項（如 vivo 手機、中嘉寬頻細節）打包成 `detailJson` 寫入 Sheets 備份，避免試算表欄位膨脹。
+
+3. **三層式 Sheets 運算 ➔ 前台個人動態儀表板**：
+   * **Tier 1 (參數控制後台)**：定義階梯抽成%數與規則。
+   * **Tier 2 (分店業績中台)**：同仁填寫的日報表儲存處。
+   * **Tier 3 (前台個人儀表板)**：使用 `getEmployeeSheetNames()` 動態雷達掃描所有員工分頁，並以 `=SUM(INDIRECT("'" & $C$4 & "'!座標"))` 實現跨 Tab 安全加總，物理隔離其他人隱私且防止公式錯誤。
+
+---
+
+### C. 獎金公告換月切換標準作業流程 (SOP)
+
+當月份交替時，管理人員請依以下流程進行更新：
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor 管理員 as 總部管理人員
+    participant Excel as Excel 獎金公告.xlsx
+    participant Workers as Cloudflare Workers (代碼)
+    participant Sheets as Google Sheets (中央庫)
+
+    管理員->>Excel: 1. 根據本月營運方針，更新「各店目標分配表」與「獎金規則」
+    管理員->>Workers: 2. 修改 sys-version 版本號 (如 v20260601-1)
+    管理員->>Workers: 3. 更新 STAFF 名單 (若有同仁入離職)
+    管理員->>Workers: 4. 更新 SD (各店目標) 與 KPIS (重點KPI目標) 常數
+    管理員->>Workers: 5. 更新 NOWITEMS (現領品項) 與 VIVO (台獎品項)
+    管理員->>Sheets: 6. 在主 Sheet 執行「一鍵初始化新月份工作表」
+    管理員->>Sheets: 7. 進入 Apps Script 執行 setupAutoSyncTrigger()，啟動下拉選單自動同步雷達
+```
+
+1. **更新 Workers 程式常數**：在 Cloudflare 中編輯 Worker，更動 `sys-version` 版號、`STAFF` 陣列，並手動填入新月的 `SD`、`KPIS`、`NOWITEMS` 與 `VIVO` 對照常數後儲存部署。
+2. **初始化 Sheets 中台**：在中央試算表執行 GAS 腳本初始化新月份分頁，並執行 `setupAutoSyncTrigger` 函數，安裝背景名單雷達。
+
+---
+
+### D. 未來整合重構走向建議 (Roadmap)
+
+我們建議的終極整合走向是：**「一次輸入（日報），公式全自動計算，由下而上鏈結彙總，前台純讀取呈現」**。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor 同仁 as 門市同仁 (如: 默默)
+    participant App as 門市系統前台
+    participant GAS as GAS 後端 API
+    participant BranchSheet as 東門店試算表 (分店中台)
+    participant Brain as 1_後台_參數設定 (中央大腦)
+    participant HQSheet as (ALL)全店業績日報表 (總部)
+
+    %% 1. 輸入
+    同仁->>App: 1. 填寫「每日業績日報表」 (毛利、配件、保險等)
+    App->>GAS: 發送日報 JSON
+    Note over GAS: 依據當前年月 (202605)<br>定位至「東門店」檔案
+    GAS->>BranchSheet: 2. 寫入「默默」分頁的指定日期列
+
+    %% 2. 運算與彙總
+    Note over BranchSheet: 3. 自動與「中央大腦」連動公式
+    Brain-->>BranchSheet: 提供最新獎金階梯%數與品項獎勵
+    Note over BranchSheet: 4. 個人分頁底部公式自動結算當月獎金
+    BranchSheet->>BranchSheet: 5. 個人獎金自動加總至「東門店」總分頁
+    BranchSheet->>HQSheet: 6. IMPORTRANGE 跨檔自動彙整至全店總表
+    Note over HQSheet: 7. 全店總表 ALL 分頁總計所有分店業績與獎金
+
+    %% 3. 看板呈現
+    同仁->>App: 8. 開啟「業績看板」 (隨時檢視)
+    App->>GAS: 請求最新業績與獎金數據
+    GAS->>BranchSheet: 讀取「默默」分頁 (當月累計與已結算獎金)
+    BranchSheet-->>GAS: 回傳累計與獎金數據
+    GAS-->>App: 回傳結構化 JSON
+    App->>同仁: 9. 顯示 RWD 達成率進度條、歷史趨勢圖與預估獎金明細
+```
+
+#### 三階段走向計畫：
+* **階段一：底層日報動態定位與直寫（已完成）**：實現前台登錄 ➔ GAS ➔ 分店 Sheets 個人分頁的 Read-Modify-Write 安全覆寫。
+* **階段二：公式大腦與獎金自動結算連動（下一階段核心）**：
+  1. 在總部雲端建立 `1_後台_參數設定` 工作表，定義階梯抽成等常數。
+  2. 在個人分頁佈署連動參數庫的 VLOOKUP/XLOOKUP 結算公式，由日報累積數據直接算出獎金。
+  3. 重構 GAS 業績看板 API，直接讀取個人分頁底部的結算獎金，正式將 Workers 表單除役。
+* **階段三：獎金系統完全整合（終極目標）**：系統新增「月底獎金審核與核發」，生成薪資與獎金明細單 PDF，並於 Dashboard 新增「本月已累積獎金」卡片，以遊戲化激勵同仁。
