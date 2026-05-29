@@ -24,6 +24,10 @@ var SHEET_CUSTOMERS = "客戶資料";
 var SHEET_SYSTEM_LOGS = "系統操作日誌";
 var SHEET_SYSTEM_LOGS_BACKUP = "操作日誌封存";
 
+// 業績資料夾 ID (母目錄或當月子目錄 ID)
+var PERFORMANCE_FOLDER_ID = "1WmUILJGUrlFWEUtaADutSluVShQq8dxg";
+
+
 // 欄位雙向對照表
 var ORDER_MAPPING = {
   'id': '編號',
@@ -686,6 +690,11 @@ function doGet(e) {
     return handleGetLineConfig();
   } else if (action === 'getECommerceRates') {
     return handleGetECommerceRates();
+  } else if (action === 'getStorePerformance') {
+    var result = handleGetStorePerformance(e.parameter.storeName, e.parameter.sheetName, e.parameter.role);
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeader("Access-Control-Allow-Origin", "*");
   }
   
   return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '未知的 Action' }))
@@ -720,6 +729,8 @@ function doPost(e) {
       result = handleSyncCustomers(postData.customers);
     } else if (action === 'writeLog') {
       result = handleWriteLog(postData.operator, postData.role, postData.actionType, postData.targetModule, postData.description);
+    } else if (action === 'submitDailyPerformance') {
+      result = handleSubmitDailyPerformance(postData.input);
     }
   } catch (err) {
     result = { status: 'error', message: err.toString() };
@@ -1719,5 +1730,245 @@ function archiveOldLogs() {
       SpreadsheetApp.getUi().alert(msg);
     } catch(e) {}
     return { status: 'success', message: msg, archivedCount: 0 };
+  }
+}
+
+// 取得業績子資料夾 (依據 YYYYMM，例如 "202605")
+function getPerformanceFolder(parentFolderId, yyyymm) {
+  try {
+    var parentFolder = DriveApp.getFolderById(parentFolderId);
+    var folders = parentFolder.getFoldersByName(yyyymm);
+    if (folders.hasNext()) {
+      return folders.next();
+    }
+    return null;
+  } catch (e) {
+    Logger.log("取得資料夾失敗: " + e.toString());
+    return null;
+  }
+}
+
+// 取得分店的試算表檔案 (模糊搜尋檔名包含 storeName)
+function getStoreSpreadsheet(folder, storeName) {
+  try {
+    var files = folder.getFiles();
+    while (files.hasNext()) {
+      var file = files.next();
+      var name = file.getName();
+      // 確保是 Google Sheets 且檔名包含店名 (如 "東門店")
+      if (name.indexOf(storeName) !== -1 && file.getMimeType() === MimeType.GOOGLE_SHEETS) {
+        return SpreadsheetApp.open(file);
+      }
+    }
+    return null;
+  } catch (e) {
+    Logger.log("取得試算表失敗: " + e.toString());
+    return null;
+  }
+}
+
+// 定位第一欄符合特定內容的 row index (1-indexed)
+function findRowByFirstColumn(sheet, targetText) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow === 0) return -1;
+  var data = sheet.getRange(1, 1, lastRow, 1).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][0] !== undefined && data[i][0] !== null && data[i][0].toString().trim() === targetText.toString().trim()) {
+      return i + 1;
+    }
+  }
+  return -1;
+}
+
+// 格式化百分比輔助函數
+function formatPercent(val) {
+  if (val === undefined || val === null || val === '') return '0%';
+  var num = Number(val);
+  if (isNaN(num)) return val.toString();
+  // 判斷是否為小數或已經是百分比整數
+  if (num <= 2 && num >= 0) {
+    return Math.round(num * 100) + '%';
+  }
+  return Math.round(num) + '%';
+}
+
+// 讀取分店與人員的業績數據
+function handleGetStorePerformance(storeName, sheetName, role) {
+  try {
+    if (!storeName || !sheetName) {
+      return { status: 'error', message: '缺少必要參數 storeName 或 sheetName' };
+    }
+    
+    // 1. 動態取得當前的 YYYYMM 時間字串 (例如 "202605")
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, '0');
+    var yyyymm_folder = yyyy + mm;
+    
+    // 2. 獲取當月業績資料夾
+    var folder = getPerformanceFolder(PERFORMANCE_FOLDER_ID, yyyymm_folder);
+    if (!folder) {
+      return { status: 'error', message: '系統偵測到本月資料夾 【' + yyyymm_folder + '】 尚未建立，請聯絡管理員先於雲端硬碟建立本月資料夾。' };
+    }
+    
+    // 3. 獲取該分店試算表
+    var spreadsheet = getStoreSpreadsheet(folder, storeName);
+    if (!spreadsheet) {
+      return { status: 'error', message: '系統偵測到分店 【' + storeName + '】 的業績日報表檔案尚未建立，請聯絡管理員。' };
+    }
+    
+    // 4. 獲取對應的分頁
+    var sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      return { status: 'error', message: '系統偵測到分頁 【' + sheetName + '】 尚未建立，請聯絡管理員先至業績表建立同仁分頁。' };
+    }
+    
+    // 5. 讀取數據
+    var lastRow = sheet.getLastRow();
+    var lastColumn = sheet.getLastColumn();
+    var values = sheet.getRange(1, 1, lastRow, lastColumn).getValues();
+    
+    // 6. 定位關鍵行
+    var rowTarget = -1;
+    var rowAccumulated = -1;
+    var rowAchievement = -1;
+    var dailyData = [];
+    
+    for (var i = 0; i < values.length; i++) {
+      var firstCell = values[i][0] ? values[i][0].toString().trim() : '';
+      if (firstCell === '目標分配') {
+        rowTarget = i;
+      } else if (firstCell === '當月累計') {
+        rowAccumulated = i;
+      } else if (firstCell === '目前達成') {
+        rowAchievement = i;
+      } else {
+        var dayNum = parseInt(firstCell);
+        if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
+          dailyData.push({
+            day: dayNum,
+            grossProfit: Number(values[i][1]) || 0, // 毛利在第二欄
+            insurance: Number(values[i][2]) || 0,    // 保險營收在第三欄
+            subscription: Number(values[i][3]) || 0, // 門號在第四欄
+            accessories: Number(values[i][4]) || 0,  // 配件營收在第五欄
+            customerCount: Number(values[i][19]) || 0 // 來客數在第二十欄
+          });
+        }
+      }
+    }
+    
+    var summary = {
+      grossProfit: { target: 0, accumulated: 0, achievement: "0%" },
+      insurance: { target: 0, accumulated: 0, achievement: "0%" },
+      subscription: { target: 0, accumulated: 0, achievement: "0%" },
+      accessories: { target: 0, accumulated: 0, achievement: "0%" },
+      customerCount: { target: 0, accumulated: 0, achievement: "0%" }
+    };
+    
+    if (rowTarget !== -1) {
+      summary.grossProfit.target = Number(values[rowTarget][1]) || 0;
+      summary.insurance.target = Number(values[rowTarget][2]) || 0;
+      summary.subscription.target = Number(values[rowTarget][3]) || 0;
+      summary.accessories.target = Number(values[rowTarget][4]) || 0;
+      summary.customerCount.target = Number(values[rowTarget][19]) || 0;
+    }
+    
+    if (rowAccumulated !== -1) {
+      summary.grossProfit.accumulated = Number(values[rowAccumulated][1]) || 0;
+      summary.insurance.accumulated = Number(values[rowAccumulated][2]) || 0;
+      summary.subscription.accumulated = Number(values[rowAccumulated][3]) || 0;
+      summary.accessories.accumulated = Number(values[rowAccumulated][4]) || 0;
+      summary.customerCount.accumulated = Number(values[rowAccumulated][19]) || 0;
+    }
+    
+    if (rowAchievement !== -1) {
+      summary.grossProfit.achievement = formatPercent(values[rowAchievement][1]);
+      summary.insurance.achievement = formatPercent(values[rowAchievement][2]);
+      summary.subscription.achievement = formatPercent(values[rowAchievement][3]);
+      summary.accessories.achievement = formatPercent(values[rowAchievement][4]);
+      summary.customerCount.achievement = formatPercent(values[rowAchievement][19]);
+    }
+    
+    return {
+      status: 'success',
+      storeName: storeName,
+      sheetName: sheetName,
+      summary: summary,
+      daily: dailyData
+    };
+  } catch (error) {
+    return { status: 'error', message: '讀取業績失敗: ' + error.toString() };
+  }
+}
+
+// 寫入業績數據 (手動登錄業績)
+function handleSubmitDailyPerformance(input) {
+  try {
+    var storeName = input.storeName;
+    var sheetName = input.sheetName;
+    var dateStr = input.date; // "YYYY-MM-DD"
+    
+    if (!storeName || !sheetName || !dateStr) {
+      return { status: 'error', message: '缺少必要參數 storeName, sheetName 或 date' };
+    }
+    
+    var dateParts = dateStr.split('-');
+    var yyyy = dateParts[0];
+    var mm = dateParts[1];
+    var day = parseInt(dateParts[2]);
+    
+    var yyyymm_folder = yyyy + mm;
+    
+    // 1. 獲取當月業績資料夾
+    var folder = getPerformanceFolder(PERFORMANCE_FOLDER_ID, yyyymm_folder);
+    if (!folder) {
+      return { status: 'error', message: '系統偵測到本月資料夾 【' + yyyymm_folder + '】 尚未建立，請聯絡管理員先於雲端硬碟建立本月資料夾。' };
+    }
+    
+    // 2. 獲取該分店試算表
+    var spreadsheet = getStoreSpreadsheet(folder, storeName);
+    if (!spreadsheet) {
+      return { status: 'error', message: '系統偵測到分店 【' + storeName + '】 的業績日報表檔案尚未建立，請聯絡管理員。' };
+    }
+    
+    // 3. 獲取對應的分頁
+    var sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      return { status: 'error', message: '系統偵測到分頁 【' + sheetName + '】 尚未建立，請聯絡管理員先至業績表建立同仁分頁。' };
+    }
+    
+    // 4. 定位該日期 (day) 在第一欄的行數
+    var targetRowIndex = findRowByFirstColumn(sheet, day);
+    if (targetRowIndex === -1) {
+      return { status: 'error', message: '在工作表中找不到 【' + day + '】 日對應的行，請確認分頁結構是否正確。' };
+    }
+    
+    // 5. 讀取-修改-寫回 (Read-Modify-Write) 模式
+    var lastColumn = sheet.getLastColumn();
+    var rowRange = sheet.getRange(targetRowIndex, 1, 1, lastColumn);
+    var rowValues = rowRange.getValues()[0];
+    
+    // 修改前端有傳入的欄位，其餘保留原樣
+    if (input.grossProfit !== undefined) rowValues[1] = Number(input.grossProfit) || 0; // 毛利
+    if (input.insurance !== undefined) rowValues[2] = Number(input.insurance) || 0;    // 保險營收
+    if (input.subscription !== undefined) rowValues[3] = Number(input.subscription) || 0; // 門號
+    if (input.accessories !== undefined) rowValues[4] = Number(input.accessories) || 0;  // 配件營收
+    if (input.customerCount !== undefined) rowValues[19] = Number(input.customerCount) || 0; // 來客數
+    
+    // 寫回
+    rowRange.setValues([rowValues]);
+    
+    // 6. 寫入系統操作稽核日誌
+    handleWriteLog(
+      input.operator || 'system',
+      input.operatorRole || 'STAFF',
+      '登錄業績',
+      '業績模組',
+      '登錄分店: ' + storeName + ', 同仁: ' + sheetName + ', 日期: ' + dateStr + ', 毛利: ' + (input.grossProfit || 0) + ', 配件: ' + (input.accessories || 0)
+    );
+    
+    return { status: 'success', message: '業績登錄成功！' };
+  } catch (error) {
+    return { status: 'error', message: '業績登錄失敗: ' + error.toString() };
   }
 }

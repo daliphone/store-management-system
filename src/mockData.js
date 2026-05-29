@@ -30,7 +30,9 @@ export const USERS = [
       "complete_tasks",
       "cancel_tasks_directly",
       "manage_accounts"
-    ]
+    ],
+    "sheetName": "",
+    "storeCodes": "ALL"
   },
   {
     "id": "user_1002",
@@ -47,7 +49,9 @@ export const USERS = [
       "complete_tasks",
       "cancel_tasks_directly",
       "manage_accounts"
-    ]
+    ],
+    "sheetName": "",
+    "storeCodes": "ALL"
   },
   {
     "id": "user_1003",
@@ -62,7 +66,9 @@ export const USERS = [
       "manage_orders",
       "complete_tasks",
       "cancel_tasks_directly"
-    ]
+    ],
+    "sheetName": "慧婷",
+    "storeCodes": "2"
   },
   {
     "id": "user_1006",
@@ -77,7 +83,9 @@ export const USERS = [
       "manage_orders",
       "complete_tasks",
       "cancel_tasks_directly"
-    ]
+    ],
+    "sheetName": "配飯",
+    "storeCodes": "5,8,11"
   },
   {
     "id": "user_1009",
@@ -92,7 +100,9 @@ export const USERS = [
       "manage_orders",
       "complete_tasks",
       "cancel_tasks_directly"
-    ]
+    ],
+    "sheetName": "914",
+    "storeCodes": "4"
   },
   {
     "id": "user_1011",
@@ -107,7 +117,9 @@ export const USERS = [
       "manage_orders",
       "complete_tasks",
       "cancel_tasks_directly"
-    ]
+    ],
+    "sheetName": "豆豆",
+    "storeCodes": "6"
   },
   {
     "id": "user_1014",
@@ -122,7 +134,9 @@ export const USERS = [
       "manage_orders",
       "complete_tasks",
       "cancel_tasks_directly"
-    ]
+    ],
+    "sheetName": "宗憲",
+    "storeCodes": "7"
   },
   {
     "id": "user_1015",
@@ -136,7 +150,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "阿緯",
+    "storeCodes": "2"
   },
   {
     "id": "user_1019",
@@ -150,7 +166,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "秀秀",
+    "storeCodes": "6"
   },
   {
     "id": "user_1020",
@@ -159,12 +177,14 @@ export const USERS = [
     "password": "686868",
     "role": "STAFF",
     "roleLabel": "一般店員",
-    "store": "永康店",
+    "store": "東門店",
     "avatar": "👩‍💼",
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "筑君",
+    "storeCodes": "4"
   },
   {
     "id": "user_1023",
@@ -179,7 +199,9 @@ export const USERS = [
       "view_all_stores",
       "complete_tasks",
       "manage_accounts"
-    ]
+    ],
+    "sheetName": "",
+    "storeCodes": "ALL"
   },
   {
     "id": "user_1028",
@@ -196,7 +218,9 @@ export const USERS = [
       "complete_tasks",
       "cancel_tasks_directly",
       "manage_accounts"
-    ]
+    ],
+    "sheetName": "",
+    "storeCodes": "ALL"
   },
   {
     "id": "user_1040",
@@ -210,7 +234,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "默默",
+    "storeCodes": "4"
   },
   {
     "id": "user_1042",
@@ -224,7 +250,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "阿吉",
+    "storeCodes": "0"
   },
   {
     "id": "user_1057",
@@ -238,7 +266,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "",
+    "storeCodes": "1"
   },
   {
     "id": "user_1065",
@@ -252,7 +282,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "",
+    "storeCodes": "0"
   },
   {
     "id": "user_1066",
@@ -266,7 +298,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "",
+    "storeCodes": ""
   },
   {
     "id": "user_1074",
@@ -280,7 +314,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "",
+    "storeCodes": "0"
   },
   {
     "id": "user_1077",
@@ -294,7 +330,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "脆迪",
+    "storeCodes": "5,8,11"
   },
   {
     "id": "user_1080",
@@ -308,7 +346,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "薪融",
+    "storeCodes": "5,8,11"
   },
   {
     "id": "user_1082",
@@ -322,7 +362,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "大俗",
+    "storeCodes": "10"
   },
   {
     "id": "user_1092",
@@ -336,7 +378,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "",
+    "storeCodes": "0"
   },
   {
     "id": "user_1094",
@@ -350,7 +394,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "阿笑",
+    "storeCodes": "7,10"
   },
   {
     "id": "user_1096",
@@ -364,7 +410,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "77",
+    "storeCodes": "5,11"
   },
   {
     "id": "user_1098",
@@ -378,7 +426,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "阿碳",
+    "storeCodes": "5,11"
   },
   {
     "id": "user_1099",
@@ -392,7 +442,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "",
+    "storeCodes": "0"
   },
   {
     "id": "user_1100",
@@ -406,7 +458,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "小昕",
+    "storeCodes": "2"
   },
   {
     "id": "user_1102",
@@ -420,7 +474,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "小郭",
+    "storeCodes": "6"
   },
   {
     "id": "user_1103",
@@ -434,7 +490,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "小菲",
+    "storeCodes": "7,10"
   },
   {
     "id": "user_1104",
@@ -448,7 +506,9 @@ export const USERS = [
     "permissions": [
       "manage_orders",
       "complete_tasks"
-    ]
+    ],
+    "sheetName": "怡蓁",
+    "storeCodes": "4"
   }
 ];
 

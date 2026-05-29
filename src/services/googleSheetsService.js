@@ -540,4 +540,102 @@ export const writeSystemLog = (operator, role, actionType, targetModule, descrip
   });
 };
 
+// 取得分店與人員當月業績數據
+export const getStorePerformance = async (storeName, sheetName, role) => {
+  const apiUrl = getApiUrl();
+  const localPerfKey = `store_mgmt_perf_${storeName}_${sheetName}`;
+  const localData = localStorage.getItem(localPerfKey);
+  
+  if (!apiUrl) {
+    return localData ? JSON.parse(localData) : null;
+  }
+  
+  try {
+    const response = await fetch(`${apiUrl}?action=getStorePerformance&storeName=${encodeURIComponent(storeName)}&sheetName=${encodeURIComponent(sheetName)}&role=${encodeURIComponent(role)}`, {
+      method: 'GET',
+      mode: 'cors',
+    });
+    
+    if (!response.ok) throw new Error('網路回應不成功');
+    const data = await response.json();
+    if (data.status === 'success') {
+      localStorage.setItem(localPerfKey, JSON.stringify(data));
+      return data;
+    } else {
+      throw new Error(data.message || 'API 讀取業績失敗');
+    }
+  } catch (error) {
+    console.warn('讀取雲端業績失敗，使用本地快取:', error);
+    return localData ? JSON.parse(localData) : null;
+  }
+};
+
+// 提交每日業績登錄
+export const submitDailyPerformance = async (inputData) => {
+  const apiUrl = getApiUrl();
+  
+  // 更新本地快取
+  const localPerfKey = `store_mgmt_perf_${inputData.storeName}_${inputData.sheetName}`;
+  const localDataStr = localStorage.getItem(localPerfKey);
+  if (localDataStr) {
+    try {
+      const localData = JSON.parse(localDataStr);
+      const dayNum = parseInt(inputData.date.split('-')[2]);
+      
+      // 更新 daily 資料中的該天
+      let updatedDaily = localData.daily || [];
+      const existingIdx = updatedDaily.findIndex(d => d.day === dayNum);
+      const newDayObj = {
+        day: dayNum,
+        grossProfit: Number(inputData.grossProfit) || 0,
+        insurance: Number(inputData.insurance) || 0,
+        subscription: Number(inputData.subscription) || 0,
+        accessories: Number(inputData.accessories) || 0,
+        customerCount: Number(inputData.customerCount) || 0
+      };
+      
+      if (existingIdx !== -1) {
+        updatedDaily[existingIdx] = newDayObj;
+      } else {
+        updatedDaily.push(newDayObj);
+      }
+      
+      localStorage.setItem(localPerfKey, JSON.stringify({
+        ...localData,
+        daily: updatedDaily
+      }));
+    } catch (e) {
+      console.warn('更新本地業績快取失敗', e);
+    }
+  }
+  
+  if (!apiUrl) {
+    return { success: true, source: 'LocalStorage (離線模式)' };
+  }
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      body: JSON.stringify({
+        action: 'submitDailyPerformance',
+        input: inputData
+      })
+    });
+    
+    const data = await response.json();
+    if (data.status === 'success') {
+      return { success: true, source: 'Google Sheets', message: data.message };
+    } else {
+      throw new Error(data.message || 'API 業績登錄失敗');
+    }
+  } catch (error) {
+    console.error('業績登錄 API 失敗：', error);
+    return { success: false, message: error.message };
+  }
+};
+
 

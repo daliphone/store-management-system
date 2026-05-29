@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ManieIcon from './ManieIcon';
-import { Settings, Calendar, AlertTriangle, Clock, Check, X, Database, LogOut, Target, Wrench } from 'lucide-react';
+import { Settings, Calendar, AlertTriangle, Clock, Check, X, Database, LogOut, Target, Wrench, TrendingUp, Loader2 } from 'lucide-react';
+import { getStorePerformance } from '../services/googleSheetsService';
 
 export default function Dashboard({ 
   orders, 
@@ -20,6 +21,30 @@ export default function Dashboard({
   const [alertSettings, setAlertSettings] = useState({ warningDays: 2, criticalDays: 7 });
   const [greetingText, setGreetingText] = useState('');
   const [isStoreTasksModalOpen, setIsStoreTasksModalOpen] = useState(false);
+  const [homePerf, setHomePerf] = useState(null);
+  const [perfLoading, setPerfLoading] = useState(false);
+
+  useEffect(() => {
+    if (currentUser && currentUser.store !== '電商部') {
+      const fetchHomePerf = async () => {
+        setPerfLoading(true);
+        try {
+          const isManager = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR' || currentUser.role === 'STORE_MANAGER';
+          const defaultSheet = isManager ? (currentUser.store === '全分店' ? '東門店' : currentUser.store) : (currentUser.sheetName || currentUser.name);
+          const storeName = currentUser.store === '全分店' ? '東門店' : currentUser.store;
+          const data = await getStorePerformance(storeName, defaultSheet, currentUser.role);
+          if (data && data.status === 'success') {
+            setHomePerf(data);
+          }
+        } catch (e) {
+          console.warn('Dashboard 業績載入失敗', e);
+        } finally {
+          setPerfLoading(false);
+        }
+      };
+      fetchHomePerf();
+    }
+  }, [currentUser]);
 
   // 統計各分店的未完成任務數 (對齊 TaskList 邏輯)
   const getStorePendingTasksMap = () => {
@@ -315,6 +340,58 @@ export default function Dashboard({
             <ManieIcon pose="gold" className="w-14 h-14" />
           </div>
         </div>
+
+        {/* 每日業績達成率卡片 */}
+        {currentUser && currentUser.store !== '電商部' && (
+          <div 
+            onClick={() => setActiveTab('performance')}
+            className="bg-white p-4 rounded-[24px] border border-slate-100 shadow-[inset_0_2px_10px_rgba(0,0,0,0.01),0_2px_8px_rgba(0,0,0,0.03)] flex flex-col space-y-3 active:scale-98 transition-all cursor-pointer hover:shadow-md font-['Outfit'] select-none"
+          >
+            <div className="flex justify-between items-center">
+              <div className="flex items-center space-x-1.5 text-rose-500 font-extrabold text-xs">
+                <TrendingUp size={15} />
+                <span className="text-slate-800">🎯 當月毛利達成率</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-bold flex items-center gap-0.5">
+                詳細分析 ➔
+              </span>
+            </div>
+
+            {perfLoading ? (
+              <div className="flex items-center space-x-2 py-1 select-none">
+                <Loader2 size={12} className="text-rose-500 animate-spin" />
+                <span className="text-[10px] font-bold text-slate-400">正在同步業績數據...</span>
+              </div>
+            ) : homePerf ? (
+              <div className="space-y-2 select-none">
+                <div className="flex justify-between items-baseline">
+                  <div className="flex items-baseline space-x-1">
+                    <span className="text-xl font-black text-slate-800 font-mono">
+                      {(homePerf.summary?.grossProfit?.accumulated || 0).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-bold">元</span>
+                  </div>
+                  <span className="text-xs font-black text-rose-500 font-mono">
+                    {homePerf.summary?.grossProfit?.achievement || '0%'}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-rose-500 rounded-full transition-all duration-500" 
+                    style={{ width: `${Math.min(parseInt(homePerf.summary?.grossProfit?.achievement || '0%') || 0, 100)}%` }}
+                  ></div>
+                </div>
+                <p className="text-[9px] text-slate-400 font-bold">
+                  分析主體：{homePerf.sheetName === homePerf.storeName ? `${homePerf.storeName}總表` : `${homePerf.sheetName} (${homePerf.storeName})`}
+                </p>
+              </div>
+            ) : (
+              <div className="py-1 text-[10px] text-slate-400 font-bold select-none">
+                ⚠️ 點選以載入當月業績數據或確認 Google Apps Script API 設定。
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 2x2 核心指標數據 */}
         <div className="grid grid-cols-2 gap-3">

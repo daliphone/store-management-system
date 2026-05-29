@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Package, ClipboardCheck, CheckSquare, Users, Search, Settings } from 'lucide-react';
+import { Home, Package, ClipboardCheck, Users, Search, Settings, TrendingUp } from 'lucide-react';
 
 export default function BottomNav({ activeTab, setActiveTab, currentUser }) {
   const canManage = currentUser && currentUser.permissions && currentUser.permissions.includes('manage_accounts');
@@ -8,9 +8,16 @@ export default function BottomNav({ activeTab, setActiveTab, currentUser }) {
     { id: 'home', label: '首頁', icon: Home },
     { id: 'orders', label: '訂單', icon: Package },
     { id: 'tasks', label: '任務', icon: ClipboardCheck },
+  ];
+
+  if (currentUser && currentUser.store !== '電商部') {
+    tabs.push({ id: 'performance', label: '業績', icon: TrendingUp });
+  }
+
+  tabs.push(
     { id: 'customers', label: '客戶', icon: Users },
     { id: 'query', label: '查詢', icon: Search }
-  ];
+  );
 
   if (canManage) {
     tabs.push({ id: 'admin', label: '管理', icon: Settings });

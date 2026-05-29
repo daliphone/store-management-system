@@ -8,6 +8,7 @@ import Settings from './components/Settings';
 import Login from './components/Login';
 import CustomerList from './components/CustomerList';
 import AdminConsole from './components/AdminConsole';
+import PerformanceBoard from './components/PerformanceBoard';
 import { loadData, addOrder, updateTaskStatus, updateOrderStatus, saveEditedOrder, addOrdersBatch, syncCustomers, writeSystemLog } from './services/googleSheetsService';
 import { USERS } from './mockData';
 import { Loader2, AlertCircle, Database, Check } from 'lucide-react';
@@ -546,6 +547,13 @@ export default function App() {
             onOpenSettings={() => setSettingsOpen(true)}
             tasksStoreFilter={tasksStoreFilter}
             setTasksStoreFilter={setTasksStoreFilter}
+          />
+        );
+      case 'performance':
+        return (
+          <PerformanceBoard
+            currentUser={currentUser}
+            stores={stores}
           />
         );
       case 'customers':
