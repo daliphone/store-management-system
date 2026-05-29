@@ -644,6 +644,7 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
         if (isNewItem) {
           const isBlue = line.startsWith('🔵');
           const isOrange = line.startsWith('🟠');
+          const isRed = line.startsWith('🔴');
           const rest = line.substring(1).trim();
           
           const nextLine = i + 1 < lines.length ? lines[i + 1] : '';
@@ -652,6 +653,10 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
           if (hasSubItems) {
             const mainProduct = rest;
             i++;
+            
+            const currentBatchItems = [];
+            let commonPromiseDate = generalPromiseDate;
+            let commonNote = '';
             
             while (i < lines.length) {
               let subLine = lines[i];
@@ -677,34 +682,84 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
                   acc = spl[1].trim();
                 }
                 
+                let itemType = '調貨';
                 let status = '訂貨需求';
                 let stockNote = '無庫存';
-                if (isBlue) { status = '已下訂'; stockNote = '可從東門調'; }
-                if (isOrange) { status = '訂貨需求'; stockNote = '分店調看看'; }
                 
-                items.push({
-                  id: `ord_batch_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}`,
+                if (isBlue) { 
+                  status = '已下訂'; 
+                  stockNote = '可從東門調'; 
+                } else if (isOrange) { 
+                  status = '訂貨需求'; 
+                  stockNote = '分店調看看'; 
+                } else if (isRed) {
+                  itemType = '訂貨';
+                  status = '訂貨需求';
+                  stockNote = '無庫存';
+                }
+                
+                currentBatchItems.push({
+                  id: `ord_batch_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}_${currentBatchItems.length}`,
                   customerName: '網拍調貨',
                   customerPhone: '0900-000-000',
                   productName: `${mainProduct} ${finalSpec}`,
-                  type: '調貨',
+                  type: itemType,
                   store: batchSettings.globalStore,
                   creator: currentUser.name,
                   source: '網拍電商',
-                  tags: ['電商調貨'],
+                  tags: itemType === '訂貨' ? ['電商訂貨'] : ['電商調貨'],
                   quantity: qty,
                   price: 0,
                   cost: 0,
                   status: status,
                   createdAt: todayStr,
-                  promiseDate: generalPromiseDate,
                   overdueDays: 0,
                   signature: '',
-                  notes: `[調貨庫存] ${stockNote}${acc ? ` | 配件: ${acc}` : ''}`
+                  acc: acc,
+                  stockNote: stockNote
                 });
+              } else if (subLine.trim()) {
+                commonNote = subLine.trim();
+                const expiryMatch = subLine.match(/(\d{1,2})[\/\.-](\d{1,2})\s*到期/);
+                if (expiryMatch) {
+                  const m = expiryMatch[1].padStart(2, '0');
+                  const d = expiryMatch[2].padStart(2, '0');
+                  commonPromiseDate = `${today.getFullYear()}-${m}-${d}`;
+                }
               }
               i++;
             }
+            
+            currentBatchItems.forEach(item => {
+              let finalNote = `[${item.type === '訂貨' ? '訂貨' : '調貨'}庫存] ${item.stockNote}`;
+              if (item.acc) {
+                finalNote += ` | 配件: ${item.acc}`;
+              }
+              if (commonNote) {
+                finalNote += ` | 備註: ${commonNote}`;
+              }
+              
+              items.push({
+                id: item.id,
+                customerName: item.customerName,
+                customerPhone: item.customerPhone,
+                productName: item.productName,
+                type: item.type,
+                store: item.store,
+                creator: item.creator,
+                source: item.source,
+                tags: item.tags,
+                quantity: item.quantity,
+                price: item.price,
+                cost: item.cost,
+                status: item.status,
+                createdAt: todayStr,
+                promiseDate: commonPromiseDate,
+                overdueDays: item.overdueDays,
+                signature: item.signature,
+                notes: finalNote
+              });
+            });
           } else {
             const parts = rest.split('*');
             let rawProductName = rest;
@@ -729,12 +784,33 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
             let nextLine = i + 1 < lines.length ? lines[i + 1] : '';
             let stockNote = '無庫存';
             let status = '訂貨需求';
+            let itemType = '調貨';
             
-            if (isBlue) { status = '已下訂'; stockNote = '可從東門調'; }
-            if (isOrange) { status = '訂貨需求'; stockNote = '分店調看看'; }
+            if (isBlue) { 
+              status = '已下訂'; 
+              stockNote = '可從東門調'; 
+            } else if (isOrange) { 
+              status = '訂貨需求'; 
+              stockNote = '分店調看看'; 
+            } else if (isRed) {
+              itemType = '訂貨';
+              status = '訂貨需求';
+              stockNote = '無庫存';
+            }
+            
+            let itemPromiseDate = generalPromiseDate;
+            let commonNote = '';
             
             if (nextLine && !nextLine.startsWith('🔵') && !nextLine.startsWith('🟠') && !nextLine.startsWith('🔴')) {
-              const stockMatch = nextLine.match(/([^\d]+)(\d+)/);
+              commonNote = nextLine.trim();
+              const expiryMatch = nextLine.match(/(\d{1,2})[\/\.-](\d{1,2})\s*到期/);
+              if (expiryMatch) {
+                const m = expiryMatch[1].padStart(2, '0');
+                const d = expiryMatch[2].padStart(2, '0');
+                itemPromiseDate = `${today.getFullYear()}-${m}-${d}`;
+              }
+              
+              const stockMatch = nextLine.match(/^([^\d\/]+)(\d+)$/);
               if (stockMatch) {
                 stockNote = `${stockMatch[1].trim()}: ${stockMatch[2].trim()}`;
               } else {
@@ -743,25 +819,30 @@ export default function OrderForm({ currentUser, onSave, onSaveBatch, onClose, e
               i++;
             }
             
+            let finalNote = `[${itemType === '訂貨' ? '訂貨' : '調貨'}庫存] ${stockNote}`;
+            if (accNote) {
+              finalNote += ` | 配件: ${accNote}`;
+            }
+            
             items.push({
               id: `ord_batch_${Math.random().toString(36).substr(2, 9)}_${new Date().getTime()}_${items.length}`,
               customerName: '網拍調貨',
               customerPhone: '0900-000-000',
               productName: finalProduct,
-              type: '調貨',
+              type: itemType,
               store: batchSettings.globalStore,
               creator: currentUser.name,
               source: '網拍電商',
-              tags: ['電商調貨'],
+              tags: itemType === '訂貨' ? ['電商訂貨'] : ['電商調貨'],
               quantity: qty,
               price: 0,
               cost: 0,
               status: status,
               createdAt: todayStr,
-              promiseDate: generalPromiseDate,
+              promiseDate: itemPromiseDate,
               overdueDays: 0,
               signature: '',
-              notes: `[調貨庫存] ${stockNote}${accNote ? ` | 配件: ${accNote}` : ''}`
+              notes: finalNote
             });
           }
         }
