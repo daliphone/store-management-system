@@ -62,10 +62,35 @@ export default function PerformanceBoard({ currentUser, stores }) {
     return availableStores.length > 0 ? availableStores[0] : (currentUser?.store || '東門店');
   });
 
-  // 取得選定分店的人員清單
+  // 取得選定分店的人員清單 (支援多店編碼與跨店支援)
   const getStorePeople = (storeName) => {
-    const list = USERS.filter(u => u.store === storeName && u.sheetName);
-    return list.map(u => ({ name: u.name, sheetName: u.sheetName }));
+    // 找出 storeName 對應的 storeCode (例如 "五甲店" -> "8")
+    const storeCode = Object.keys(STORE_CODE_MAP).find(key => STORE_CODE_MAP[key] === storeName);
+    
+    const list = USERS.filter(u => {
+      // 1. 如果使用者的主要 store 直接匹配店名
+      if (u.store === storeName) return true;
+      // 2. 如果使用者的 storeCodes 包含該店編號
+      if (storeCode && u.storeCodes) {
+        const codes = u.storeCodes.split(',').map(c => c.trim());
+        if (codes.includes(storeCode)) return true;
+      }
+      return false;
+    });
+
+    // 過濾出有 sheetName 的同仁，並去除重複
+    const filteredList = list.filter(u => u.sheetName);
+    const seen = new Set();
+    const result = [];
+    filteredList.forEach(u => {
+      const key = `${u.name}-${u.sheetName}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ name: u.name, sheetName: u.sheetName });
+      }
+    });
+
+    return result;
   };
 
   const storePeople = getStorePeople(selectedStore);
