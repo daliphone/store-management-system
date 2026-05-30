@@ -17,6 +17,27 @@ export default function ManieIcon({ pose = 'welcome', className = '', style = {}
     sleep: '/manie/5.png',
     thinking: '/manie/10.png',
     shocked: '/manie/11.png',
+    
+    // 情境語意化命名
+    cheer: '/manie/3.png',
+    gift: '/manie/4.png',
+    smile: '/manie/6.png',
+    sweat: '/manie/7.png',
+    fun: '/manie/8.png',
+    great: '/manie/9.png',
+    
+    // 支援直接使用數字編號
+    1: '/manie/1.png',
+    2: '/manie/2.png',
+    3: '/manie/3.png',
+    4: '/manie/4.png',
+    5: '/manie/5.png',
+    6: '/manie/6.png',
+    7: '/manie/7.png',
+    8: '/manie/8.png',
+    9: '/manie/9.png',
+    10: '/manie/10.png',
+    11: '/manie/11.png'
   };
 
   const imgSrc = images[pose] || images.welcome;

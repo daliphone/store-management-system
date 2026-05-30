@@ -9,6 +9,7 @@ import {
 import { getStorePerformance } from '../services/googleSheetsService';
 import { USERS } from '../mockData';
 import PerformanceForm from './PerformanceForm';
+import ManieIcon from './ManieIcon';
 
 export default function PerformanceBoard({ currentUser, stores }) {
   const [loading, setLoading] = useState(false);
@@ -448,6 +449,25 @@ export default function PerformanceBoard({ currentUser, stores }) {
     const index = Math.abs(Math.floor(achievementPercent + timeProgress.percent)) % list.length;
     const dialogText = list[index];
 
+    // 判定吉祥物的去背圖 (支援 11 張去背圖片的情境運用)
+    let maniePose = 'smile';
+    if (diff < -12) {
+      // 業績落後時，使用流汗 (sweat) 或睡覺 (sleep) 或托腮煩惱 (thinking)
+      const laggingPoses = ['sweat', 'sleep', 'thinking'];
+      const poseIdx = Math.abs(Math.floor(achievementPercent + timeProgress.percent)) % laggingPoses.length;
+      maniePose = laggingPoses[poseIdx];
+    } else if (diff >= 0) {
+      // 業績領先時，使用歡呼 (cheer) 或讚賞 (great) 或比讚 (welcome)
+      const leadingPoses = ['cheer', 'great', 'welcome'];
+      const poseIdx = Math.abs(Math.floor(achievementPercent + timeProgress.percent)) % leadingPoses.length;
+      maniePose = leadingPoses[poseIdx];
+    } else {
+      // 業績保持中，使用精神抖擻叉腰 (idle) 或微笑 (smile)
+      const normalPoses = ['idle', 'smile'];
+      const poseIdx = Math.abs(Math.floor(achievementPercent + timeProgress.percent)) % normalPoses.length;
+      maniePose = normalPoses[poseIdx];
+    }
+
     // 今日分店任務進度
     let completedTasks = 0;
     let totalTasks = 5;
@@ -488,7 +508,8 @@ export default function PerformanceBoard({ currentUser, stores }) {
       totalTasks,
       points,
       characterAvatar,
-      diff
+      diff,
+      maniePose
     };
   };
 
@@ -522,39 +543,9 @@ export default function PerformanceBoard({ currentUser, stores }) {
         <div className="space-y-3.5 select-none">
           {/* 上半部：Manie 互動氣泡對話框 */}
           <div className="bg-gradient-to-br from-pink-50/70 to-rose-50/70 border border-pink-100 rounded-[28px] p-4 flex items-center space-x-4 shadow-sm">
-            {/* 動態表情小粉紅精靈 SVG */}
-            <div className="w-20 h-20 shrink-0 flex items-center justify-center relative">
-              <svg viewBox="0 0 100 100" className="w-20 h-20 drop-shadow-sm">
-                <defs>
-                  <radialGradient id="bodyGrad" cx="45%" cy="45%" r="50%">
-                    <stop offset="0%" stopColor="#fff1f2" />
-                    <stop offset="60%" stopColor="#ffe4e6" />
-                    <stop offset="100%" stopColor="#fda4af" />
-                  </radialGradient>
-                  <radialGradient id="shadowGrad" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stopColor="rgba(244,63,94,0.12)" />
-                    <stop offset="100%" stopColor="rgba(0,0,0,0)" />
-                  </radialGradient>
-                </defs>
-                <ellipse cx="50" cy="90" rx="28" ry="5" fill="url(#shadowGrad)" />
-                <circle cx="50" cy="48" r="36" fill="url(#bodyGrad)" stroke="#fecdd3" strokeWidth="1.5" />
-                <circle cx="28" cy="55" r="7" fill="#f43f5e" opacity="0.3" filter="blur(1px)" />
-                <circle cx="72" cy="55" r="7" fill="#f43f5e" opacity="0.3" filter="blur(1px)" />
-                <circle cx="36" cy="46" r="3.2" fill="#1e293b" />
-                <circle cx="35" cy="44" r="0.9" fill="#ffffff" />
-                <circle cx="64" cy="46" r="3.2" fill="#1e293b" />
-                <circle cx="63" cy="44" r="0.9" fill="#ffffff" />
-                {rpg.diff < -12 ? (
-                  <path d="M 44 60 Q 50 55 56 60" fill="none" stroke="#1e293b" strokeWidth="2.2" strokeLinecap="round" />
-                ) : rpg.diff >= 0 ? (
-                  <path d="M 44 55 Q 50 63 56 55" fill="none" stroke="#1e293b" strokeWidth="2.2" strokeLinecap="round" />
-                ) : (
-                  <line x1="44" y1="58" x2="56" y2="58" stroke="#1e293b" strokeWidth="2.2" strokeLinecap="round" />
-                )}
-                {rpg.diff < -12 && (
-                  <path d="M 72 32 C 72 32, 75 37, 75 40 C 75 42, 73 44, 71 44 C 69 44, 67 42, 67 40 C 67 37, 71 32, 71 32 Z" fill="#38bdf8" />
-                )}
-              </svg>
+            {/* 動態表情去背圖 */}
+            <div className="w-20 h-20 shrink-0 flex items-center justify-center relative bg-white/50 rounded-full shadow-inner border border-white/60 overflow-hidden p-1">
+              <ManieIcon pose={rpg.maniePose} className="w-16 h-16" />
             </div>
             
             {/* 氣泡對話框 */}

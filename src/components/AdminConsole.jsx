@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getApiUrl, saveApiUrl, syncLocalToGoogleSheets, getLineConfig, saveLineConfig, testLinePush } from '../services/googleSheetsService';
+import { getLineConfig, saveLineConfig, testLinePush } from '../services/googleSheetsService';
 import ManieIcon from './ManieIcon';
 import { Settings as SettingsIcon, Users, Clock, Database, Link, RefreshCw, AlertTriangle, Plus, Trash2, Edit2, Check, X, ShieldAlert, BookOpen, Layers } from 'lucide-react';
 
@@ -28,12 +28,9 @@ export default function AdminConsole({
   stores,
   onUpdateStores
 }) {
-  const [activeSubSection, setActiveSubSection] = useState('accounts'); // 'accounts', 'stores', 'sync', 'line', 'alerts'
+  const [activeSubSection, setActiveSubSection] = useState('accounts'); // 'accounts', 'stores', 'line', 'alerts'
   
-  // API URL
-  const [apiUrl, setApiUrl] = useState('');
-  const [syncStatus, setSyncStatus] = useState({ type: '', message: '' });
-  const [isSyncing, setIsSyncing] = useState(false);
+
 
   // LINE Bot
   const [lineConfig, setLineConfig] = useState({
@@ -68,7 +65,6 @@ export default function AdminConsole({
   const [editingStoreNewName, setEditingStoreNewName] = useState('');
 
   useEffect(() => {
-    setApiUrl(getApiUrl());
     
     // 載入警示天數
     const cachedAlert = localStorage.getItem('store_mgmt_alert_settings');
@@ -344,38 +340,7 @@ export default function AdminConsole({
     }
   };
 
-  // 5. Google 試算表連線設定
-  const handleSaveApi = () => {
-    saveApiUrl(apiUrl);
-    setSyncStatus({
-      type: 'success',
-      message: apiUrl ? 'API 網址儲存成功！將開始與 Google 試算表連動。' : 'API 網址已清除，系統將降級使用本地儲存。'
-    });
-    setTimeout(() => {
-      setSyncStatus({ type: '', message: '' });
-      if (onRefreshData) onRefreshData();
-    }, 2000);
-  };
 
-  const handleSyncData = async () => {
-    if (!apiUrl) {
-      setSyncStatus({ type: 'error', message: '請先填寫 API 網址再進行同步！' });
-      return;
-    }
-
-    setIsSyncing(true);
-    setSyncStatus({ type: 'info', message: '正在同步資料至 Google 試算表...' });
-    
-    try {
-      await syncLocalToGoogleSheets();
-      setSyncStatus({ type: 'success', message: '一鍵同步成功！本地資料已完全寫入您的 Google 試算表。' });
-      if (onRefreshData) onRefreshData();
-    } catch (error) {
-      setSyncStatus({ type: 'error', message: `同步失敗: ${error.message}` });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   // 判定管理帳號權限
   const canManageAccounts = currentUser.permissions && currentUser.permissions.includes('manage_accounts');
@@ -406,7 +371,6 @@ export default function AdminConsole({
           { id: 'accounts', label: '👥 帳號管理' },
           { id: 'stores', label: '🏢 編制管理' },
           { id: 'alerts', label: '⏰ 時效警示' },
-          { id: 'sync', label: '📊 數據同步' },
           { id: 'line', label: '💬 LINE 通知' }
         ].map(item => (
           <button
@@ -781,114 +745,7 @@ export default function AdminConsole({
         )}
 
         {/* ==================== 4. 數據同步 ==================== */}
-        {activeSubSection === 'sync' && (
-          <div className="space-y-4 animate-fade-in">
-            {/* Google Sheets 連線設定 */}
-            <div className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100 space-y-4">
-              <div className="flex items-center space-x-2 text-green-600 font-extrabold text-sm border-b border-slate-100/50 pb-2.5">
-                <Database size={18} />
-                <span>Google 試算表同步設定</span>
-              </div>
 
-              <div className="space-y-4">
-                <div className="mb-1">
-                  <a
-                    href="https://docs.google.com/spreadsheets/d/186q0vSOMCtPtNSK16LiVl0OlevmOkdAmGEC4YRz4jNs/edit?gid=1709500613#gid=1709500613"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-2.5 rounded-xl text-xs font-extrabold active:scale-98 transition-all shadow-sm"
-                  >
-                    <span>📑 開啟 Google 試算表稽核存檔</span>
-                  </a>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-400 font-bold block mb-1">
-                    Google Apps Script Web App URL：
-                  </label>
-                  <div className="relative rounded-xl shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                      <Link size={16} className="text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      value={apiUrl}
-                      onChange={(e) => setApiUrl(e.target.value)}
-                      placeholder="https://script.google.com/macros/s/.../exec"
-                      className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs text-slate-700 bg-slate-50/50 font-mono"
-                    />
-                  </div>
-                </div>
-
-                {syncStatus.message && (
-                  <div className={`p-3.5 rounded-xl text-xs flex items-start space-x-2 ${
-                    syncStatus.type === 'success' 
-                      ? 'bg-green-50 text-green-700 border border-green-200' 
-                      : syncStatus.type === 'error'
-                        ? 'bg-red-50 text-red-700 border border-red-200'
-                        : 'bg-blue-50 text-blue-700 border border-blue-200'
-                  }`}>
-                    {syncStatus.type === 'error' ? (
-                      <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                    ) : (
-                      <RefreshCw size={16} className={`mt-0.5 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
-                    )}
-                    <span className="font-bold">{syncStatus.message}</span>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <button
-                    onClick={handleSaveApi}
-                    className="w-full bg-blue-500 hover:bg-blue-600 text-white font-extrabold py-3 px-4 rounded-xl text-xs transition-colors shadow-md active:scale-95 border-none"
-                  >
-                    儲存 API 設定
-                  </button>
-                  <button
-                    onClick={handleSyncData}
-                    disabled={isSyncing || !apiUrl}
-                    className={`w-full font-extrabold py-3 px-4 rounded-xl text-xs transition-all shadow-md flex items-center justify-center space-x-1.5 ${
-                      isSyncing || !apiUrl
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 shadow-none'
-                        : 'bg-green-500 hover:bg-green-600 text-white active:scale-95 border-none'
-                    }`}
-                  >
-                    <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
-                    <span>一鍵同步至 Google</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* GAS 部署教學 */}
-            <div className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100">
-              <div className="flex items-center space-x-2 text-yellow-600 font-extrabold text-sm border-b border-slate-100/50 pb-2.5 mb-3.5">
-                <BookOpen size={18} />
-                <span>Google Sheets GAS 部署步驟</span>
-              </div>
-              
-              <div className="text-[11px] text-slate-500 space-y-3 leading-relaxed font-semibold">
-                <p>本系統透過 Google Apps Script (GAS) 將資料同步至雲端，操作步驟如下：</p>
-                <ol className="list-decimal pl-4 space-y-2">
-                  <li>
-                    建立一個雲端 Google 試算表，新增三個工作表分頁並命名為：
-                    <span className="font-mono bg-slate-100 px-1 rounded text-red-500 font-bold">Orders</span>、
-                    <span className="font-mono bg-slate-100 px-1 rounded text-red-500 font-bold">Tasks</span>、
-                    <span className="font-mono bg-slate-100 px-1 rounded text-red-500 font-bold">OrderStatus</span>。
-                  </li>
-                  <li>
-                    在試算表的「第一列」依序設定好各個欄位的標題（大小寫與字元需完全一致）。
-                  </li>
-                  <li>
-                    點選試算表頂部的 <span className="bg-slate-100 px-1 rounded font-extrabold text-slate-700">擴充功能 &gt; Apps Script</span>，複製專案根目錄下的 <span className="font-mono bg-slate-100 px-1 rounded text-blue-600">google-apps-script.js</span> 檔案內容貼上並存檔。
-                  </li>
-                  <li>
-                    點選右上角 <span className="bg-slate-100 px-1 rounded font-extrabold text-slate-700">部署 &gt; 新增部署</span>。類型選擇「網頁應用程式」，將存取權限設為<span className="font-extrabold text-red-500">「任何人 (Anyone)」</span>，部署後複製產生的 Web URL 網址填入上方輸入框。
-                  </li>
-                </ol>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* ==================== 5. LINE 通知 ==================== */}
         {activeSubSection === 'line' && (
