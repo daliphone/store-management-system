@@ -13,9 +13,11 @@ const DEFAULT_CUSTOMERS = [
   { id: 'cust_4', name: '游小姐', phone: '0915-556-589', lineId: 'missyou', notes: '調貨機型通知', creator: 'admin', createdAt: '2026-05-17', lastFollowUp: '2026-05-17' }
 ];
 
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbyZ6ETll8qFYa987RxsERDplFov6oLfoS5dtgov-K3MkMwB4BA9qaaglWyel3bZgg95/exec';
+
 // 取得設定的 Google Sheets API 網址
 export const getApiUrl = () => {
-  return localStorage.getItem(API_URL_KEY) || '';
+  return localStorage.getItem(API_URL_KEY) || DEFAULT_API_URL;
 };
 
 // 儲存 Google Sheets API 網址

@@ -397,6 +397,104 @@ export default function PerformanceBoard({ currentUser, stores }) {
     return count > 0 ? Math.round(totalRate / count) : 0;
   };
 
+  // === 遊戲化 (RPG) 業績養成卡片計算邏輯 ===
+  const getRpgStats = () => {
+    const grossProfitMetric = summary['毛利'] || { target: 0, accumulated: 0, achievement: '0%' };
+    const achievementPercent = parseFloat(grossProfitMetric.achievement) || 0;
+    
+    const exp = Math.floor(achievementPercent);
+    const level = Math.floor(exp / 10) + 1;
+    const nextLevelExp = level * 10;
+    const expPercent = nextLevelExp > 0 ? Math.min((exp / nextLevelExp) * 100, 100) : 0;
+
+    // 稱號系統
+    let titleText = '🌱 新生';
+    if (achievementPercent >= 20 && achievementPercent < 40) titleText = '⚔️ 門市新兵';
+    else if (achievementPercent >= 40 && achievementPercent < 60) titleText = '🛡️ 業績衛士';
+    else if (achievementPercent >= 60 && achievementPercent < 80) titleText = '🔥 銷售精英';
+    else if (achievementPercent >= 80 && achievementPercent < 100) titleText = '⚡ 傳奇獵人';
+    else if (achievementPercent >= 100) titleText = '👑 達標大宗師';
+
+    // 冒險對話框 (動態反映業績進度相較於時間基線的狀態)
+    const diff = achievementPercent - timeProgress.percent;
+    const dialogs = {
+      lagging: [
+        `😭 勇者，前方的怪物有點強大... 隊伍體力有點不支了！`,
+        `⚠️ 警告！發現高難度 Boss，需要同仁們合力施展大絕招！`,
+        `☕ 冒險者，要不要在篝火旁休息一下？喝瓶藥水我們再繼續出發！`,
+        `🔥 戰火正在蔓延！快點燃你的鬥志，別讓達標寶箱被搶走了！`
+      ],
+      normal: [
+        `⚔️ 冒險者，穩紮穩打！我們正朝著達標深處順利前進！`,
+        `🛡️ 盾牌防禦正常！保持這個節奏，本月 Boss 很快就會被擊退！`,
+        `✨ 獲得微光祝福！目前的戰鬥節奏相當不錯，繼續維持下去！`,
+        `💰 發現哥布林商人！配件加購與門號合約是我們獲取金幣的關鍵！`
+      ],
+      leading: [
+        `🎉 太強了！隊伍正處於狂暴狀態，業績傷害輸出爆表！`,
+        `👑 獲得傳奇稱號！您就是這片大陸最強的黃金開單王！`,
+        `🌟 聖光普照！滿級裝備已解鎖，本月達標的終極寶藏就在眼前！`,
+        `🚀 瞬間移動！我們的達成率已經超越了時間基線，衝啊！`
+      ]
+    };
+
+    let list = dialogs.normal;
+    if (diff < -12) {
+      list = dialogs.lagging;
+    } else if (diff >= 0) {
+      list = dialogs.leading;
+    }
+
+    const index = Math.abs(Math.floor(achievementPercent + timeProgress.percent)) % list.length;
+    const dialogText = list[index];
+
+    // 今日分店任務進度
+    let completedTasks = 0;
+    let totalTasks = 5;
+    try {
+      const localTasks = JSON.parse(localStorage.getItem('store_mgmt_tasks') || '[]');
+      const myStoreTasks = localTasks.filter(t => t.store === selectedStore);
+      if (myStoreTasks.length > 0) {
+        completedTasks = myStoreTasks.filter(t => t.completed).length;
+        totalTasks = myStoreTasks.length;
+      }
+    } catch (e) {}
+
+    // 本月冒險點數 (毛利實績 / 1000)
+    const points = Math.round(Number(grossProfitMetric.accumulated || 0) / 1000);
+
+    // 角色頭像
+    let characterAvatar = '🌸';
+    if (selectedSheetName !== selectedStore) {
+      const matchedUser = USERS.find(u => u.sheetName === selectedSheetName || u.name === selectedSheetName);
+      if (matchedUser && matchedUser.avatar) {
+        characterAvatar = matchedUser.avatar;
+      } else {
+        characterAvatar = '👤';
+      }
+    }
+
+    const charName = selectedSheetName === selectedStore ? `${selectedStore}冒險團` : selectedSheetName;
+
+    return {
+      charName,
+      exp,
+      level,
+      nextLevelExp,
+      expPercent,
+      titleText,
+      dialogText,
+      completedTasks,
+      totalTasks,
+      points,
+      characterAvatar,
+      diff
+    };
+  };
+
+  const rpg = getRpgStats();
+  const grossProfitMetric = summary['毛利'] || { target: 0, accumulated: 0, achievement: '0%' };
+
   return (
     <div className="flex-1 flex flex-col pb-24 overflow-y-auto no-scrollbar bg-[#f8fafc] font-['Outfit',_'Inter',_sans-serif]">
       {/* 頂部發光導航列 */}
@@ -420,34 +518,122 @@ export default function PerformanceBoard({ currentUser, stores }) {
       </div>
 
       <div className="p-4 space-y-4 max-w-[600px] mx-auto w-full">
-        {/* 1. 時間進度基線卡片 (Time Baseline Card) */}
-        <div className="bg-slate-900 rounded-[32px] p-5 text-white shadow-xl relative overflow-hidden border border-slate-800">
-          <div className="absolute right-3 top-3 opacity-15">
-            <Flame size={48} className="text-rose-500 animate-pulse" />
-          </div>
-          <div className="flex justify-between items-center mb-3">
-            <div className="flex items-center space-x-2">
-              <Calendar size={15} className="text-rose-400" />
-              <span className="text-[11px] font-black tracking-wide text-slate-200">
-                本月時間進度基線
-              </span>
+        {/* 1. 遊戲化互動狀態養成卡片 (RPG Status & Gamified Card) */}
+        <div className="space-y-3.5 select-none">
+          {/* 上半部：Manie 互動氣泡對話框 */}
+          <div className="bg-gradient-to-br from-pink-50/70 to-rose-50/70 border border-pink-100 rounded-[28px] p-4 flex items-center space-x-4 shadow-sm">
+            {/* 動態表情小粉紅精靈 SVG */}
+            <div className="w-20 h-20 shrink-0 flex items-center justify-center relative">
+              <svg viewBox="0 0 100 100" className="w-20 h-20 drop-shadow-sm">
+                <defs>
+                  <radialGradient id="bodyGrad" cx="45%" cy="45%" r="50%">
+                    <stop offset="0%" stopColor="#fff1f2" />
+                    <stop offset="60%" stopColor="#ffe4e6" />
+                    <stop offset="100%" stopColor="#fda4af" />
+                  </radialGradient>
+                  <radialGradient id="shadowGrad" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="rgba(244,63,94,0.12)" />
+                    <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+                  </radialGradient>
+                </defs>
+                <ellipse cx="50" cy="90" rx="28" ry="5" fill="url(#shadowGrad)" />
+                <circle cx="50" cy="48" r="36" fill="url(#bodyGrad)" stroke="#fecdd3" strokeWidth="1.5" />
+                <circle cx="28" cy="55" r="7" fill="#f43f5e" opacity="0.3" filter="blur(1px)" />
+                <circle cx="72" cy="55" r="7" fill="#f43f5e" opacity="0.3" filter="blur(1px)" />
+                <circle cx="36" cy="46" r="3.2" fill="#1e293b" />
+                <circle cx="35" cy="44" r="0.9" fill="#ffffff" />
+                <circle cx="64" cy="46" r="3.2" fill="#1e293b" />
+                <circle cx="63" cy="44" r="0.9" fill="#ffffff" />
+                {rpg.diff < -12 ? (
+                  <path d="M 44 60 Q 50 55 56 60" fill="none" stroke="#1e293b" strokeWidth="2.2" strokeLinecap="round" />
+                ) : rpg.diff >= 0 ? (
+                  <path d="M 44 55 Q 50 63 56 55" fill="none" stroke="#1e293b" strokeWidth="2.2" strokeLinecap="round" />
+                ) : (
+                  <line x1="44" y1="58" x2="56" y2="58" stroke="#1e293b" strokeWidth="2.2" strokeLinecap="round" />
+                )}
+                {rpg.diff < -12 && (
+                  <path d="M 72 32 C 72 32, 75 37, 75 40 C 75 42, 73 44, 71 44 C 69 44, 67 42, 67 40 C 67 37, 71 32, 71 32 Z" fill="#38bdf8" />
+                )}
+              </svg>
             </div>
-            <span className="text-[9px] bg-slate-800 text-slate-300 font-bold px-2 py-0.5 rounded-full border border-slate-700">
-              剩餘 {timeProgress.remainingDays} 天
-            </span>
+            
+            {/* 氣泡對話框 */}
+            <div className="flex-1 bg-white border border-pink-100/80 rounded-2xl p-3 shadow-inner relative min-h-[70px] flex flex-col justify-center">
+              <div className="absolute left-[-6px] top-7 w-3 h-3 bg-white border-l border-b border-pink-100/80 rotate-45"></div>
+              <p className="text-[11px] text-slate-700 font-extrabold leading-relaxed">
+                {rpg.dialogText}
+              </p>
+              <div className="text-[7.5px] text-slate-400 font-bold text-right mt-1.5 flex items-center justify-end gap-1">
+                <span>本月已過 {timeProgress.percent}%</span>
+                <span>·</span>
+                <span>剩餘 {timeProgress.remainingDays} 天</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-baseline space-x-1.5 mb-2.5">
-            <span className="text-3xl font-black font-mono tracking-tight text-white">{timeProgress.percent}%</span>
-            <span className="text-[10px] text-slate-400 font-bold">已過 ({timeProgress.currentDay} / {timeProgress.daysInMonth} 天)</span>
-          </div>
+          {/* 下半部：店員業績養成卡片 */}
+          <div className="bg-gradient-to-r from-rose-500 to-pink-600 rounded-[28px] p-5 text-white shadow-lg relative overflow-hidden border border-rose-400/20 shadow-rose-500/10">
+            {/* 背景微光 */}
+            <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/5 blur-xl pointer-events-none"></div>
 
-          {/* 基線進度條 */}
-          <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700/50">
-            <div 
-              className="h-full bg-gradient-to-r from-rose-500 to-pink-500 rounded-full shadow-[0_0_8px_rgba(244,63,94,0.4)]" 
-              style={{ width: `${timeProgress.percent}%` }}
-            ></div>
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center space-x-3">
+                {/* 角色白底圓形頭像 */}
+                <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-lg border border-rose-100 shrink-0">
+                  {rpg.characterAvatar}
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-black tracking-wide">{rpg.charName}</span>
+                    <span className="text-[8.5px] bg-white/20 px-2 py-0.5 rounded-full font-black tracking-wider border border-white/10">
+                      {rpg.titleText}
+                    </span>
+                  </div>
+                  <p className="text-[7.5px] text-white/70 font-bold mt-0.5">歸屬分店：{selectedStore}</p>
+                </div>
+              </div>
+              
+              {/* 等級標籤 */}
+              <div className="bg-white text-rose-600 font-extrabold text-[10px] px-3.5 py-1 rounded-xl shadow-md border-none font-mono">
+                Lv.{rpg.level}
+              </div>
+            </div>
+
+            {/* EXP 經驗值進度條 */}
+            <div className="space-y-1.5">
+              <div className="w-full h-2.5 bg-black/15 rounded-full overflow-hidden border border-white/5 relative">
+                <div 
+                  className="h-full bg-gradient-to-r from-yellow-300 to-amber-300 rounded-full shadow-[0_0_6px_#fde047]" 
+                  style={{ width: `${rpg.expPercent}%` }}
+                ></div>
+                {/* 時間基線標記虛線 */}
+                <div 
+                  className="absolute top-0 bottom-0 w-[1.5px] bg-white shadow-[0_0_3px_#ffffff] opacity-75"
+                  style={{ left: `${timeProgress.percent}%` }}
+                  title={`本月時間基線: ${timeProgress.percent}%`}
+                ></div>
+              </div>
+              <div className="flex justify-between text-[8px] font-black font-mono text-white/90">
+                <span>{rpg.exp} / {rpg.nextLevelExp} 升下一級</span>
+                <span>本月毛利達成率：{grossProfitMetric.achievement}</span>
+              </div>
+            </div>
+
+            {/* 最下方今日進度與本月點數 */}
+            <div className="mt-4 pt-3 border-t border-white/15 flex justify-between items-center text-[10px] font-black text-white/90 font-mono">
+              <div className="flex items-center space-x-1">
+                <span>今日任務進度</span>
+                <span className="bg-white/20 text-white px-2 py-0.5 rounded-md text-[8.5px] font-black">
+                  {rpg.completedTasks} / {rpg.totalTasks}
+                </span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <span>本月冒險積分</span>
+                <span className="bg-yellow-400 text-slate-900 px-2 py-0.5 rounded-md text-[8.5px] font-bold shadow-sm">
+                  {rpg.points.toLocaleString()} 點
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
