@@ -562,11 +562,15 @@ export const getStorePerformance = async (storeName, sheetName, role) => {
       localStorage.setItem(localPerfKey, JSON.stringify(data));
       return data;
     } else {
-      throw new Error(data.message || 'API 讀取業績失敗');
+      // 直接回傳帶有錯誤訊息的 data，避免被 catch 吞掉而回傳 null
+      return data;
     }
   } catch (error) {
     console.warn('讀取雲端業績失敗，使用本地快取:', error);
-    return localData ? JSON.parse(localData) : null;
+    if (localData) {
+      return JSON.parse(localData);
+    }
+    throw error;
   }
 };
 
