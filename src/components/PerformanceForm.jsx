@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Coins, Smartphone, Users as UsersIcon, ShieldCheck, HelpCircle, Calendar, ArrowLeft, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
+import { 
+  Coins, Smartphone, Users as UsersIcon, ShieldCheck, 
+  HelpCircle, Calendar, ArrowLeft, Loader2, Sparkles, 
+  CheckCircle2, ChevronDown, ChevronUp, Watch, Gift, MessageCircle 
+} from 'lucide-react';
 import { submitDailyPerformance } from '../services/googleSheetsService';
 import { USERS } from '../mockData';
 
@@ -75,11 +79,107 @@ export default function PerformanceForm({ currentUser, onClose, onRefreshData })
     return currentUser?.sheetName || currentUser?.name || '';
   });
 
-  const [grossProfit, setGrossProfit] = useState('');
-  const [insurance, setInsurance] = useState('');
-  const [subscription, setSubscription] = useState('');
-  const [accessories, setAccessories] = useState('');
-  const [customerCount, setCustomerCount] = useState('');
+  // 24 指標狀態集 (對照馬尼試算表 Row 3 定位)
+  const [metrics, setMetrics] = useState({
+    "毛利": "",
+    "保險營收": "",
+    "門號": "",
+    "配件營收": "",
+    "中嘉寬頻": "",
+    "Garmini": "",
+    "iPhone組合銷售": "",
+    "庫存手機": "",
+    "蘋果手機": "",
+    "蘋果平板+手錶": "",
+    "華為穿戴(點數)": "",
+    "橙艾玻璃貼\n(13,14,15,16系列)": "",
+    "VIVO手機": "",
+    "GPLUS GP-S10吸塵器": "",
+    "LiTV開通數": "",
+    "生活圈": "",
+    "GOOGLE 評論": "",
+    "社群會員數": "",
+    "來客數": ""
+  });
+
+  // Accordion 摺疊展開狀態管理 (預設展開財務分區)
+  const [openGroups, setOpenGroups] = useState({
+    finance: true,
+    hardware: false,
+    wearable: false,
+    accessory: false,
+    social: false
+  });
+
+  const toggleGroup = (groupId) => {
+    setOpenGroups(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }));
+  };
+
+  // 24 指標分類分組配置
+  const METRIC_GROUPS = [
+    {
+      id: 'finance',
+      title: '💰 財務與來客',
+      description: '毛利、配件及客流量',
+      icon: <Coins className="text-amber-500" size={16} />,
+      fields: [
+        { name: '毛利', label: '當日實際毛利 (元)', placeholder: '請輸入當日累計毛利' },
+        { name: '配件營收', label: '當日配件營收 (元)', placeholder: '請輸入配件銷售額' },
+        { name: '來客數', label: '當日實質來客數 (人)', placeholder: '請輸入不重複來客人數' }
+      ]
+    },
+    {
+      id: 'hardware',
+      title: '📱 手機與硬體',
+      description: '蘋果、VIVO、Garmini 等硬體銷量',
+      icon: <Smartphone className="text-sky-500" size={16} />,
+      fields: [
+        { name: '蘋果手機', label: '蘋果手機銷量 (台)', placeholder: '請輸入銷量，無則留空' },
+        { name: 'VIVO手機', label: 'VIVO 手機銷量 (台)', placeholder: '請輸入銷量，無則留空' },
+        { name: '庫存手機', label: '庫存手機銷量 (台)', placeholder: '請輸入銷量，無則留空' },
+        { name: 'Garmini', label: 'Garmini 銷售量 (台)', placeholder: '請輸入銷量，無則留空' }
+      ]
+    },
+    {
+      id: 'wearable',
+      title: '⌚ 穿戴與平板',
+      description: '平板、手錶組合與華為點數',
+      icon: <Watch className="text-indigo-500" size={16} />,
+      fields: [
+        { name: '蘋果平板+手錶', label: '蘋果平板+手錶 (件)', placeholder: '請輸入件數，無則留空' },
+        { name: '華為穿戴(點數)', label: '華為售出點數 (點)', placeholder: '請對照設定表點數輸入' },
+        { name: 'iPhone組合銷售', label: 'iPhone 組合銷量 (套)', placeholder: 'iPad+Watch+華為手錶組合' }
+      ]
+    },
+    {
+      id: 'accessory',
+      title: '⚡ 配件、保險與專案',
+      description: '保險、門號、中嘉、玻璃貼與吸塵器',
+      icon: <Gift className="text-emerald-500" size={16} />,
+      fields: [
+        { name: '保險營收', label: '當日保險營收 (元)', placeholder: '手機保險營收，無則留空' },
+        { name: '門號', label: '當日門號開通數 (門)', placeholder: '續約/攜碼開通門數，無則留空' },
+        { name: '中嘉寬頻', label: '中嘉寬頻申辦數 (件)', placeholder: '請輸入中嘉申辦件數' },
+        { name: '橙艾玻璃貼\n(13,14,15,16系列)', label: '橙艾玻璃貼銷量 (片)', placeholder: '13-16系列銷售片數' },
+        { name: 'GPLUS GP-S10吸塵器', label: 'GPLUS 吸塵器銷量 (台)', placeholder: '請輸入吸塵器銷售台數' },
+        { name: 'LiTV開通數', label: 'LiTV 開通數 (件)', placeholder: '請輸入 LiTV 開通件數' }
+      ]
+    },
+    {
+      id: 'social',
+      title: '🎯 行銷與社群',
+      description: '生活圈、Google評論、社群會員',
+      icon: <MessageCircle className="text-rose-400" size={16} />,
+      fields: [
+        { name: 'GOOGLE 評論', label: 'Google 評論新增 (個)', placeholder: '有效圖文評論數' },
+        { name: '社群會員數', label: '社群會員新增 (人)', placeholder: '新增社群人數' },
+        { name: '生活圈', label: '生活圈好友新增 (人)', placeholder: '新增生活圈人數' }
+      ]
+    }
+  ];
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -94,6 +194,13 @@ export default function PerformanceForm({ currentUser, onClose, onRefreshData })
     }
   }, [selectedStore, currentUser, isManager]);
 
+  const handleMetricChange = (name, value) => {
+    setMetrics(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedSheetName) {
@@ -104,15 +211,17 @@ export default function PerformanceForm({ currentUser, onClose, onRefreshData })
     setLoading(true);
     setErrorMsg('');
 
+    // 將空字串轉換為 0
+    const finalMetrics = {};
+    Object.keys(metrics).forEach(key => {
+      finalMetrics[key] = metrics[key] === '' ? 0 : Number(metrics[key]);
+    });
+
     const inputData = {
       storeName: selectedStore,
       sheetName: selectedSheetName,
       date,
-      grossProfit: grossProfit === '' ? 0 : Number(grossProfit),
-      insurance: insurance === '' ? 0 : Number(insurance),
-      subscription: subscription === '' ? 0 : Number(subscription),
-      accessories: accessories === '' ? 0 : Number(accessories),
-      customerCount: customerCount === '' ? 0 : Number(customerCount),
+      metrics: finalMetrics,
       operator: currentUser.name,
       operatorRole: currentUser.role
     };
@@ -171,7 +280,7 @@ export default function PerformanceForm({ currentUser, onClose, onRefreshData })
             </h2>
             <p className="text-[10px] text-slate-400 font-bold">請確實填寫當日實際營運業績</p>
           </div>
-          <div className="w-8"></div> {/* 佔位 balance */}
+          <div className="w-8"></div>
         </div>
 
         {/* 表單主體 */}
@@ -245,92 +354,59 @@ export default function PerformanceForm({ currentUser, onClose, onRefreshData })
             </div>
           </div>
 
-          {/* 2. 數值輸入項 */}
-          <div className="space-y-3.5">
-            {/* 實際毛利 */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 flex items-center gap-1">
-                <Coins size={12} className="text-amber-500" />
-                當日實際毛利 (今日業績)
-              </label>
-              <input
-                type="number"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                placeholder="請輸入當日累計毛利"
-                value={grossProfit}
-                onChange={(e) => setGrossProfit(e.target.value)}
-                className="w-full bg-slate-50/50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-black text-slate-800 placeholder-slate-350 focus:outline-none focus:border-rose-500 focus:bg-white transition-all shadow-inner-sm"
-              />
-            </div>
+          {/* 2. 24指標分類摺疊面板區 (Accordions) */}
+          <div className="space-y-3">
+            {METRIC_GROUPS.map((group) => {
+              const isOpen = openGroups[group.id];
+              return (
+                <div 
+                  key={group.id} 
+                  className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-md transition-all duration-350"
+                >
+                  {/* 面板標頭 */}
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.id)}
+                    className="w-full px-5 py-4 flex items-center justify-between text-left bg-slate-50/40 hover:bg-slate-50/80 active:bg-slate-100/50 transition-colors border-none"
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <div className="p-1.5 bg-white rounded-xl shadow-sm border border-slate-50">
+                        {group.icon}
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-extrabold text-slate-700">{group.title}</h3>
+                        <p className="text-[9px] text-slate-400 font-bold mt-0.5">{group.description}</p>
+                      </div>
+                    </div>
+                    <div className="text-slate-400">
+                      {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </div>
+                  </button>
 
-            {/* 配件營收 */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 flex items-center gap-1">
-                <Smartphone size={12} className="text-sky-500" />
-                當日配件營收
-              </label>
-              <input
-                type="number"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                placeholder="請輸入配件銷售額"
-                value={accessories}
-                onChange={(e) => setAccessories(e.target.value)}
-                className="w-full bg-slate-50/50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-black text-slate-800 placeholder-slate-350 focus:outline-none focus:border-rose-500 focus:bg-white transition-all shadow-inner-sm"
-              />
-            </div>
-
-            {/* 來客數 */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 flex items-center gap-1">
-                <UsersIcon size={12} className="text-indigo-500" />
-                當日實質來客數 (人)
-              </label>
-              <input
-                type="number"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                placeholder="請輸入不重複來客人數"
-                value={customerCount}
-                onChange={(e) => setCustomerCount(e.target.value)}
-                className="w-full bg-slate-50/50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-black text-slate-800 placeholder-slate-350 focus:outline-none focus:border-rose-500 focus:bg-white transition-all shadow-inner-sm"
-              />
-            </div>
-
-            {/* 保險營收 */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 flex items-center gap-1">
-                <ShieldCheck size={12} className="text-emerald-500" />
-                當日保險營收 (選填)
-              </label>
-              <input
-                type="number"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                placeholder="請輸入手機保險營收，無則留空"
-                value={insurance}
-                onChange={(e) => setInsurance(e.target.value)}
-                className="w-full bg-slate-50/50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 placeholder-slate-350 focus:outline-none focus:border-rose-500 focus:bg-white transition-all shadow-inner-sm"
-              />
-            </div>
-
-            {/* 門號數 */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-500 flex items-center gap-1">
-                <HelpCircle size={12} className="text-rose-400" />
-                當日門號開通數 (選填)
-              </label>
-              <input
-                type="number"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                placeholder="請輸入攜碼/續約開通門號數，無則留空"
-                value={subscription}
-                onChange={(e) => setSubscription(e.target.value)}
-                className="w-full bg-slate-50/50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 placeholder-slate-350 focus:outline-none focus:border-rose-500 focus:bg-white transition-all shadow-inner-sm"
-              />
-            </div>
+                  {/* 面板輸入框 (展開時) */}
+                  {isOpen && (
+                    <div className="p-5 border-t border-slate-50 bg-white grid grid-cols-1 sm:grid-cols-2 gap-4 animate-slide-down">
+                      {group.fields.map((field) => (
+                        <div key={field.name} className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-500 flex items-center gap-1.5">
+                            {field.label}
+                          </label>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder={field.placeholder}
+                            value={metrics[field.name]}
+                            onChange={(e) => handleMetricChange(field.name, e.target.value)}
+                            className="w-full bg-slate-50/50 border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-bold text-slate-700 placeholder-slate-350 focus:outline-none focus:border-rose-500 focus:bg-white transition-all shadow-inner-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* 3. 送出按鈕 */}
