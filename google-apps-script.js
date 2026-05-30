@@ -25,7 +25,7 @@ var SHEET_SYSTEM_LOGS = "系統操作日誌";
 var SHEET_SYSTEM_LOGS_BACKUP = "操作日誌封存";
 
 // 業績資料夾 ID (母目錄或當月子目錄 ID)
-var PERFORMANCE_FOLDER_ID = "1WmUILJGUrlFWEUtaADutSluVShQq8dxg";
+var PERFORMANCE_FOLDER_ID = "1PqU0PHkJGUBqpnm7R8UWQyJlOvI1-8qC";
 
 
 // 欄位雙向對照表
