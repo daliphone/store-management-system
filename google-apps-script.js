@@ -2069,7 +2069,23 @@ function debugListFolder() {
     while (subfolders.hasNext()) {
       hasSub = true;
       var sub = subfolders.next();
-      Logger.log("資料夾名稱: " + sub.getName() + " | ID: " + sub.getId());
+      var subName = sub.getName();
+      Logger.log("資料夾名稱: " + subName + " | ID: " + sub.getId());
+      
+      // 若為 202605 或 202606 子資料夾，印出其內部所有檔案
+      if (subName === '202605' || subName === '202606') {
+        Logger.log("  >>> [" + subName + "] 子資料夾內的檔案列表：");
+        var subFiles = sub.getFiles();
+        var hasSubFiles = false;
+        while (subFiles.hasNext()) {
+          hasSubFiles = true;
+          var f = subFiles.next();
+          Logger.log("    - 檔案: " + f.getName() + " | ID: " + f.getId() + " | 類型: " + f.getMimeType());
+        }
+        if (!hasSubFiles) {
+          Logger.log("    (此子資料夾內無任何檔案)");
+        }
+      }
     }
     if (!hasSub) {
       Logger.log("(此母資料夾下無子資料夾)");
