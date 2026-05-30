@@ -21,7 +21,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
   // 雙層導覽狀態：null 為總覽入口，'finance'...'health' 為專屬子分頁
   const [currentSubPage, setCurrentSubPage] = useState(null);
   // 版面視角切換：'portal' 為卡片戰情入口，'tab' 為原本的快捷標籤頁籤模式
-  const [viewMode, setViewMode] = useState('portal');
+  const [viewMode, setViewMode] = useState('tab');
 
   // 門市列表與編號對照
   const STORE_CODE_MAP = {

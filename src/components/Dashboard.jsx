@@ -362,30 +362,33 @@ export default function Dashboard({
                 <Loader2 size={12} className="text-rose-500 animate-spin" />
                 <span className="text-[10px] font-bold text-slate-400">正在同步業績數據...</span>
               </div>
-            ) : homePerf ? (
-              <div className="space-y-2 select-none">
-                <div className="flex justify-between items-baseline">
-                  <div className="flex items-baseline space-x-1">
-                    <span className="text-xl font-black text-slate-800 font-mono">
-                      {(homePerf.summary?.grossProfit?.accumulated || 0).toLocaleString()}
+            ) : homePerf ? (() => {
+              const grossProfitData = homePerf.summary?.['毛利'] || homePerf.summary?.grossProfit || { target: 0, accumulated: 0, achievement: '0%' };
+              return (
+                <div className="space-y-2 select-none">
+                  <div className="flex justify-between items-baseline">
+                    <div className="flex items-baseline space-x-1">
+                      <span className="text-xl font-black text-slate-800 font-mono">
+                        {Number(grossProfitData.accumulated || 0).toLocaleString()}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold">元</span>
+                    </div>
+                    <span className="text-xs font-black text-rose-500 font-mono">
+                      {grossProfitData.achievement || '0%'}
                     </span>
-                    <span className="text-[10px] text-slate-400 font-bold">元</span>
                   </div>
-                  <span className="text-xs font-black text-rose-500 font-mono">
-                    {homePerf.summary?.grossProfit?.achievement || '0%'}
-                  </span>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-rose-500 rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min(parseInt(grossProfitData.achievement || '0%') || 0, 100)}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-[9px] text-slate-400 font-bold">
+                    分析主體：{homePerf.sheetName === homePerf.storeName ? `${homePerf.storeName}總表` : `${homePerf.sheetName} (${homePerf.storeName})`}
+                  </p>
                 </div>
-                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-rose-500 rounded-full transition-all duration-500" 
-                    style={{ width: `${Math.min(parseInt(homePerf.summary?.grossProfit?.achievement || '0%') || 0, 100)}%` }}
-                  ></div>
-                </div>
-                <p className="text-[9px] text-slate-400 font-bold">
-                  分析主體：{homePerf.sheetName === homePerf.storeName ? `${homePerf.storeName}總表` : `${homePerf.sheetName} (${homePerf.storeName})`}
-                </p>
-              </div>
-            ) : (
+              );
+            })() : (
               <div className="py-1 text-[10px] text-slate-400 font-bold select-none">
                 ⚠️ 點選以載入當月業績數據或確認 Google Apps Script API 設定。
               </div>
