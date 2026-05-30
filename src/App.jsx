@@ -9,7 +9,7 @@ import Login from './components/Login';
 import CustomerList from './components/CustomerList';
 import AdminConsole from './components/AdminConsole';
 import PerformanceBoard from './components/PerformanceBoard';
-import { loadData, addOrder, updateTaskStatus, updateOrderStatus, saveEditedOrder, addOrdersBatch, syncCustomers, writeSystemLog } from './services/googleSheetsService';
+import { loadData, addOrder, updateTaskStatus, updateOrderStatus, saveEditedOrder, addOrdersBatch, syncCustomers, writeSystemLog, getPetStats } from './services/googleSheetsService';
 import { USERS } from './mockData';
 import { Loader2, AlertCircle, Database, Check } from 'lucide-react';
 import OrderDetails from './components/OrderDetails';
@@ -140,6 +140,34 @@ export default function App() {
   
   // 用於控制任務頁面選中的分店篩選 (首頁跳轉連動)
   const [tasksStoreFilter, setTasksStoreFilter] = useState('');
+
+  // 數位寵物全局狀態
+  const [petStats, setPetStats] = useState(null);
+  const [mCoins, setMCoins] = useState(100);
+
+  // 取得/重新整理寵物資料的函數，供全局呼叫
+  const refreshPetStats = async () => {
+    if (!currentUser || currentUser.store === '全分店') return;
+    try {
+      const stats = await getPetStats(currentUser.name, currentUser.store);
+      if (stats && stats.status === 'success') {
+        setPetStats(stats);
+        setMCoins(stats.mCoins);
+      }
+    } catch (e) {
+      console.warn('載入寵物資料失敗:', e);
+    }
+  };
+
+  // 當登入狀態或使用者變更時，載入寵物資料
+  useEffect(() => {
+    if (isLoggedIn && currentUser) {
+      refreshPetStats();
+    } else {
+      setPetStats(null);
+      setMCoins(100);
+    }
+  }, [isLoggedIn, currentUser]);
 
   // 動態人員編制分店與部門清單
   const [stores, setStores] = useState(() => {
@@ -352,6 +380,7 @@ export default function App() {
     try {
       await addOrder(newOrder, calcResult);
       await fetchData();
+      await refreshPetStats();
       setAddOrderOpen(false);
     } catch (error) {
       console.error('新增訂單錯誤：', error);
@@ -368,6 +397,7 @@ export default function App() {
       if (result.success) {
         setTasks(result.tasks);
         setDataSource(result.source);
+        await refreshPetStats();
       }
     } catch (error) {
       console.error('更新任務錯誤：', error);
@@ -384,6 +414,7 @@ export default function App() {
       if (result.success) {
         setOrders(result.orders);
         setDataSource(result.source);
+        await refreshPetStats();
       }
     } catch (error) {
       console.error('變更訂單狀態錯誤：', error);
@@ -404,6 +435,7 @@ export default function App() {
         setDataSource(result.source);
         // 同步更新當前選取的訂單狀態，以在詳情頁面即時反映
         setSelectedOrder(prev => prev ? { ...prev, status: '已交單', signature } : null);
+        await refreshPetStats();
       }
     } catch (error) {
       console.error('確認簽收交機錯誤：', error);
@@ -424,6 +456,7 @@ export default function App() {
         setDataSource(result.source);
         setSelectedOrder(updatedOrder); // 更新當前選取詳情資料
         setIsEditing(false);
+        await refreshPetStats();
       }
     } catch (error) {
       console.error('儲存編輯訂單錯誤：', error);
@@ -442,6 +475,7 @@ export default function App() {
         setOrders(result.orders);
         setDataSource(result.source);
         setAddOrderOpen(false);
+        await refreshPetStats();
       }
     } catch (error) {
       console.error('批次儲存訂單錯誤：', error);
@@ -574,6 +608,8 @@ export default function App() {
             onOpenSettings={() => setSettingsOpen(true)}
             tasksStoreFilter={tasksStoreFilter}
             setTasksStoreFilter={setTasksStoreFilter}
+            petStats={petStats}
+            mCoins={mCoins}
           />
         );
       case 'performance':
@@ -581,6 +617,9 @@ export default function App() {
           <PerformanceBoard
             currentUser={currentUser}
             stores={stores}
+            petStats={petStats}
+            mCoins={mCoins}
+            refreshPetStats={refreshPetStats}
           />
         );
       case 'customers':

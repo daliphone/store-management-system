@@ -12,8 +12,19 @@ export default function TaskList({
   onUpdateTasks, 
   onOpenSettings,
   tasksStoreFilter,
-  setTasksStoreFilter
+  setTasksStoreFilter,
+  petStats,
+  mCoins
 }) {
+  const getMascotPose = () => {
+    if (!petStats || !petStats.pet) return "tablet";
+    const hp = petStats.pet.hp || 0;
+    if (hp <= 0) return "sleep";
+    if (hp <= 20) return "sweat";
+    if (petStats.pet.level >= 5) return "great";
+    return "tablet";
+  };
+  const mascotPose = getMascotPose();
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [pendingCancelTaskId, setPendingCancelTaskId] = useState(null);
   
@@ -540,7 +551,9 @@ export default function TaskList({
                 <div className="flex items-center space-x-2.5">
                   {/* 圓形頭貼 */}
                   <div className="w-10 h-10 rounded-full bg-[#FCE7F3] flex items-center justify-center shrink-0 border border-pink-100 shadow-sm">
-                    <span className="text-xs font-black text-[#BE185D] font-mono">JS</span>
+                    <span className="text-xs font-black text-[#BE185D] font-mono">
+                      {currentUser?.name ? currentUser.name.slice(-2) : '同仁'}
+                    </span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[10px] text-slate-400 font-bold">今日進度</span>
@@ -550,17 +563,25 @@ export default function TaskList({
                   </div>
                 </div>
                 
-                {/* 本月積分膠囊 */}
-                <div className="inline-flex items-center space-x-1.5 border border-rose-200 bg-white text-rose-600 px-3 py-1 rounded-full text-[11px] font-extrabold shadow-sm">
-                  <span className="text-amber-500 text-xs">★</span>
-                  <span>本月積分: {totalScore || 1250}</span>
+                {/* 積分與 M幣膠囊 */}
+                <div className="flex flex-wrap gap-1.5">
+                  <div className="inline-flex items-center space-x-1.5 border border-rose-200 bg-white text-rose-600 px-3 py-1 rounded-full text-[11px] font-extrabold shadow-sm">
+                    <span className="text-amber-500 text-xs">★</span>
+                    <span>本月積分: {totalScore || 1250}</span>
+                  </div>
+                  {mCoins !== undefined && (
+                    <div className="inline-flex items-center space-x-1.5 border border-yellow-200 bg-white text-yellow-600 px-3 py-1 rounded-full text-[11px] font-extrabold shadow-sm">
+                      <span className="text-yellow-500 text-xs">🪙</span>
+                      <span>M幣: {mCoins}</span>
+                    </div>
+                  )}
                 </div>
               </div>
               
               {/* 右側貓咪吉祥物背景 */}
               <div className="relative w-16 h-16 rounded-full bg-pink-100/50 border border-pink-200/30 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                 <div className="absolute bottom-[-8px]">
-                  <ManieIcon pose="tablet" group="auto" className="w-16 h-12 scale-110" />
+                  <ManieIcon pose={mascotPose} group="auto" className="w-16 h-12 scale-110" />
                 </div>
               </div>
             </div>

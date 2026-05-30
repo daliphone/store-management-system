@@ -6,16 +6,46 @@ import {
   Target, Info, Flame, Heart, Star, Gift, Loader2,
   LayoutGrid, Layers
 } from 'lucide-react';
-import { getStorePerformance } from '../services/googleSheetsService';
+import { getStorePerformance, getStoreItemsConfig, buyStoreItem, useInventoryItem, checkPetEvolution, renamePet } from '../services/googleSheetsService';
 import { USERS } from '../mockData';
 import PerformanceForm from './PerformanceForm';
 import ManieIcon from './ManieIcon';
 
-export default function PerformanceBoard({ currentUser, stores }) {
+export default function PerformanceBoard({ currentUser, stores, petStats, mCoins, refreshPetStats }) {
   const [loading, setLoading] = useState(false);
   const [perfData, setPerfData] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [showForm, setShowForm] = useState(false);
+
+  // 數位寵物商店與背包控制狀態
+  const [storeOpen, setStoreOpen] = useState(false);
+  const [storeTab, setStoreTab] = useState('shop'); // 'shop' 或 'inventory'
+  const [actionLoading, setActionLoading] = useState(false);
+  const [showPetRoom, setShowPetRoom] = useState(true);
+
+  // 數位寵物相關資料解構與預設值
+  const pet = petStats?.pet || {
+    name: '數據卵',
+    level: 1,
+    hp: 100,
+    xp: 0,
+    petId: 'egg_driver',
+    status: '孵化中',
+    nextEvolutionTime: Date.now() + 86400000,
+    pp_points: 0,
+    battles: 0,
+    sheetName: currentUser?.sheetName || currentUser?.name || ''
+  };
+
+  const coins = mCoins !== undefined ? mCoins : (petStats?.mCoins || 0);
+
+  // 屬性計算與 Buff
+  const finalAttributes = petStats?.attributes || {
+    STR: 10,
+    CON: 10,
+    INT: 10,
+    PER: 10
+  };
 
   // 當前選中的項目大類 Tab ('finance', 'hardware', 'wearable', 'accessory', 'social', 'health')
   const [activeTab, setActiveTab] = useState('finance');
@@ -181,6 +211,83 @@ export default function PerformanceBoard({ currentUser, stores }) {
       setErrorMsg('系統連線失敗');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBuy = async (itemId) => {
+    if (actionLoading) return;
+    setActionLoading(true);
+    try {
+      const result = await buyStoreItem(currentUser.name, itemId);
+      if (result.status === 'success') {
+        if (refreshPetStats) await refreshPetStats();
+      } else {
+        alert(result.message || '購買失敗');
+      }
+    } catch (e) {
+      alert('網路連線失敗，請重試');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUse = async (itemId, isEquip) => {
+    if (actionLoading) return;
+    setActionLoading(true);
+    try {
+      const result = await useInventoryItem(currentUser.name, itemId, isEquip);
+      if (result.status === 'success') {
+        if (refreshPetStats) await refreshPetStats();
+      } else {
+        alert(result.message || '操作失敗');
+      }
+    } catch (e) {
+      alert('網路連線失敗，請重試');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEvolve = async () => {
+    if (actionLoading) return;
+    setActionLoading(true);
+    try {
+      const result = await checkPetEvolution(currentUser.name);
+      if (result.status === 'success') {
+        alert(`🎉 恭喜！進化成功！您的寵物已演化為：${result.pet.name}！`);
+        if (refreshPetStats) await refreshPetStats();
+      } else {
+        alert(result.message || '進化失敗');
+      }
+    } catch (e) {
+      alert('網路連線失敗，請重試');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRename = async () => {
+    if (actionLoading) return;
+    const currentName = pet.name || '數碼蛋';
+    const newName = prompt(`請輸入您的數位寵物新暱稱：\n(當前名稱：${currentName})`, currentName);
+    if (newName === null) return;
+    if (newName.trim() === '') {
+      alert('寵物暱稱不能為空！');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const result = await renamePet(currentUser.name, newName);
+      if (result.status === 'success') {
+        alert(`🎉 成功將寵物命名為「${newName.trim()}」！`);
+        if (refreshPetStats) await refreshPetStats();
+      } else {
+        alert(result.message || '改名失敗');
+      }
+    } catch (e) {
+      alert('網路連線失敗，請重試');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -597,97 +704,229 @@ export default function PerformanceBoard({ currentUser, stores }) {
       <div className="p-4 space-y-4 max-w-[600px] mx-auto w-full">
         {/* 1. 遊戲化互動狀態養成卡片 (RPG Status & Gamified Card) */}
         <div className="space-y-3.5 select-none">
-          {/* 上半部：Manie 互動氣泡對話框 */}
-          <div className="bg-gradient-to-br from-pink-50/70 to-rose-50/70 border border-pink-100 rounded-[28px] p-4 flex items-center space-x-4 shadow-sm">
-            {/* 動態表情去背圖 (支援點擊彈跳互動與款式切換) */}
-            <div 
-              onClick={handleManieClick}
-              className={`w-20 h-20 shrink-0 flex items-center justify-center relative bg-white/50 rounded-full shadow-inner border border-white/60 overflow-hidden p-1 cursor-pointer transition-all duration-300 ${
-                isBouncing ? 'scale-110 -translate-y-1' : 'hover:scale-105 active:scale-95'
-              }`}
-              title="點我互動！"
-            >
-              <ManieIcon pose={manieClickPose || rpg.maniePose} group="auto" className="w-16 h-16" />
-            </div>
-            
-            {/* 氣泡對話框 */}
-            <div className="flex-1 bg-white border border-pink-100/80 rounded-2xl p-3 shadow-inner relative min-h-[70px] flex flex-col justify-center">
-              <div className="absolute left-[-6px] top-7 w-3 h-3 bg-white border-l border-b border-pink-100/80 rotate-45"></div>
-              <p className="text-xs text-slate-700 font-extrabold leading-relaxed">
-                {rpg.dialogText}
-              </p>
-              <div className="text-[10px] text-slate-400 font-bold text-right mt-1.5 flex items-center justify-end gap-1">
-                <span>本月已過 {timeProgress.percent}%</span>
-                <span>·</span>
-                <span>剩餘 {timeProgress.remainingDays} 天</span>
-              </div>
-            </div>
-          </div>
+          {showPetRoom ? (
+            // ==================== 新版：數位寵物發光育成戰情室 ====================
+            <div className={`rounded-[32px] p-5 shadow-lg relative overflow-hidden border transition-all duration-500 ${
+              pet.petId.includes("driver")
+                ? "bg-gradient-to-br from-rose-50 to-orange-50/90 text-slate-800 border-rose-100 shadow-rose-500/5"
+                : pet.petId.includes("guardian")
+                ? "bg-gradient-to-br from-blue-50 to-sky-50/90 text-slate-800 border-blue-100 shadow-blue-500/5"
+                : pet.petId.includes("pioneer")
+                ? "bg-gradient-to-br from-purple-50 to-fuchsia-50/90 text-slate-800 border-purple-100 shadow-purple-500/5"
+                : pet.petId.includes("integrator")
+                ? "bg-gradient-to-br from-emerald-50 to-teal-50/90 text-slate-800 border-emerald-100 shadow-emerald-500/5"
+                : "bg-gradient-to-br from-slate-50 to-zinc-100/90 text-slate-800 border-slate-200 shadow-slate-900/5"
+            }`}>
+              {/* 背景微光 */}
+              <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/40 blur-xl pointer-events-none"></div>
 
-          {/* 下半部：店員業績養成卡片 */}
-          <div className="bg-gradient-to-r from-rose-500 to-pink-600 rounded-[28px] p-5 text-white shadow-lg relative overflow-hidden border border-rose-400/20 shadow-rose-500/10">
-            {/* 背景微光 */}
-            <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/5 blur-xl pointer-events-none"></div>
-
-            <div className="flex justify-between items-center mb-3">
-              <div className="flex items-center space-x-3">
-                {/* 角色白底圓形頭像 */}
-                <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-lg border border-rose-100 shrink-0">
-                  {rpg.characterAvatar}
+              {/* 頂部名稱與商城按鈕 */}
+              <div className="flex justify-between items-start mb-3.5">
+                <div className="flex items-center space-x-3.5">
+                  <div className="w-12 h-12 rounded-full bg-white/60 backdrop-blur-md shadow-inner flex items-center justify-center text-xl shrink-0 relative overflow-hidden border border-slate-200/50">
+                    <ManieIcon 
+                      pose={
+                        pet.hp <= 0 
+                          ? "sweat" 
+                          : pet.status === "孵化中" 
+                          ? "sleep" 
+                          : pet.level >= 5 
+                          ? "great" 
+                          : "idle"
+                      } 
+                      group="auto" 
+                      className="w-10 h-10" 
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 group/name cursor-pointer select-none" onClick={handleRename} title="點擊為寵物命名">
+                        <span className="text-sm font-black tracking-wide text-slate-800 hover:underline decoration-slate-400 decoration-dashed">{pet.name}</span>
+                        <span className="text-[10px] opacity-70 group-hover/name:opacity-100 transition-opacity">🖊️</span>
+                      </div>
+                      <span className="text-[9px] bg-slate-200/60 text-slate-600 px-2 py-0.5 rounded-full font-black tracking-wider border border-slate-300/30">
+                        {pet.level === 1 ? "數據卵" : pet.level === 2 ? "萌芽體" : pet.level === 3 ? "幼生體" : pet.level === 4 ? "雛形體" : pet.level === 5 ? "成熟體" : pet.level === 6 ? "完全體" : "究極體"} (Stage {pet.level})
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-bold mt-0.5">同仁夥伴：{pet.sheetName}</p>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-black tracking-wide">{rpg.charName}</span>
-                    <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-black tracking-wider border border-white/10">
-                      {rpg.titleText}
+
+                {/* 道具商店按鈕 */}
+                <button
+                  onClick={() => setStoreOpen(true)}
+                  className="bg-white hover:bg-slate-50 shadow-sm text-slate-700 font-extrabold text-[10px] px-3.5 py-1.5 rounded-xl border border-slate-200/70 active:scale-95 transition-all flex items-center gap-1.5"
+                >
+                  <Coins size={12} className="text-yellow-500 animate-spin" style={{ animationDuration: '3s' }} />
+                  <span>🪙 {coins} | 商店背包</span>
+                </button>
+              </div>
+
+              {/* HP 與 XP 狀態條 */}
+              <div className="space-y-2.5">
+                {/* HP 條 */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[9px] font-black text-slate-700">
+                    <span>❤️ 生命值 HP</span>
+                    <span>{pet.hp} / 100</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-200/60 rounded-full overflow-hidden border border-slate-200/30 relative">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        pet.hp > 50 ? "bg-gradient-to-r from-emerald-400 to-green-500 shadow-[0_0_4px_rgba(52,211,153,0.3)]" : pet.hp > 20 ? "bg-gradient-to-r from-yellow-400 to-orange-500 shadow-[0_0_4px_rgba(251,191,36,0.3)]" : "bg-gradient-to-r from-red-500 to-rose-600 shadow-[0_0_4px_rgba(244,63,94,0.5)] animate-pulse"
+                      }`}
+                      style={{ width: `${pet.hp}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* XP 經驗值條 */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[9px] font-black text-slate-700">
+                    <span>✨ 經驗值 XP</span>
+                    <span>{pet.xp} / {Math.round(100 * Math.pow(pet.level, 1.5))}</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-200/60 rounded-full overflow-hidden border border-slate-200/30 relative">
+                    <div 
+                      className="h-full bg-gradient-to-r from-yellow-400 to-amber-400 rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min(100, (pet.xp / (100 * Math.pow(pet.level, 1.5))) * 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 四大屬性面板 */}
+              <div className="grid grid-cols-4 gap-2 mt-4 pt-3.5 border-t border-slate-200/50">
+                <div className="bg-white/60 rounded-xl p-1.5 text-center border border-slate-200/40 shadow-xs">
+                  <div className="text-[9px] text-slate-500 font-black">STR 力量</div>
+                  <div className="text-xs font-black font-mono mt-0.5 text-amber-600">⚔️ {finalAttributes.STR}</div>
+                </div>
+                <div className="bg-white/60 rounded-xl p-1.5 text-center border border-slate-200/40 shadow-xs">
+                  <div className="text-[9px] text-slate-500 font-black">CON 體質</div>
+                  <div className="text-xs font-black font-mono mt-0.5 text-sky-600">🛡️ {finalAttributes.CON}</div>
+                </div>
+                <div className="bg-white/60 rounded-xl p-1.5 text-center border border-slate-200/40 shadow-xs">
+                  <div className="text-[9px] text-slate-500 font-black">INT 智力</div>
+                  <div className="text-xs font-black font-mono mt-0.5 text-emerald-600">🎓 {finalAttributes.INT}</div>
+                </div>
+                <div className="bg-white/60 rounded-xl p-1.5 text-center border border-slate-200/40 shadow-xs">
+                  <div className="text-[9px] text-slate-500 font-black">PER 感知</div>
+                  <div className="text-xs font-black font-mono mt-0.5 text-purple-600">🔍 {finalAttributes.PER}</div>
+                </div>
+              </div>
+
+              {/* 進化計時器或進化按鈕 */}
+              {pet.level < 7 && (
+                <div className="mt-3.5 pt-2 flex justify-between items-center text-[10px] font-black text-slate-500 font-mono">
+                  <div className="flex items-center space-x-1.5">
+                    <span>培育積分: {pet.pp_points || pet.PP || 0} PP</span>
+                    <span>·</span>
+                    <span>挑戰次數: {pet.battles || 0}</span>
+                  </div>
+                  
+                  {Date.now() >= pet.nextEvolutionTime ? (
+                    <button
+                      onClick={handleEvolve}
+                      className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 text-[10px] font-extrabold px-3 py-1.5 rounded-xl border-none shadow-md shadow-yellow-400/20 animate-pulse active:scale-95 transition-all"
+                    >
+                      ⚡ 立即進化 (Evolve)
+                    </button>
+                  ) : (
+                    <span className="text-amber-600 font-black">
+                      ⏳ 進化蓄能中 (還剩 {((pet.nextEvolutionTime - Date.now()) / (3600 * 1000)).toFixed(1)}h)
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            // ==================== 舊版：原本的業績模擬 RPG 卡片 ====================
+            <>
+              {/* 上半部：Manie 互動氣泡對話框 */}
+              <div className="bg-gradient-to-br from-pink-50/70 to-rose-50/70 border border-pink-100 rounded-[28px] p-4 flex items-center space-x-4 shadow-sm">
+                <div 
+                  onClick={handleManieClick}
+                  className={`w-20 h-20 shrink-0 flex items-center justify-center relative bg-white/50 rounded-full shadow-inner border border-white/60 overflow-hidden p-1 cursor-pointer transition-all duration-300 ${
+                    isBouncing ? 'scale-110 -translate-y-1' : 'hover:scale-105 active:scale-95'
+                  }`}
+                  title="點我互動！"
+                >
+                  <ManieIcon pose={manieClickPose || rpg.maniePose} group="auto" className="w-16 h-16" />
+                </div>
+                
+                <div className="flex-1 bg-white border border-pink-100/80 rounded-2xl p-3 shadow-inner relative min-h-[70px] flex flex-col justify-center">
+                  <div className="absolute left-[-6px] top-7 w-3 h-3 bg-white border-l border-b border-pink-100/80 rotate-45"></div>
+                  <p className="text-xs text-slate-700 font-extrabold leading-relaxed">
+                    {rpg.dialogText}
+                  </p>
+                  <div className="text-[10px] text-slate-400 font-bold text-right mt-1.5 flex items-center justify-end gap-1">
+                    <span>本月已過 {timeProgress.percent}%</span>
+                    <span>·</span>
+                    <span>剩餘 {timeProgress.remainingDays} 天</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 下半部：店員業績養成卡片 */}
+              <div className="bg-gradient-to-r from-rose-500 to-pink-600 rounded-[28px] p-5 text-white shadow-lg relative overflow-hidden border border-rose-400/20 shadow-rose-500/10">
+                <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/5 blur-xl pointer-events-none"></div>
+
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-lg border border-rose-100 shrink-0">
+                      {rpg.characterAvatar}
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-black tracking-wide">{rpg.charName}</span>
+                        <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-black tracking-wider border border-white/10">
+                          {rpg.titleText}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-white/70 font-bold mt-0.5">歸屬分店：{selectedStore}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white text-rose-600 font-extrabold text-xs px-3.5 py-1 rounded-xl shadow-md border-none font-mono">
+                    Lv.{rpg.level}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="w-full h-2.5 bg-black/15 rounded-full overflow-hidden border border-white/5 relative">
+                    <div 
+                      className="h-full bg-gradient-to-r from-yellow-300 to-amber-300 rounded-full shadow-[0_0_6px_#fde047]" 
+                      style={{ width: `${rpg.expPercent}%` }}
+                    ></div>
+                    <div 
+                      className="absolute top-0 bottom-0 w-[1.5px] bg-white shadow-[0_0_3px_#ffffff] opacity-75"
+                      style={{ left: `${timeProgress.percent}%` }}
+                      title={`本月時間基線: ${timeProgress.percent}%`}
+                    ></div>
+                  </div>
+                  <div className="flex justify-between text-[10px] font-black font-mono text-white/90">
+                    <span>{rpg.exp} / {rpg.nextLevelExp} 升下一級</span>
+                    <span>本月毛利達成率：{grossProfitMetric.achievement}</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-white/15 flex justify-between items-center text-xs font-black text-white/90 font-mono">
+                  <div className="flex items-center space-x-1">
+                    <span>今日任務進度</span>
+                    <span className="bg-white/20 text-white px-2 py-0.5 rounded-md text-[10px] font-black">
+                      {rpg.completedTasks} / {rpg.totalTasks}
                     </span>
                   </div>
-                  <p className="text-[10px] text-white/70 font-bold mt-0.5">歸屬分店：{selectedStore}</p>
+                  <div className="flex items-center space-x-1">
+                    <span>本月冒險積分</span>
+                    <span className="bg-yellow-400 text-slate-900 px-2 py-0.5 rounded-md text-[10px] font-bold shadow-sm">
+                      {rpg.points.toLocaleString()} 點
+                    </span>
+                  </div>
                 </div>
               </div>
-              
-              {/* 等級標籤 */}
-              <div className="bg-white text-rose-600 font-extrabold text-xs px-3.5 py-1 rounded-xl shadow-md border-none font-mono">
-                Lv.{rpg.level}
-              </div>
-            </div>
-
-            {/* EXP 經驗值進度條 */}
-            <div className="space-y-1.5">
-              <div className="w-full h-2.5 bg-black/15 rounded-full overflow-hidden border border-white/5 relative">
-                <div 
-                  className="h-full bg-gradient-to-r from-yellow-300 to-amber-300 rounded-full shadow-[0_0_6px_#fde047]" 
-                  style={{ width: `${rpg.expPercent}%` }}
-                ></div>
-                {/* 時間基線標記虛線 */}
-                <div 
-                  className="absolute top-0 bottom-0 w-[1.5px] bg-white shadow-[0_0_3px_#ffffff] opacity-75"
-                  style={{ left: `${timeProgress.percent}%` }}
-                  title={`本月時間基線: ${timeProgress.percent}%`}
-                ></div>
-              </div>
-              <div className="flex justify-between text-[10px] font-black font-mono text-white/90">
-                <span>{rpg.exp} / {rpg.nextLevelExp} 升下一級</span>
-                <span>本月毛利達成率：{grossProfitMetric.achievement}</span>
-              </div>
-            </div>
-
-            {/* 最下方今日進度與本月點數 */}
-            <div className="mt-4 pt-3 border-t border-white/15 flex justify-between items-center text-xs font-black text-white/90 font-mono">
-              <div className="flex items-center space-x-1">
-                <span>今日任務進度</span>
-                <span className="bg-white/20 text-white px-2 py-0.5 rounded-md text-[10px] font-black">
-                  {rpg.completedTasks} / {rpg.totalTasks}
-                </span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <span>本月冒險積分</span>
-                <span className="bg-yellow-400 text-slate-900 px-2 py-0.5 rounded-md text-[10px] font-bold shadow-sm">
-                  {rpg.points.toLocaleString()} 點
-                </span>
-              </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
 
         {/* 篩選控制器 */}
@@ -1220,6 +1459,222 @@ export default function PerformanceBoard({ currentUser, stores }) {
           onClose={() => setShowForm(false)}
           onRefreshData={loadPerf}
         />
+      )}
+
+      {/* 道具商店與同仁背包抽屜 */}
+      {storeOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          {/* 點擊背景關閉 */}
+          <div className="absolute inset-0" onClick={() => setStoreOpen(false)}></div>
+          
+          {/* 抽屜本體 */}
+          <div className="relative w-full max-w-md h-full bg-white/95 backdrop-blur-md shadow-2xl flex flex-col animate-slide-in border-l border-slate-100">
+            {/* 抽屜頭部 */}
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-lg bg-yellow-400/10 flex items-center justify-center text-yellow-600 shadow-inner">
+                  <Coins size={16} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-slate-800">馬尼道具鋪 & 背包</h2>
+                  <p className="text-[9px] text-slate-400 font-extrabold">培育積分與裝備強化</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setStoreOpen(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center border-none transition-all active:scale-90"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* M幣餘額與頁籤切換 */}
+            <div className="p-4 bg-white border-b border-slate-100 flex items-center justify-between">
+              <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200/60">
+                <button
+                  type="button"
+                  onClick={() => setStoreTab('shop')}
+                  className={`px-4 py-1.5 text-xs font-black rounded-lg transition-all border-none ${
+                    storeTab === 'shop'
+                      ? 'bg-white shadow-sm text-slate-800'
+                      : 'text-slate-400 hover:text-slate-600 bg-transparent'
+                  }`}
+                >
+                  🛒 道具商品
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStoreTab('inventory')}
+                  className={`px-4 py-1.5 text-xs font-black rounded-lg transition-all border-none ${
+                    storeTab === 'inventory'
+                      ? 'bg-white shadow-sm text-slate-800'
+                      : 'text-slate-400 hover:text-slate-600 bg-transparent'
+                  }`}
+                >
+                  🎒 同仁背包
+                </button>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-100 rounded-xl px-3 py-1 flex items-center gap-1.5">
+                <span className="text-xs text-yellow-600">🪙</span>
+                <span className="text-xs font-mono font-black text-yellow-700">{coins} <span className="text-[9px] font-bold text-yellow-600/80">M幣</span></span>
+              </div>
+            </div>
+
+            {/* 內容區域 */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 no-scrollbar relative">
+              {actionLoading && (
+                <div className="absolute inset-0 bg-white/70 backdrop-blur-xs flex flex-col items-center justify-center z-10 space-y-2">
+                  <Loader2 className="text-rose-500 animate-spin" size={28} />
+                  <span className="text-[10px] font-black text-slate-500">同步至 Google Sheets 中...</span>
+                </div>
+              )}
+
+              {storeTab === 'shop' ? (
+                // 商店商品列表
+                <div className="space-y-4">
+                  {/* 消耗品區 */}
+                  <div className="space-y-2">
+                    <h3 className="text-[10px] font-black text-slate-400 tracking-wider flex items-center gap-1">
+                      🧪 消耗性補給品 ({Object.values(getStoreItemsConfig()).filter(i => i.type === 'consumable').length}款)
+                    </h3>
+                    <div className="grid grid-cols-1 gap-2.5">
+                      {Object.values(getStoreItemsConfig())
+                        .filter(i => i.type === 'consumable')
+                        .map(item => (
+                          <div key={item.id} className="bg-slate-50 border border-slate-100 rounded-2xl p-3 flex justify-between items-center hover:bg-slate-100/55 transition-all">
+                            <div className="space-y-1 pr-2 flex-1">
+                              <div className="flex items-center space-x-1.5">
+                                <span className="text-xs font-black text-slate-800">{item.name}</span>
+                                {item.price >= 100 && (
+                                  <span className="text-[8px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-black border border-amber-200">珍貴</span>
+                                )}
+                              </div>
+                              <p className="text-[9px] text-slate-400 font-bold leading-relaxed">{item.desc}</p>
+                            </div>
+                            <button
+                              onClick={() => handleBuy(item.id)}
+                              disabled={coins < item.price || actionLoading}
+                              className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-xl border transition-all active:scale-95 flex items-center gap-1 ${
+                                coins >= item.price
+                                  ? 'bg-yellow-400 hover:bg-yellow-500 text-slate-900 border-none shadow-sm'
+                                  : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                              }`}
+                            >
+                              <span>🪙 {item.price}</span>
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* 裝備區 */}
+                  <div className="space-y-2 pt-2">
+                    <h3 className="text-[10px] font-black text-slate-400 tracking-wider flex items-center gap-1">
+                      🛡️ 屬性強化裝備 ({Object.values(getStoreItemsConfig()).filter(i => i.type === 'equip').length}款)
+                    </h3>
+                    <div className="grid grid-cols-1 gap-2.5">
+                      {Object.values(getStoreItemsConfig())
+                        .filter(i => i.type === 'equip')
+                        .map(item => (
+                          <div key={item.id} className="bg-slate-50 border border-slate-100 rounded-2xl p-3 flex justify-between items-center hover:bg-slate-100/55 transition-all">
+                            <div className="space-y-1 pr-2 flex-1">
+                              <div className="flex items-center space-x-1.5">
+                                <span className="text-xs font-black text-slate-800">{item.name}</span>
+                                <span className="text-[8px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-black border border-blue-100">
+                                  {Object.entries(item.stats).map(([k, v]) => `${k}+${v}`).join(', ')}
+                                </span>
+                              </div>
+                              <p className="text-[9px] text-slate-400 font-bold leading-relaxed">{item.desc}</p>
+                            </div>
+                            <button
+                              onClick={() => handleBuy(item.id)}
+                              disabled={coins < item.price || actionLoading}
+                              className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-xl border transition-all active:scale-95 flex items-center gap-1 ${
+                                coins >= item.price
+                                  ? 'bg-yellow-400 hover:bg-yellow-500 text-slate-900 border-none shadow-sm'
+                                  : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                              }`}
+                            >
+                              <span>🪙 {item.price}</span>
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // 玩家背包列表
+                <div className="space-y-3">
+                  {(!petStats?.inventory || petStats.inventory.filter(i => i.count > 0 || i.isEquipped).length === 0) ? (
+                    <div className="py-12 text-center space-y-2">
+                      <div className="text-3xl">🎒</div>
+                      <div className="text-xs font-black text-slate-400">您的背包空空如也</div>
+                      <p className="text-[9px] text-slate-350 font-bold">前往道具商品頁面，使用 M幣 購買道具吧！</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2.5">
+                      {petStats.inventory
+                        .filter(i => i.count > 0 || i.isEquipped)
+                        .map(invItem => {
+                          const config = getStoreItemsConfig();
+                          const item = config[invItem.itemId];
+                          if (!item) return null;
+                          return (
+                            <div key={invItem.itemId} className="bg-slate-50 border border-slate-100 rounded-2xl p-3 flex justify-between items-center hover:bg-slate-100/55 transition-all">
+                              <div className="space-y-1 flex-1 pr-2">
+                                <div className="flex items-center space-x-1.5">
+                                  <span className="text-xs font-black text-slate-800">{item.name}</span>
+                                  {item.type === 'equip' ? (
+                                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-black border ${
+                                      invItem.isEquipped
+                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                        : 'bg-slate-100 text-slate-500 border-slate-200'
+                                    }`}>
+                                      {invItem.isEquipped ? '已穿戴' : '未穿戴'}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-black border border-slate-200">
+                                      數量: {invItem.count}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[9px] text-slate-400 font-bold leading-relaxed">{item.desc}</p>
+                              </div>
+
+                              <div className="shrink-0 flex items-center space-x-2">
+                                {item.type === 'consumable' ? (
+                                  <button
+                                    onClick={() => handleUse(item.id, false)}
+                                    disabled={invItem.count <= 0 || actionLoading}
+                                    className="bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-black px-3.5 py-1.5 rounded-xl border-none shadow-sm active:scale-95 transition-all"
+                                  >
+                                    使用
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleUse(item.id, !invItem.isEquipped)}
+                                    disabled={actionLoading}
+                                    className={`text-[10px] font-black px-3.5 py-1.5 rounded-xl border transition-all active:scale-95 ${
+                                      invItem.isEquipped
+                                        ? 'bg-slate-200 hover:bg-slate-350 text-slate-700 border-none'
+                                        : 'bg-emerald-500 hover:bg-emerald-600 text-white border-none shadow-sm'
+                                    }`}
+                                  >
+                                    {invItem.isEquipped ? '卸下' : '穿戴'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

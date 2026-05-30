@@ -25,6 +25,9 @@ var SHEET_ECOMMERCE_DETAILS = "電商扣費明細";
 var SHEET_CUSTOMERS = "客戶資料";
 var SHEET_SYSTEM_LOGS = "系統操作日誌";
 var SHEET_SYSTEM_LOGS_BACKUP = "操作日誌封存";
+var SHEET_PET_ATTRIBUTES = "數位寵物_同仁屬性";
+var SHEET_PET_DATA = "數位寵物_寵物資料";
+var SHEET_PET_INVENTORY = "數位寵物_背包";
 
 // 業績資料夾 ID (母目錄或當月子目錄 ID)
 var PERFORMANCE_FOLDER_ID = "1WmUILJGUrlFWEUtaADutSluVShQq8dxg";
@@ -391,6 +394,51 @@ function initializeSystemSheets() {
     }
   }
 
+  // 3.11. 初始化 數位寵物_同仁屬性
+  var petAttrSheet = ss.getSheetByName(SHEET_PET_ATTRIBUTES);
+  var cnPetAttrHeaders = ['同仁姓名', 'STR', 'CON', 'INT', 'PER', 'M幣'];
+  if (!petAttrSheet) {
+    petAttrSheet = ss.insertSheet(SHEET_PET_ATTRIBUTES);
+    petAttrSheet.appendRow(cnPetAttrHeaders);
+    petAttrSheet.getRange(1, 1, 1, cnPetAttrHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    petAttrSheet.setFrozenRows(1);
+  } else {
+    if (petAttrSheet.getLastRow() === 0) {
+      petAttrSheet.appendRow(cnPetAttrHeaders);
+      petAttrSheet.getRange(1, 1, 1, cnPetAttrHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    }
+  }
+
+  // 3.12. 初始化 數位寵物_寵物資料
+  var petDataSheet = ss.getSheetByName(SHEET_PET_DATA);
+  var cnPetDataHeaders = ['同仁姓名', '寵物名稱', '寵物ID', '等級', '當前HP', '當前XP', '進化值', '淨化值', '戰鬥次數', '勝率', '狀態', '進化倒數時間', '最後更新時間'];
+  if (!petDataSheet) {
+    petDataSheet = ss.insertSheet(SHEET_PET_DATA);
+    petDataSheet.appendRow(cnPetDataHeaders);
+    petDataSheet.getRange(1, 1, 1, cnPetDataHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    petDataSheet.setFrozenRows(1);
+  } else {
+    if (petDataSheet.getLastRow() === 0) {
+      petDataSheet.appendRow(cnPetDataHeaders);
+      petDataSheet.getRange(1, 1, 1, cnPetDataHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    }
+  }
+
+  // 3.13. 初始化 數位寵物_背包
+  var petInvSheet = ss.getSheetByName(SHEET_PET_INVENTORY);
+  var cnPetInvHeaders = ['同仁姓名', '道具ID', '數量', '是否穿戴'];
+  if (!petInvSheet) {
+    petInvSheet = ss.insertSheet(SHEET_PET_INVENTORY);
+    petInvSheet.appendRow(cnPetInvHeaders);
+    petInvSheet.getRange(1, 1, 1, cnPetInvHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    petInvSheet.setFrozenRows(1);
+  } else {
+    if (petInvSheet.getLastRow() === 0) {
+      petInvSheet.appendRow(cnPetInvHeaders);
+      petInvSheet.getRange(1, 1, 1, cnPetInvHeaders.length).setFontWeight("bold").setBackground("#f3f4f6");
+    }
+  }
+
   // 4. 套用條件式格式設定 (顏色提示連動)
   try {
     applyConditionalFormatting(orderSheet);
@@ -405,6 +453,13 @@ function initializeSystemSheets() {
     statusSheet.getRange(1, 1, 1000, cnStatusHeaders.length).setHorizontalAlignment("left");
     statusSheet.getRange(1, 1, 1, cnStatusHeaders.length).setHorizontalAlignment("center");
     
+    petAttrSheet.getRange(1, 1, 1000, cnPetAttrHeaders.length).setHorizontalAlignment("left");
+    petAttrSheet.getRange(1, 1, 1, cnPetAttrHeaders.length).setHorizontalAlignment("center");
+    petDataSheet.getRange(1, 1, 1000, cnPetDataHeaders.length).setHorizontalAlignment("left");
+    petDataSheet.getRange(1, 1, 1, cnPetDataHeaders.length).setHorizontalAlignment("center");
+    petInvSheet.getRange(1, 1, 1000, cnPetInvHeaders.length).setHorizontalAlignment("left");
+    petInvSheet.getRange(1, 1, 1, cnPetInvHeaders.length).setHorizontalAlignment("center");
+    
     // 執行細部排版優化 (設定固定寬度，防止 Base64 簽名與照片撐爆欄位)
     formatOrderSheet(orderSheet);
     formatTaskSheet(taskSheet);
@@ -414,6 +469,10 @@ function initializeSystemSheets() {
     formatCustomerSheet(customerSheet);
     formatLogSheet(logSheet);
     formatLogSheet(backupSheet);
+    
+    petAttrSheet.autoResizeColumns(1, cnPetAttrHeaders.length);
+    petDataSheet.autoResizeColumns(1, cnPetDataHeaders.length);
+    petInvSheet.autoResizeColumns(1, cnPetInvHeaders.length);
   } catch(e) {}
 
   // 註冊自動按月封存日誌定時器 (每月 1 號凌晨 3 點自動執行)
@@ -731,6 +790,16 @@ function doPost(e) {
       result = handleWriteLog(postData.operator, postData.role, postData.actionType, postData.targetModule, postData.description);
     } else if (action === 'submitDailyPerformance') {
       result = handleSubmitDailyPerformance(postData.input);
+    } else if (action === 'getPetStats') {
+      result = handleGetPetStats(postData.sheetName, postData.storeName);
+    } else if (action === 'buyStoreItem') {
+      result = handleBuyStoreItem(postData.sheetName, postData.itemId);
+    } else if (action === 'useInventoryItem') {
+      result = handleUseInventoryItem(postData.sheetName, postData.itemId, postData.isEquipAction);
+    } else if (action === 'checkPetEvolution') {
+      result = handleCheckPetEvolution(postData.sheetName);
+    } else if (action === 'renamePet') {
+      result = handleRenamePet(postData.sheetName, postData.newName);
     }
   } catch (err) {
     result = { status: 'error', message: err.toString() };
@@ -1086,11 +1155,36 @@ function handleUpdateTask(taskId, completed, completedBy, completedAt, photo, no
   
   for (var i = 1; i < data.length; i++) {
     if (data[i][idColIndex].toString() === taskId.toString()) {
+      var oldCompVal = data[i][compColIndex];
+      var oldCompleted = (oldCompVal === true || oldCompVal === 'true' || oldCompVal === '是');
+      
       sheet.getRange(i + 1, compColIndex + 1).setValue(completed ? '是' : '否');
       if (userColIndex !== -1) sheet.getRange(i + 1, userColIndex + 1).setValue(completed ? completedBy : '');
       if (dateColIndex !== -1) sheet.getRange(i + 1, dateColIndex + 1).setValue(completed ? completedAt : '');
       if (photoColIndex !== -1) sheet.getRange(i + 1, photoColIndex + 1).setValue(completed ? (photo || '') : '');
       if (notesColIndex !== -1) sheet.getRange(i + 1, notesColIndex + 1).setValue(completed ? (notes || '') : '');
+      
+      // 數位寵物系統聯動獎勵
+      try {
+        var isNewlyCompleted = completed && !oldCompleted;
+        var isNewlyCancelled = !completed && oldCompleted;
+        var targetUser = completed ? completedBy : (data[i][userColIndex] || completedBy);
+        
+        if (targetUser && (isNewlyCompleted || isNewlyCancelled)) {
+          var scoreColIndex = headers.indexOf('分數');
+          var score = 5; // 預設 5 分
+          if (scoreColIndex !== -1) {
+            score = Number(data[i][scoreColIndex]) || 5;
+          }
+          
+          var coef = isNewlyCompleted ? 1 : -1;
+          var deltaCoins = coef * score * 10;
+          var deltaPP = coef * score;
+          var deltaBattles = coef * 1;
+          
+          rewardPetAndCoins(targetUser, deltaCoins, deltaPP, deltaBattles);
+        }
+      } catch(e) {}
       
       try {
         formatTaskSheet(sheet);
@@ -2077,6 +2171,8 @@ function handleSubmitDailyPerformance(input) {
     // 檢查 input 底下是否有 metrics 物件，或是直接傳入屬性
     var metrics = input.metrics || input;
     
+    var diffs = { grossProfit: 0, insurance: 0, subscription: 0, accessories: 0, customerCount: 0 };
+    
     // 8. 遍歷項目進行動態賦值
     for (var colName in headerMap) {
       var colIdx = headerMap[colName];
@@ -2094,12 +2190,28 @@ function handleSubmitDailyPerformance(input) {
       
       // 僅在前端有傳入該值時進行修改，避免覆蓋 Sheets 裡的無關數據
       if (val !== undefined) {
-        rowValues[colIdx] = Number(val) || 0;
+        var oldVal = Number(rowValues[colIdx]) || 0;
+        var newVal = Number(val) || 0;
+        var diff = newVal - oldVal;
+        
+        if (colName === "毛利" || colName === "grossProfit") diffs.grossProfit += diff;
+        else if (colName === "保險營收" || colName === "insurance") diffs.insurance += diff;
+        else if (colName === "門號" || colName === "subscription") diffs.subscription += diff;
+        else if (colName === "配件營收" || colName === "accessories") diffs.accessories += diff;
+        else if (colName === "來客數" || colName === "customerCount") diffs.customerCount += diff;
+        
+        rowValues[colIdx] = newVal;
       }
     }
     
     // 9. 寫回
     rowRange.setValues([rowValues]);
+    
+    // 9.5. 獎勵數位寵物 (XP & M幣)
+    try {
+      var deltaCoins = (diffs.grossProfit * 0.01) + (diffs.accessories * 0.1) + (diffs.subscription * 100) + (diffs.customerCount * 2) + (diffs.insurance * 0.05);
+      rewardPetAndCoins(sheetName, deltaCoins, 0, 0);
+    } catch(e) {}
     
     // 10. 寫入系統操作稽核日誌
     handleWriteLog(
@@ -2166,3 +2278,586 @@ function debugListFolder() {
     Logger.log("發生錯誤: " + e.toString());
   }
 }
+
+// ==========================================
+// 數位寵物與道具商城系統 (v2.0.0) 核心邏輯
+// ==========================================
+
+// 24 款特色道具與裝備定義
+var STORE_ITEMS = {
+  // 消耗品 - 藥水與盲盒 (12款)
+  'item_potion_hp_small': { name: "過期促銷飲料", price: 10, type: "consumable", effect: { hp: 20 }, desc: "喝了會拉肚子，但能回復 20 HP。" },
+  'item_potion_hp_medium': { name: "能量維他命", price: 30, type: "consumable", effect: { hp: 50 }, desc: "門市同仁必備，快速回復 50 HP。" },
+  'item_potion_hp_large': { name: "店長特調心靈雞湯", price: 80, type: "consumable", effect: { hp: 100 }, desc: "喝了充滿幹勁，HP 全滿！" },
+  'item_cleanse': { name: "奧客去去噴霧", price: 50, type: "consumable", effect: { cleanse: true }, desc: "解除任務扣血威脅，HP+50且淨化值滿。" },
+  'item_xp_boost': { name: "業績加成御守", price: 100, type: "consumable", effect: { xp_boost: 1.5, duration: 3600 }, desc: "1小時內業績獲得 XP 提升 50%。" },
+  'item_coin_double': { name: "招財黃金貓", price: 150, type: "consumable", effect: { coin_boost: 2.0, duration: 1800 }, desc: "30分鐘內業績獲得 M幣 翻倍。" },
+  'item_blind_box_normal': { name: "新手盲盒", price: 40, type: "consumable", effect: { random_item: "normal" }, desc: "隨機獲得一款普通裝備或藥水。" },
+  'item_blind_box_rare': { name: "豪華旗艦盲盒", price: 120, type: "consumable", effect: { random_item: "rare" }, desc: "隨機獲得一款稀有或傳說裝備。" },
+  'item_toy_ball': { name: "壓力捏捏球", price: 20, type: "consumable", effect: { clean_val: 15 }, desc: "提升寵物淨化值 15 點。" },
+  'item_pet_food': { name: "特盛貓罐頭", price: 25, type: "consumable", effect: { clean_val: 20 }, desc: "提升寵物淨化值 20 點。" },
+  'item_evo_stone': { name: "神秘進化石", price: 200, type: "consumable", effect: { evo_time_reduce: 12 * 3600 * 1000 }, desc: "減少進化倒數 12 小時。" },
+  'item_buff_scroll': { name: "過期合約加速符", price: 60, type: "consumable", effect: { temp_all_stats: 5, duration: 7200 }, desc: "2小時內所有屬性 +5 點。" },
+
+  // 裝備 - 穿戴加成 (12款)
+  'item_equip_badge': { name: "德勤徽章", price: 150, type: "equip", stats: { STR: 5 }, desc: "力量 +5。象徵團隊榮譽。" },
+  'item_equip_5g': { name: "滿格 5G 天線", price: 250, type: "equip", stats: { INT: 10 }, desc: "智力 +10。連網速度極快。" },
+  'item_equip_ticket': { name: "蘋果發表會門票", price: 400, type: "equip", stats: { PER: 15 }, desc: "感知 +15。走在科技最前端。" },
+  'item_equip_mug': { name: "保溫咖啡杯", price: 100, type: "equip", stats: { CON: 5 }, desc: "體質 +5。加班必備良伴。" },
+  'item_equip_uniform': { name: "馬尼黃金戰甲", price: 500, type: "equip", stats: { CON: 20 }, desc: "體質 +20。防禦力極高。" },
+  'item_equip_shoes': { name: "門市巡邏跑鞋", price: 180, type: "equip", stats: { STR: 8 }, desc: "力量 +8。穿梭店內外無阻。" },
+  'item_equip_watch': { name: "業績倒數智慧手錶", price: 300, type: "equip", stats: { PER: 12 }, desc: "感知 +12。精確掌握時間。" },
+  'item_equip_mouse': { name: "電競發光滑鼠", price: 200, type: "equip", stats: { INT: 8 }, desc: "智力 +8。點擊結帳如有神助。" },
+  'item_equip_crown': { name: "百萬店長金冠", price: 1000, type: "equip", stats: { STR: 15, CON: 15, INT: 15, PER: 15 }, desc: "傳說級！所有屬性 +15 點。" },
+  'item_equip_key': { name: "主控台神秘金鑰", price: 800, type: "equip", stats: { INT: 25 }, desc: "智力 +25。掌握系統的核心原始碼。" },
+  'item_equip_shield': { name: "奧客防護盾", price: 350, type: "equip", stats: { CON: 15 }, desc: "體質 +15。能抵擋奧客的心靈衝擊。" },
+  'item_equip_glasses': { name: "業績透視眼鏡", price: 450, type: "equip", stats: { PER: 20 }, desc: "感知 +20。一眼看出誰是潛在客戶。" }
+};
+
+// 輔助函數：在工作表的特定欄位尋找符合的值
+function findRowInSheet(sheet, colIndex, searchValue) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+  var range = sheet.getRange(1, colIndex, lastRow, 1);
+  var values = range.getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][0] && values[i][0].toString().trim() === searchValue.toString().trim()) {
+      return i + 1; // 1-based line index
+    }
+  }
+  return -1;
+}
+
+// 計算業績獲得 XP
+function calculateXPGained(deltaCoins, str, intel) {
+  var intBonus = 1.0 + (intel * 0.025);
+  var critProb = Math.min(0.5, str / 200.0); // 暴擊率上限 50%
+  var critMultiplier = 1.0;
+  if (Math.random() < critProb) {
+    critMultiplier = 1.5 + ((4.0 * str) / (str + 200.0));
+  }
+  var xp = deltaCoins * intBonus * critMultiplier * 1.5;
+  return {
+    xp: Math.round(Math.max(0, xp)),
+    isCrit: critMultiplier > 1.0
+  };
+}
+
+// 時間流逝扣血與狀態更新
+function processTimeElapseHPRecoveryAndDamage(sheetName, storeName, pet, baseCon) {
+  var now = Date.now();
+  var diffMs = now - pet.lastUpdated;
+  var oneDayMs = 24 * 3600 * 1000;
+  
+  if (diffMs >= oneDayMs) {
+    var daysElapsed = Math.floor(diffMs / oneDayMs);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var taskSheet = ss.getSheetByName(SHEET_TASKS);
+    
+    var overdueDailiesCount = 0;
+    if (taskSheet && storeName) {
+      var taskData = taskSheet.getDataRange().getValues();
+      var headers = taskData[0];
+      var storeCol = headers.indexOf('分店');
+      var compCol = headers.indexOf('是否完成');
+      
+      for (var i = 1; i < taskData.length; i++) {
+        var tStore = taskData[i][storeCol];
+        var tComp = taskData[i][compCol];
+        if (tStore && tStore.toString().trim() === storeName.toString().trim() && (tComp === '否' || tComp === false || tComp === 'false')) {
+          overdueDailiesCount++;
+        }
+      }
+    }
+    
+    if (overdueDailiesCount > 0) {
+      var baseDamage = 5;
+      var totalDamage = (baseDamage * overdueDailiesCount * daysElapsed);
+      var reducedDamage = totalDamage / (1.0 + (baseCon * 0.05));
+      pet.hp = Math.max(0, pet.hp - Math.round(reducedDamage));
+      
+      if (pet.hp <= 0) {
+        pet.hp = 0;
+        pet.status = "受傷";
+      }
+    } else {
+      if (pet.hp < 100 && pet.hp > 0) {
+        pet.hp = Math.min(100, pet.hp + 10 * daysElapsed);
+      }
+    }
+    
+    pet.cleanVal = Math.max(0, pet.cleanVal - 5 * daysElapsed);
+    pet.lastUpdated = now;
+    
+    var dataSheet = ss.getSheetByName(SHEET_PET_DATA);
+    var petRowIdx = findRowInSheet(dataSheet, 1, sheetName);
+    if (petRowIdx !== -1) {
+      dataSheet.getRange(petRowIdx, 5).setValue(pet.hp);
+      dataSheet.getRange(petRowIdx, 8).setValue(pet.cleanVal);
+      dataSheet.getRange(petRowIdx, 13).setValue(pet.lastUpdated);
+    }
+  }
+}
+
+// 取得同仁寵物狀態、屬性與背包
+function handleGetPetStats(sheetName, storeName) {
+  if (!sheetName) return { status: 'error', message: '缺少同仁姓名' };
+  
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var attrSheet = ss.getSheetByName(SHEET_PET_ATTRIBUTES);
+  var dataSheet = ss.getSheetByName(SHEET_PET_DATA);
+  var invSheet = ss.getSheetByName(SHEET_PET_INVENTORY);
+  
+  if (!attrSheet || !dataSheet || !invSheet) {
+    ensureSheetsExist();
+    attrSheet = ss.getSheetByName(SHEET_PET_ATTRIBUTES);
+    dataSheet = ss.getSheetByName(SHEET_PET_DATA);
+    invSheet = ss.getSheetByName(SHEET_PET_INVENTORY);
+  }
+  
+  // 1. 取得基礎屬性與 M幣
+  var attrRowIdx = findRowInSheet(attrSheet, 1, sheetName);
+  var coins = 100;
+  var baseStr = 10, baseCon = 10, baseIntel = 10, basePer = 10;
+  
+  if (attrRowIdx === -1) {
+    attrSheet.appendRow([sheetName, baseStr, baseCon, baseIntel, basePer, coins]);
+  } else {
+    var attrVals = attrSheet.getRange(attrRowIdx, 1, 1, 6).getValues()[0];
+    baseStr = Number(attrVals[1]) || 10;
+    baseCon = Number(attrVals[2]) || 10;
+    baseIntel = Number(attrVals[3]) || 10;
+    basePer = Number(attrVals[4]) || 10;
+    coins = Number(attrVals[5]) || 0;
+  }
+  
+  // 2. 取得背包
+  var inventory = [];
+  var invData = invSheet.getDataRange().getValues();
+  var equipBuffs = { STR: 0, CON: 0, INT: 0, PER: 0 };
+  
+  for (var i = 1; i < invData.length; i++) {
+    if (invData[i][0] === sheetName) {
+      var itemId = invData[i][1];
+      var count = Number(invData[i][2]) || 0;
+      var isEquipped = invData[i][3] === true || invData[i][3] === 'true' || invData[i][3] === '是';
+      
+      inventory.push({
+        itemId: itemId,
+        count: count,
+        isEquipped: isEquipped
+      });
+      
+      if (isEquipped && STORE_ITEMS[itemId] && STORE_ITEMS[itemId].type === 'equip') {
+        var stats = STORE_ITEMS[itemId].stats;
+        if (stats) {
+          if (stats.STR) equipBuffs.STR += stats.STR;
+          if (stats.CON) equipBuffs.CON += stats.CON;
+          if (stats.INT) equipBuffs.INT += stats.INT;
+          if (stats.PER) equipBuffs.PER += stats.PER;
+        }
+      }
+    }
+  }
+  
+  var finalStr = baseStr + equipBuffs.STR;
+  var finalCon = baseCon + equipBuffs.CON;
+  var finalIntel = baseIntel + equipBuffs.INT;
+  var finalPer = basePer + equipBuffs.PER;
+  
+  // 3. 取得寵物資料
+  var dataRowIdx = findRowInSheet(dataSheet, 1, sheetName);
+  var pet = {};
+  if (dataRowIdx === -1) {
+    var eggTypes = [
+      { id: "egg_driver", name: "烈焰數據卵" },
+      { id: "egg_guardian", name: "岩石數據卵" },
+      { id: "egg_pioneer", name: "閃電數據卵" },
+      { id: "egg_integrator", name: "冰霜數據卵" }
+    ];
+    var randomEgg = eggTypes[Math.floor(Math.random() * eggTypes.length)];
+    var defaultPet = {
+      sheetName: sheetName,
+      name: randomEgg.name,
+      petId: randomEgg.id,
+      level: 1,
+      hp: 100,
+      xp: 0,
+      evoVal: 0,
+      cleanVal: 100,
+      battles: 0,
+      winRatio: 0,
+      status: "孵化中",
+      nextEvolutionTime: Date.now() + 12 * 3600 * 1000,
+      lastUpdated: Date.now()
+    };
+    dataSheet.appendRow([
+      defaultPet.sheetName,
+      defaultPet.name,
+      defaultPet.petId,
+      defaultPet.level,
+      defaultPet.hp,
+      defaultPet.xp,
+      defaultPet.evoVal,
+      defaultPet.cleanVal,
+      defaultPet.battles,
+      defaultPet.winRatio,
+      defaultPet.status,
+      defaultPet.nextEvolutionTime,
+      defaultPet.lastUpdated
+    ]);
+    pet = defaultPet;
+  } else {
+    var petVals = dataSheet.getRange(dataRowIdx, 1, 1, 13).getValues()[0];
+    pet = {
+      sheetName: petVals[0],
+      name: petVals[1],
+      petId: petVals[2],
+      level: Number(petVals[3]) || 1,
+      hp: Number(petVals[4]) || 0,
+      xp: Number(petVals[5]) || 0,
+      evoVal: Number(petVals[6]) || 0,
+      cleanVal: Number(petVals[7]) || 0,
+      battles: Number(petVals[8]) || 0,
+      winRatio: Number(petVals[9]) || 0,
+      status: petVals[10],
+      nextEvolutionTime: Number(petVals[11]) || 0,
+      lastUpdated: Number(petVals[12]) || Date.now()
+    };
+  }
+  
+  // 4. 處理跨天扣血與狀態更新
+  if (storeName) {
+    processTimeElapseHPRecoveryAndDamage(sheetName, storeName, pet, finalCon);
+  }
+  
+  return {
+    status: 'success',
+    mCoins: coins,
+    baseAttributes: { STR: baseStr, CON: baseCon, INT: baseIntel, PER: basePer },
+    attributes: { STR: finalStr, CON: finalCon, INT: finalIntel, PER: finalPer },
+    pet: pet,
+    inventory: inventory
+  };
+}
+
+// 購買道具
+function handleBuyStoreItem(sheetName, itemId) {
+  if (!sheetName || !itemId) return { status: 'error', message: '缺少同仁姓名或道具ID' };
+  
+  var item = STORE_ITEMS[itemId];
+  if (!item) return { status: 'error', message: '找不到該道具配置' };
+  
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var attrSheet = ss.getSheetByName(SHEET_PET_ATTRIBUTES);
+  var invSheet = ss.getSheetByName(SHEET_PET_INVENTORY);
+  
+  var attrRowIdx = findRowInSheet(attrSheet, 1, sheetName);
+  if (attrRowIdx === -1) {
+    return { status: 'error', message: '找不到該同仁的屬性資料' };
+  }
+  
+  var coins = Number(attrSheet.getRange(attrRowIdx, 6).getValue()) || 0;
+  if (coins < item.price) {
+    return { status: 'error', message: 'M幣不足，無法購買此道具' };
+  }
+  
+  var newCoins = coins - item.price;
+  attrSheet.getRange(attrRowIdx, 6).setValue(newCoins);
+  
+  var invRowIdx = -1;
+  var invData = invSheet.getDataRange().getValues();
+  for (var i = 1; i < invData.length; i++) {
+    if (invData[i][0] === sheetName && invData[i][1] === itemId) {
+      invRowIdx = i + 1;
+      break;
+    }
+  }
+  
+  if (invRowIdx === -1) {
+    invSheet.appendRow([sheetName, itemId, 1, '否']);
+  } else {
+    var count = Number(invSheet.getRange(invRowIdx, 3).getValue()) || 0;
+    invSheet.getRange(invRowIdx, 3).setValue(count + 1);
+  }
+  
+  handleWriteLog(
+    sheetName,
+    'STAFF',
+    '購買道具',
+    '數位寵物',
+    '同仁: ' + sheetName + ' 購買了 ' + item.name + '，扣除 M幣: ' + item.price
+  );
+  
+  return handleGetPetStats(sheetName);
+}
+
+// 使用背包道具
+function handleUseInventoryItem(sheetName, itemId, isEquipAction) {
+  if (!sheetName || !itemId) return { status: 'error', message: '缺少同仁姓名或道具ID' };
+  
+  var item = STORE_ITEMS[itemId];
+  if (!item) return { status: 'error', message: '找不到該道具配置' };
+  
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var invSheet = ss.getSheetByName(SHEET_PET_INVENTORY);
+  var dataSheet = ss.getSheetByName(SHEET_PET_DATA);
+  
+  var invRowIdx = -1;
+  var invData = invSheet.getDataRange().getValues();
+  for (var i = 1; i < invData.length; i++) {
+    if (invData[i][0] === sheetName && invData[i][1] === itemId) {
+      invRowIdx = i + 1;
+      break;
+    }
+  }
+  
+  if (invRowIdx === -1) {
+    return { status: 'error', message: '背包中無此道具' };
+  }
+  
+  var count = Number(invSheet.getRange(invRowIdx, 3).getValue()) || 0;
+  if (count <= 0) {
+    return { status: 'error', message: '道具數量不足' };
+  }
+  
+  if (item.type === 'consumable') {
+    invSheet.getRange(invRowIdx, 3).setValue(count - 1);
+    
+    var petRowIdx = findRowInSheet(dataSheet, 1, sheetName);
+    if (petRowIdx === -1) {
+      return { status: 'error', message: '找不到寵物資料' };
+    }
+    var petVals = dataSheet.getRange(petRowIdx, 1, 1, 13).getValues()[0];
+    var hp = Number(petVals[4]) || 0;
+    var cleanVal = Number(petVals[7]) || 0;
+    var nextEvolutionTime = Number(petVals[11]) || 0;
+    
+    var effectMsg = "";
+    if (item.effect.hp) {
+      var heal = item.effect.hp;
+      hp = Math.min(100, hp + heal);
+      dataSheet.getRange(petRowIdx, 5).setValue(hp);
+      effectMsg = "回復 HP: " + heal;
+    }
+    
+    if (item.effect.cleanse) {
+      hp = Math.min(100, hp + 50);
+      cleanVal = 100;
+      dataSheet.getRange(petRowIdx, 5).setValue(hp);
+      dataSheet.getRange(petRowIdx, 8).setValue(cleanVal);
+      effectMsg = "使用奧客去去噴霧，回復 HP 50，且淨化值已補滿";
+    }
+    
+    if (item.effect.clean_val) {
+      var cleanAdd = item.effect.clean_val;
+      cleanVal = Math.min(100, cleanVal + cleanAdd);
+      dataSheet.getRange(petRowIdx, 8).setValue(cleanVal);
+      effectMsg = "回復淨化值: " + cleanAdd;
+    }
+    
+    if (item.effect.evo_time_reduce) {
+      var reduce = item.effect.evo_time_reduce;
+      nextEvolutionTime = Math.max(Date.now(), nextEvolutionTime - reduce);
+      dataSheet.getRange(petRowIdx, 12).setValue(nextEvolutionTime);
+      effectMsg = "進化倒數縮短了 " + (reduce / (3600 * 1000)) + " 小時";
+    }
+    
+    dataSheet.getRange(petRowIdx, 13).setValue(Date.now());
+    
+    handleWriteLog(
+      sheetName,
+      'STAFF',
+      '使用道具',
+      '數位寵物',
+      '同仁: ' + sheetName + ' 使用了 ' + item.name + '。效果: ' + effectMsg
+    );
+  } else if (item.type === 'equip') {
+    var isEquip = isEquipAction === true || isEquipAction === 'true';
+    invSheet.getRange(invRowIdx, 4).setValue(isEquip ? '是' : '否');
+    
+    handleWriteLog(
+      sheetName,
+      'STAFF',
+      isEquip ? '穿戴裝備' : '卸下裝備',
+      '數位寵物',
+      '同仁: ' + sheetName + (isEquip ? ' 穿戴了 ' : ' 卸下了 ') + item.name
+    );
+  }
+  
+  return handleGetPetStats(sheetName);
+}
+
+// 判定進化
+function handleCheckPetEvolution(sheetName) {
+  if (!sheetName) return { status: 'error', message: '缺少同仁姓名' };
+  
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var dataSheet = ss.getSheetByName(SHEET_PET_DATA);
+  var attrSheet = ss.getSheetByName(SHEET_PET_ATTRIBUTES);
+  
+  var petRowIdx = findRowInSheet(dataSheet, 1, sheetName);
+  if (petRowIdx === -1) {
+    return { status: 'error', message: '找不到寵物資料' };
+  }
+  
+  var petVals = dataSheet.getRange(petRowIdx, 1, 1, 13).getValues()[0];
+  var pet = {
+    sheetName: petVals[0],
+    name: petVals[1],
+    petId: petVals[2],
+    level: Number(petVals[3]) || 1,
+    hp: Number(petVals[4]) || 0,
+    xp: Number(petVals[5]) || 0,
+    evoVal: Number(petVals[6]) || 0,
+    cleanVal: Number(petVals[7]) || 0,
+    battles: Number(petVals[8]) || 0,
+    winRatio: Number(petVals[9]) || 0,
+    status: petVals[10],
+    nextEvolutionTime: Number(petVals[11]) || 0,
+    lastUpdated: Number(petVals[12]) || Date.now()
+  };
+  
+  if (pet.hp <= 0) {
+    return { status: 'error', message: '寵物正處於受傷瀕死狀態，無法進化，請先使用藥水治療！' };
+  }
+  
+  if (Date.now() < pet.nextEvolutionTime) {
+    var hoursLeft = ((pet.nextEvolutionTime - Date.now()) / (3600 * 1000)).toFixed(1);
+    return { status: 'error', message: '進化能量蓄積中，還需要 ' + hoursLeft + ' 小時。' };
+  }
+  
+  var attrRowIdx = findRowInSheet(attrSheet, 1, sheetName);
+  var str = 10, con = 10, intel = 10, per = 10;
+  if (attrRowIdx !== -1) {
+    var attrVals = attrSheet.getRange(attrRowIdx, 1, 1, 6).getValues()[0];
+    str = Number(attrVals[1]) || 10;
+    con = Number(attrVals[2]) || 10;
+    intel = Number(attrVals[3]) || 10;
+    per = Number(attrVals[4]) || 10;
+  }
+  
+  var maxAttrVal = Math.max(str, con, intel, per);
+  var chosenAttribute = "Integrator";
+  if (maxAttrVal === str) chosenAttribute = "Driver";
+  else if (maxAttrVal === con) chosenAttribute = "Guardian";
+  else if (maxAttrVal === per) chosenAttribute = "Pioneer";
+  
+  var nextLevel = pet.level + 1;
+  var newPetId = "";
+  var newName = "";
+  var evoTimeAdd = 24 * 3600 * 1000;
+  
+  if (pet.level === 1) {
+    newPetId = "baby_01";
+    newName = "萌芽獸";
+    evoTimeAdd = 3 * 3600 * 1000;
+    
+    // 依據蛋的 ID，在孵化時給予對應的基礎屬性 +5 天賦加值
+    if (attrRowIdx !== -1) {
+      if (pet.petId === "egg_driver") attrSheet.getRange(attrRowIdx, 2).setValue(str + 5);
+      else if (pet.petId === "egg_guardian") attrSheet.getRange(attrRowIdx, 3).setValue(con + 5);
+      else if (pet.petId === "egg_integrator") attrSheet.getRange(attrRowIdx, 4).setValue(intel + 5);
+      else if (pet.petId === "egg_pioneer") attrSheet.getRange(attrRowIdx, 5).setValue(per + 5);
+    }
+  } else if (pet.level === 2) {
+    newPetId = "baby_02";
+    newName = "幼生獸";
+    evoTimeAdd = 16 * 3600 * 1000;
+  } else if (pet.level === 3) {
+    if (chosenAttribute === "Driver") { newPetId = "rookie_driver"; newName = "小鋼鐵獸"; }
+    else if (chosenAttribute === "Guardian") { newPetId = "rookie_guardian"; newName = "小石盾獸"; }
+    else if (chosenAttribute === "Pioneer") { newPetId = "rookie_pioneer"; newName = "小火焰獸"; }
+    else { newPetId = "rookie_integrator"; newName = "小水靈獸"; }
+    evoTimeAdd = 24 * 3600 * 1000;
+  } else if (pet.level === 4) {
+    if (chosenAttribute === "Driver") { newPetId = "adult_driver"; newName = "鋼鐵加魯魯獸"; }
+    else if (chosenAttribute === "Guardian") { newPetId = "adult_guardian"; newName = "黃金巨盾獸"; }
+    else if (chosenAttribute === "Pioneer") { newPetId = "adult_pioneer"; newName = "烈火獸"; }
+    else { newPetId = "adult_integrator"; newName = "聖水天音獸"; }
+    evoTimeAdd = 24 * 3600 * 1000;
+  } else if (pet.level === 5) {
+    if (chosenAttribute === "Driver") { newPetId = "perfect_driver"; newName = "戰鬥鋼鐵加魯魯"; }
+    else if (chosenAttribute === "Guardian") { newPetId = "perfect_guardian"; newName = "要塞守護神獸"; }
+    else if (chosenAttribute === "Pioneer") { newPetId = "perfect_pioneer"; newName = "超究極火神獸"; }
+    else { newPetId = "perfect_integrator"; newName = "天界大天使獸"; }
+    evoTimeAdd = 24 * 3600 * 1000;
+  } else if (pet.level === 6) {
+    if (chosenAttribute === "Driver") { newPetId = "ultimate_driver"; newName = "帝皇龍甲獸"; }
+    else if (chosenAttribute === "Guardian") { newPetId = "ultimate_guardian"; newName = "奧林匹斯玄武神獸"; }
+    else if (chosenAttribute === "Pioneer") { newPetId = "ultimate_pioneer"; newName = "紅蓮騎士獸"; }
+    else { newPetId = "ultimate_integrator"; newName = "奧米加協同神獸"; }
+    evoTimeAdd = 0;
+  } else {
+    return { status: 'error', message: '寵物已達究極體最高階，無法再進化！' };
+  }
+  
+  var newEvoVal = (pet.level <= 2) ? pet.evoVal : 0;
+  var newBattles = 0;
+  var newWinRatio = 0;
+  var newStatus = "正常";
+  var newNextEvolutionTime = evoTimeAdd > 0 ? (Date.now() + evoTimeAdd) : 0;
+  
+  dataSheet.getRange(petRowIdx, 2).setValue(newName);
+  dataSheet.getRange(petRowIdx, 3).setValue(newPetId);
+  dataSheet.getRange(petRowIdx, 4).setValue(nextLevel);
+  dataSheet.getRange(petRowIdx, 6).setValue(0);
+  dataSheet.getRange(petRowIdx, 7).setValue(newEvoVal);
+  dataSheet.getRange(petRowIdx, 9).setValue(newBattles);
+  dataSheet.getRange(petRowIdx, 10).setValue(newWinRatio);
+  dataSheet.getRange(petRowIdx, 11).setValue(newStatus);
+  dataSheet.getRange(petRowIdx, 12).setValue(newNextEvolutionTime);
+  dataSheet.getRange(petRowIdx, 13).setValue(Date.now());
+  
+  if (attrRowIdx !== -1) {
+    attrSheet.getRange(attrRowIdx, 2).setValue(str + 5);
+    attrSheet.getRange(attrRowIdx, 3).setValue(con + 5);
+    attrSheet.getRange(attrRowIdx, 4).setValue(intel + 5);
+    attrSheet.getRange(attrRowIdx, 5).setValue(per + 5);
+  }
+  
+  handleWriteLog(
+    sheetName,
+    'STAFF',
+    '寵物進化',
+    '數位寵物',
+    '同仁: ' + sheetName + ' 的寵物進化為 Stage ' + nextLevel + ' : ' + newName + ' (屬性傾向: ' + chosenAttribute + ')'
+  );
+  
+  return handleGetPetStats(sheetName);
+}
+
+// 改名系統：讓同仁可以自訂寵物暱稱
+function handleRenamePet(sheetName, newName) {
+  if (!sheetName) return { status: 'error', message: '缺少同仁姓名' };
+  if (!newName || newName.trim() === '') return { status: 'error', message: '名字不能為空' };
+  
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var dataSheet = ss.getSheetByName(SHEET_PET_DATA);
+  if (!dataSheet) {
+    ensureSheetsExist();
+    dataSheet = ss.getSheetByName(SHEET_PET_DATA);
+  }
+  
+  var dataRowIdx = findRowInSheet(dataSheet, 1, sheetName);
+  if (dataRowIdx === -1) {
+    return { status: 'error', message: '找不到寵物資料，請先初始化' };
+  }
+  
+  try {
+    dataSheet.getRange(dataRowIdx, 2).setValue(newName.trim());
+    
+    handleWriteLog(
+      sheetName,
+      'STAFF',
+      '寵物改名',
+      '數位寵物',
+      '同仁: ' + sheetName + ' 將寵物重新命名為: ' + newName.trim()
+    );
+    
+    return handleGetPetStats(sheetName);
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  }
+}
+

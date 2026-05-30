@@ -650,4 +650,380 @@ export const submitDailyPerformance = async (inputData) => {
   }
 };
 
+// ==========================================
+// 數位寵物與道具商城系統 (v2.0.0) 核心服務
+// ==========================================
+
+export const getStoreItemsConfig = () => {
+  return {
+    // 消耗品 - 藥水與盲盒 (12款)
+    'item_potion_hp_small': { id: 'item_potion_hp_small', name: "過期促銷飲料", price: 10, type: "consumable", effect: { hp: 20 }, desc: "喝了會拉肚子，但能回復 20 HP。" },
+    'item_potion_hp_medium': { id: 'item_potion_hp_medium', name: "能量維他命", price: 30, type: "consumable", effect: { hp: 50 }, desc: "門市同仁必備，快速回復 50 HP。" },
+    'item_potion_hp_large': { id: 'item_potion_hp_large', name: "店長特調心靈雞湯", price: 80, type: "consumable", effect: { hp: 100 }, desc: "喝了充滿幹勁，HP 全滿！" },
+    'item_cleanse': { id: 'item_cleanse', name: "奧客去去噴霧", price: 50, type: "consumable", effect: { cleanse: true }, desc: "解除任務扣血威脅，HP+50且淨化值滿。" },
+    'item_xp_boost': { id: 'item_xp_boost', name: "業績加成御守", price: 100, type: "consumable", effect: { xp_boost: 1.5, duration: 3600 }, desc: "1小時內業績獲得 XP 提升 50%。" },
+    'item_coin_double': { id: 'item_coin_double', name: "招財黃金貓", price: 150, type: "consumable", effect: { coin_boost: 2.0, duration: 1800 }, desc: "30分鐘內業績獲得 M幣 翻倍。" },
+    'item_blind_box_normal': { id: 'item_blind_box_normal', name: "新手盲盒", price: 40, type: "consumable", effect: { random_item: "normal" }, desc: "隨機獲得一款普通裝備或藥水。" },
+    'item_blind_box_rare': { id: 'item_blind_box_rare', name: "豪華旗艦盲盒", price: 120, type: "consumable", effect: { random_item: "rare" }, desc: "隨機獲得一款稀有或傳說裝備。" },
+    'item_toy_ball': { id: 'item_toy_ball', name: "壓力捏捏球", price: 20, type: "consumable", effect: { clean_val: 15 }, desc: "提升寵物淨化值 15 點。" },
+    'item_pet_food': { id: 'item_pet_food', name: "特盛貓罐頭", price: 25, type: "consumable", effect: { clean_val: 20 }, desc: "提升寵物淨化值 20 點。" },
+    'item_evo_stone': { id: 'item_evo_stone', name: "神秘進化石", price: 200, type: "consumable", effect: { evo_time_reduce: 12 * 3600 * 1000 }, desc: "減少進化倒數 12 小時。" },
+    'item_buff_scroll': { id: 'item_buff_scroll', name: "過期合約加速符", price: 60, type: "consumable", effect: { temp_all_stats: 5, duration: 7200 }, desc: "2小時內所有屬性 +5 點。" },
+
+    // 裝備 - 穿戴加成 (12款)
+    'item_equip_badge': { id: 'item_equip_badge', name: "德勤徽章", price: 150, type: "equip", stats: { STR: 5 }, desc: "力量 +5。象徵團隊榮譽。" },
+    'item_equip_5g': { id: 'item_equip_5g', name: "滿格 5G 天線", price: 250, type: "equip", stats: { INT: 10 }, desc: "智力 +10。連網速度極快。" },
+    'item_equip_ticket': { id: 'item_equip_ticket', name: "蘋果發表會門票", price: 400, type: "equip", stats: { PER: 15 }, desc: "感知 +15。走在科技最前端。" },
+    'item_equip_mug': { id: 'item_equip_mug', name: "保溫咖啡杯", price: 100, type: "equip", stats: { CON: 5 }, desc: "體質 +5。加班必備良伴。" },
+    'item_equip_uniform': { id: 'item_equip_uniform', name: "馬尼黃金戰甲", price: 500, type: "equip", stats: { CON: 20 }, desc: "體質 +20。防禦力極高。" },
+    'item_equip_shoes': { id: 'item_equip_shoes', name: "門市巡邏跑鞋", price: 180, type: "equip", stats: { STR: 8 }, desc: "力量 +8。穿梭店內外無阻。" },
+    'item_equip_watch': { id: 'item_equip_watch', name: "業績倒數智慧手錶", price: 300, type: "equip", stats: { PER: 12 }, desc: "感知 +12。精確掌握時間。" },
+    'item_equip_mouse': { id: 'item_equip_mouse', name: "電競發光滑鼠", price: 200, type: "equip", stats: { INT: 8 }, desc: "智力 +8。點擊結帳如有神助。" },
+    'item_equip_crown': { id: 'item_equip_crown', name: "百萬店長金冠", price: 1000, type: "equip", stats: { STR: 15, CON: 15, INT: 15, PER: 15 }, desc: "傳說級！所有屬性 +15 點。" },
+    'item_equip_key': { id: 'item_equip_key', name: "主控台神秘金鑰", price: 800, type: "equip", stats: { INT: 25 }, desc: "智力 +25。掌握系統的核心原始碼。" },
+    'item_equip_shield': { id: 'item_equip_shield', name: "奧客防護盾", price: 350, type: "equip", stats: { CON: 15 }, desc: "體質 +15。能抵擋奧客的心靈衝擊。" },
+    'item_equip_glasses': { id: 'item_equip_glasses', name: "業績透視眼鏡", price: 450, type: "equip", stats: { PER: 20 }, desc: "感知 +20。一眼看出誰是潛在客戶。" }
+  };
+};
+
+// 輔助函數：初始化本地模擬數位寵物資料
+const initLocalPetData = (sheetName) => {
+  const eggTypes = [
+    { id: "egg_driver", name: "烈焰數據卵" },
+    { id: "egg_guardian", name: "岩石數據卵" },
+    { id: "egg_pioneer", name: "閃電數據卵" },
+    { id: "egg_integrator", name: "冰霜數據卵" }
+  ];
+  const randomEgg = eggTypes[Math.floor(Math.random() * eggTypes.length)];
+  const defaultData = {
+    mCoins: 100,
+    baseAttributes: { STR: 10, CON: 10, INT: 10, PER: 10 },
+    attributes: { STR: 10, CON: 10, INT: 10, PER: 10 },
+    pet: {
+      sheetName,
+      name: randomEgg.name,
+      petId: randomEgg.id,
+      level: 1,
+      hp: 100,
+      xp: 0,
+      evoVal: 0,
+      cleanVal: 100,
+      battles: 0,
+      winRatio: 0,
+      status: "孵化中",
+      nextEvolutionTime: Date.now() + 12 * 3600 * 1000,
+      lastUpdated: Date.now()
+    },
+    inventory: []
+  };
+  localStorage.setItem(`store_mgmt_pet_${sheetName}`, JSON.stringify(defaultData));
+  return defaultData;
+};
+
+// 輔助函數：取得本地模擬數位寵物資料
+const getLocalPetData = (sheetName) => {
+  const data = localStorage.getItem(`store_mgmt_pet_${sheetName}`);
+  if (!data) return initLocalPetData(sheetName);
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return initLocalPetData(sheetName);
+  }
+};
+
+// 輔助函數：儲存本地模擬數位寵物資料
+const saveLocalPetData = (sheetName, data) => {
+  localStorage.setItem(`store_mgmt_pet_${sheetName}`, JSON.stringify(data));
+};
+
+// 取得寵物統計與背包 (含 LocalStorage 降級備援)
+export const getPetStats = async (sheetName, storeName) => {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) {
+    return { ...getLocalPetData(sheetName), source: 'LocalStorage (離線模式)' };
+  }
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'getPetStats',
+        sheetName,
+        storeName
+      })
+    });
+    const data = await response.json();
+    if (data.status === 'success') {
+      saveLocalPetData(sheetName, data);
+      return { ...data, source: 'Google Sheets' };
+    } else {
+      throw new Error(data.message || '讀取失敗');
+    }
+  } catch (error) {
+    console.warn('Google Sheets 讀取寵物資料失敗，降級使用本地模擬:', error);
+    return {
+      ...getLocalPetData(sheetName),
+      source: `LocalStorage (API 失敗: ${error.message})`
+    };
+  }
+};
+
+// 購買商城道具 (含 LocalStorage 降級備援)
+export const buyStoreItem = async (sheetName, itemId) => {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) {
+    const local = getLocalPetData(sheetName);
+    const config = getStoreItemsConfig();
+    const item = config[itemId];
+    if (!item) return { status: 'error', message: '找不到道具配置' };
+    if (local.mCoins < item.price) return { status: 'error', message: 'M幣不足，無法購買' };
+    
+    local.mCoins -= item.price;
+    const invItemIdx = local.inventory.findIndex(i => i.itemId === itemId);
+    if (invItemIdx === -1) {
+      local.inventory.push({ itemId, count: 1, isEquipped: false });
+    } else {
+      local.inventory[invItemIdx].count += 1;
+    }
+    saveLocalPetData(sheetName, local);
+    return { ...local, status: 'success', source: 'LocalStorage' };
+  }
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'buyStoreItem',
+        sheetName,
+        itemId
+      })
+    });
+    const data = await response.json();
+    if (data.status === 'success') {
+      saveLocalPetData(sheetName, data);
+      return { ...data, source: 'Google Sheets' };
+    } else {
+      throw new Error(data.message || '購買失敗');
+    }
+  } catch (error) {
+    console.error('購買道具 API 失敗，降級為本地處理:', error);
+    return { status: 'error', message: `API 失敗: ${error.message}` };
+  }
+};
+
+// 使用/穿戴道具 (含 LocalStorage 降級備援)
+export const useInventoryItem = async (sheetName, itemId, isEquipAction) => {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) {
+    const local = getLocalPetData(sheetName);
+    const config = getStoreItemsConfig();
+    const item = config[itemId];
+    if (!item) return { status: 'error', message: '找不到道具配置' };
+    
+    const invItemIdx = local.inventory.findIndex(i => i.itemId === itemId);
+    if (invItemIdx === -1 || local.inventory[invItemIdx].count <= 0) {
+      return { status: 'error', message: '背包內無此道具' };
+    }
+    
+    if (item.type === 'consumable') {
+      local.inventory[invItemIdx].count -= 1;
+      if (item.effect.hp) {
+        local.pet.hp = Math.min(100, local.pet.hp + item.effect.hp);
+      }
+      if (item.effect.cleanse) {
+        local.pet.hp = Math.min(100, local.pet.hp + 50);
+        local.pet.cleanVal = 100;
+      }
+      if (item.effect.clean_val) {
+        local.pet.cleanVal = Math.min(100, local.pet.cleanVal + item.effect.clean_val);
+      }
+      if (item.effect.evo_time_reduce) {
+        local.pet.nextEvolutionTime = Math.max(Date.now(), local.pet.nextEvolutionTime - item.effect.evo_time_reduce);
+      }
+    } else if (item.type === 'equip') {
+      local.inventory[invItemIdx].isEquipped = isEquipAction;
+      
+      const equipBuffs = { STR: 0, CON: 0, INT: 0, PER: 0 };
+      local.inventory.forEach(i => {
+        if (i.isEquipped && config[i.itemId]) {
+          const stats = config[i.itemId].stats;
+          if (stats) {
+            if (stats.STR) equipBuffs.STR += stats.STR;
+            if (stats.CON) equipBuffs.CON += stats.CON;
+            if (stats.INT) equipBuffs.INT += stats.INT;
+            if (stats.PER) equipBuffs.PER += stats.PER;
+          }
+        }
+      });
+      local.attributes.STR = local.baseAttributes.STR + equipBuffs.STR;
+      local.attributes.CON = local.baseAttributes.CON + equipBuffs.CON;
+      local.attributes.INT = local.baseAttributes.INT + equipBuffs.INT;
+      local.attributes.PER = local.baseAttributes.PER + equipBuffs.PER;
+    }
+    
+    saveLocalPetData(sheetName, local);
+    return { ...local, status: 'success', source: 'LocalStorage' };
+  }
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'useInventoryItem',
+        sheetName,
+        itemId,
+        isEquipAction
+      })
+    });
+    const data = await response.json();
+    if (data.status === 'success') {
+      saveLocalPetData(sheetName, data);
+      return { ...data, source: 'Google Sheets' };
+    } else {
+      throw new Error(data.message || '使用失敗');
+    }
+  } catch (error) {
+    console.error('使用道具 API 失敗，降級為本地處理:', error);
+    return { status: 'error', message: `API 失敗: ${error.message}` };
+  }
+};
+
+// 判定寵物進化 (含 LocalStorage 降級備援)
+export const checkPetEvolution = async (sheetName) => {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) {
+    const local = getLocalPetData(sheetName);
+    if (Date.now() < local.pet.nextEvolutionTime) {
+      return { status: 'error', message: '進化能量不足' };
+    }
+    
+    const maxVal = Math.max(local.attributes.STR, local.attributes.CON, local.attributes.INT, local.attributes.PER);
+    let chosen = "Integrator";
+    if (maxVal === local.attributes.STR) chosen = "Driver";
+    else if (maxVal === local.attributes.CON) chosen = "Guardian";
+    else if (maxVal === local.attributes.PER) chosen = "Pioneer";
+    
+    local.pet.level += 1;
+    
+    const evoTimes = [0, 3 * 3600 * 1000, 16 * 3600 * 1000, 24 * 3600 * 1000, 24 * 3600 * 1000, 24 * 3600 * 1000, 0];
+    const evoTimeAdd = evoTimes[local.pet.level - 1] || 0;
+    
+    if (local.pet.level === 2) {
+      // 根據原本蛋的 ID 給予天賦屬性加成
+      if (local.pet.petId === "egg_driver") local.baseAttributes.STR += 5;
+      else if (local.pet.petId === "egg_guardian") local.baseAttributes.CON += 5;
+      else if (local.pet.petId === "egg_integrator") local.baseAttributes.INT += 5;
+      else if (local.pet.petId === "egg_pioneer") local.baseAttributes.PER += 5;
+      
+      local.attributes.STR = local.baseAttributes.STR;
+      local.attributes.CON = local.baseAttributes.CON;
+      local.attributes.INT = local.baseAttributes.INT;
+      local.attributes.PER = local.baseAttributes.PER;
+      
+      local.pet.petId = "baby_01";
+      local.pet.name = "萌芽獸";
+    } else if (local.pet.level === 3) {
+      local.pet.petId = "baby_02";
+      local.pet.name = "幼生獸";
+    } else if (local.pet.level === 4) {
+      local.pet.petId = `rookie_${chosen.toLowerCase()}`;
+      local.pet.name = chosen === "Driver" ? "小鋼鐵獸" : chosen === "Guardian" ? "小石盾獸" : chosen === "Pioneer" ? "小火焰獸" : "小水靈獸";
+    } else if (local.pet.level === 5) {
+      local.pet.petId = `adult_${chosen.toLowerCase()}`;
+      local.pet.name = chosen === "Driver" ? "鋼鐵加魯魯獸" : chosen === "Guardian" ? "黃金巨盾獸" : chosen === "Pioneer" ? "烈火獸" : "聖水天音獸";
+    } else if (local.pet.level === 6) {
+      local.pet.petId = `perfect_${chosen.toLowerCase()}`;
+      local.pet.name = chosen === "Driver" ? "戰鬥鋼鐵加魯魯" : chosen === "Guardian" ? "要塞守護神獸" : chosen === "Pioneer" ? "超究極火神獸" : "天界大天使獸";
+    } else if (local.pet.level === 7) {
+      local.pet.petId = `ultimate_${chosen.toLowerCase()}`;
+      local.pet.name = chosen === "Driver" ? "帝皇龍甲獸" : chosen === "Guardian" ? "奧林匹斯玄武神獸" : chosen === "Pioneer" ? "紅蓮騎士獸" : "奧米加協同神獸";
+    }
+    
+    local.pet.nextEvolutionTime = evoTimeAdd > 0 ? (Date.now() + evoTimeAdd) : 0;
+    local.pet.xp = 0;
+    local.pet.evoVal = 0;
+    local.pet.battles = 0;
+    local.pet.winRatio = 0;
+    local.pet.lastUpdated = Date.now();
+    
+    local.baseAttributes.STR += 5;
+    local.baseAttributes.CON += 5;
+    local.baseAttributes.INT += 5;
+    local.baseAttributes.PER += 5;
+    
+    local.attributes.STR = local.baseAttributes.STR;
+    local.attributes.CON = local.baseAttributes.CON;
+    local.attributes.INT = local.baseAttributes.INT;
+    local.attributes.PER = local.baseAttributes.PER;
+    
+    saveLocalPetData(sheetName, local);
+    return { ...local, status: 'success', source: 'LocalStorage' };
+  }
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'checkPetEvolution',
+        sheetName
+      })
+    });
+    const data = await response.json();
+    if (data.status === 'success') {
+      saveLocalPetData(sheetName, data);
+      return { ...data, source: 'Google Sheets' };
+    } else {
+      throw new Error(data.message || '進化判定失敗');
+    }
+  } catch (error) {
+    console.error('寵物進化 API 失敗，降級為本地處理:', error);
+    return { status: 'error', message: `API 失敗: ${error.message}` };
+  }
+};
+
+// 寵物改名 (自訂暱稱，含 LocalStorage 降級備援)
+export const renamePet = async (sheetName, newName) => {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) {
+    const local = getLocalPetData(sheetName);
+    local.pet.name = newName.trim();
+    saveLocalPetData(sheetName, local);
+    return { ...local, status: 'success', source: 'LocalStorage' };
+  }
+  
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'renamePet',
+        sheetName,
+        newName
+      })
+    });
+    const data = await response.json();
+    if (data.status === 'success') {
+      saveLocalPetData(sheetName, data);
+      return { ...data, source: 'Google Sheets' };
+    } else {
+      throw new Error(data.message || '改名失敗');
+    }
+  } catch (error) {
+    console.warn('改名 API 失敗，降級為本地處理:', error);
+    const local = getLocalPetData(sheetName);
+    local.pet.name = newName.trim();
+    saveLocalPetData(sheetName, local);
+    return { ...local, status: 'success', source: `LocalStorage (API 失敗: ${error.message})` };
+  }
+};
+
 
