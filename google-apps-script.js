@@ -1733,15 +1733,38 @@ function archiveOldLogs() {
   }
 }
 
-// 取得業績子資料夾 (依據 YYYYMM，例如 "202605")
+// 取得業績子資料夾 (支援精準匹配、模糊匹配，若皆無則回傳母資料夾本身作為 Fallback)
 function getPerformanceFolder(parentFolderId, yyyymm) {
   try {
     var parentFolder = DriveApp.getFolderById(parentFolderId);
+    
+    // 1. 嘗試精準匹配 (例如 "202605")
     var folders = parentFolder.getFoldersByName(yyyymm);
     if (folders.hasNext()) {
       return folders.next();
     }
-    return null;
+    
+    // 2. 模糊匹配 (支援 "2026-05"、"2026_05"、"2026.05"、"2026年5月" 等常見命名)
+    var yyyy = yyyymm.substring(0, 4);
+    var mm = yyyymm.substring(4, 6);
+    var m = parseInt(mm).toString(); // 例如 "05" 轉為 "5"
+    
+    var allFolders = parentFolder.getFolders();
+    while (allFolders.hasNext()) {
+      var folder = allFolders.next();
+      var name = folder.getName();
+      if (name.indexOf(yyyy) !== -1) {
+        if (name.indexOf(mm) !== -1 || 
+            name.indexOf(m) !== -1 || 
+            name.indexOf(yyyy + "-" + mm) !== -1 || 
+            name.indexOf(yyyy + "年" + m + "月") !== -1) {
+          return folder;
+        }
+      }
+    }
+    
+    // 3. Fallback 安全網：若無匹配的月份資料夾，直接使用母資料夾本身
+    return parentFolder;
   } catch (e) {
     Logger.log("取得資料夾失敗: " + e.toString());
     return null;
@@ -2030,5 +2053,40 @@ function handleSubmitDailyPerformance(input) {
     return { status: 'success', message: '業績登錄成功！' };
   } catch (error) {
     return { status: 'error', message: '業績登錄失敗: ' + error.toString() };
+  }
+}
+
+// 偵錯輔助函數：供使用者於 Apps Script 編輯器中手動執行，以列出並排查資料夾與檔案名稱
+function debugListFolder() {
+  var parentFolderId = "1WmUILJGUrlFWEUtaADutSluVShQq8dxg";
+  try {
+    var parentFolder = DriveApp.getFolderById(parentFolderId);
+    Logger.log("=== [1] 母資料夾名稱: " + parentFolder.getName() + " ===");
+    
+    Logger.log("=== [2] 母資料夾下的子資料夾列表 ===");
+    var subfolders = parentFolder.getFolders();
+    var hasSub = false;
+    while (subfolders.hasNext()) {
+      hasSub = true;
+      var sub = subfolders.next();
+      Logger.log("資料夾名稱: " + sub.getName() + " | ID: " + sub.getId());
+    }
+    if (!hasSub) {
+      Logger.log("(此母資料夾下無子資料夾)");
+    }
+    
+    Logger.log("=== [3] 母資料夾下直接存放的檔案列表 ===");
+    var files = parentFolder.getFiles();
+    var hasFiles = false;
+    while (files.hasNext()) {
+      hasFiles = true;
+      var file = files.next();
+      Logger.log("檔案名稱: " + file.getName() + " | ID: " + file.getId() + " | 類型: " + file.getMimeType());
+    }
+    if (!hasFiles) {
+      Logger.log("(此母資料夾下無直接存放的檔案)");
+    }
+  } catch (e) {
+    Logger.log("發生錯誤: " + e.toString());
   }
 }
