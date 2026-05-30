@@ -3,7 +3,7 @@ import {
   TrendingUp, Award, Calendar, Coins, Smartphone, 
   Users as UsersIcon, ShieldCheck, HelpCircle, BarChart3, 
   Plus, RefreshCw, AlertCircle, ChevronRight, Sparkles, 
-  Target, Info, Flame, Heart, Star, Award as AwardIcon
+  Target, Info, Flame, Heart, Star, Gift, Loader2
 } from 'lucide-react';
 import { getStorePerformance } from '../services/googleSheetsService';
 import { USERS } from '../mockData';
@@ -140,7 +140,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
     }
   };
 
-  // 3. 計算動態今日日需求 (剩餘目標/剩餘天數)
+  // 3. 計算動態今日日需
   const calculateDailyRequirement = (target, accumulated) => {
     const remainingTarget = target - accumulated;
     if (remainingTarget <= 0) return '已達標 🎉';
@@ -149,13 +149,42 @@ export default function PerformanceBoard({ currentUser, stores }) {
     return req.toLocaleString();
   };
 
-  // 生成 SVG 趨勢折線圖
+  // 動態讀取日數據數值，支援新舊鍵向下相容
+  const getDailyValue = (dayData, keyName) => {
+    if (!dayData) return 0;
+    const oldKeysMap = {
+      grossProfit: "毛利",
+      accessories: "配件營收",
+      insurance: "保險營收",
+      subscription: "門號",
+      customerCount: "來客數"
+    };
+    
+    if (dayData[keyName] !== undefined) {
+      return Number(dayData[keyName]) || 0;
+    }
+    
+    const altKey = oldKeysMap[keyName];
+    if (altKey && dayData[altKey] !== undefined) {
+      return Number(dayData[altKey]) || 0;
+    }
+    
+    for (const k in oldKeysMap) {
+      if (oldKeysMap[k] === keyName && dayData[k] !== undefined) {
+        return Number(dayData[k]) || 0;
+      }
+    }
+    
+    return 0;
+  };
+
+  // 生成 SVG 折線圖
   const renderLineChart = (dailyList, keyName, color = '#f43f5e') => {
     if (!dailyList || dailyList.length === 0) return null;
     
-    // 過濾有值的資料
-    const validData = dailyList.filter(d => d[keyName] > 0 || d.day <= new Date().getDate());
-    const allZero = validData.every(d => d[keyName] === 0);
+    // 過濾有值的資料，動態相容新舊金鑰
+    const validData = dailyList.filter(d => getDailyValue(d, keyName) > 0 || d.day <= new Date().getDate());
+    const allZero = validData.every(d => getDailyValue(d, keyName) === 0);
 
     if (allZero) {
       return (
@@ -166,7 +195,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
       );
     }
 
-    const maxVal = Math.max(...validData.map(d => d[keyName] || 0), 100);
+    const maxVal = Math.max(...validData.map(d => getDailyValue(d, keyName)), 100);
     const minVal = 0;
     const range = maxVal - minVal;
 
@@ -176,8 +205,8 @@ export default function PerformanceBoard({ currentUser, stores }) {
 
     const points = validData.map((d, idx) => {
       const x = padding + (idx / (validData.length - 1 || 1)) * (width - padding * 2);
-      const y = height - padding - (((d[keyName] || 0) - minVal) / range) * (height - padding * 2);
-      return { x, y, day: d.day, val: d[keyName] || 0 };
+      const y = height - padding - ((getDailyValue(d, keyName) - minVal) / range) * (height - padding * 2);
+      return { x, y, day: d.day, val: getDailyValue(d, keyName) };
     });
 
     const pathD = points.reduce((acc, p, idx) => {
