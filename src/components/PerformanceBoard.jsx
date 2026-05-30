@@ -17,6 +17,8 @@ export default function PerformanceBoard({ currentUser, stores }) {
 
   // 當前選中的項目大類 Tab ('finance', 'hardware', 'wearable', 'accessory', 'social', 'health')
   const [activeTab, setActiveTab] = useState('finance');
+  // 雙層導覽狀態：null 為總覽入口，'finance'...'health' 為專屬子分頁
+  const [currentSubPage, setCurrentSubPage] = useState(null);
 
   // 門市列表與編號對照
   const STORE_CODE_MAP = {
@@ -103,7 +105,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
     return currentUser?.sheetName || currentUser?.name || selectedStore;
   });
 
-  // 當分店改變時，重置人員選擇
+  // 當分店改變時，重置人員選擇與子分頁
   useEffect(() => {
     const isManager = currentUser && (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR' || currentUser.role === 'STORE_MANAGER');
     if (isManager) {
@@ -111,6 +113,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
     } else {
       setSelectedSheetName(currentUser?.sheetName || currentUser?.name || selectedStore);
     }
+    setCurrentSubPage(null);
   }, [selectedStore, currentUser]);
 
   const loadPerf = async () => {
@@ -134,6 +137,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
 
   useEffect(() => {
     loadPerf();
+    setCurrentSubPage(null);
   }, [selectedStore, selectedSheetName]);
 
   // 1. 動態計算當前時間進度 % 
@@ -372,6 +376,24 @@ export default function PerformanceBoard({ currentUser, stores }) {
     getCoreMetricState('配件營收', '⚡ 當月配件實績')
   ];
 
+  // 取得各大類的整體平均達成率
+  const getCategoryAvgProgress = (keys, tabId) => {
+    if (!summary || Object.keys(summary).length === 0) return 0;
+    let totalRate = 0;
+    let count = 0;
+    keys.forEach(k => {
+      const metric = summary[k];
+      if (metric) {
+        // 體質指標分類的值直接是累計百分比，如 "85%" -> 85
+        const rateStr = tabId === 'health' ? metric.accumulated : metric.currentAchievement || '0%';
+        const rate = parseFloat(rateStr) || 0;
+        totalRate += rate;
+        count++;
+      }
+    });
+    return count > 0 ? Math.round(totalRate / count) : 0;
+  };
+
   return (
     <div className="flex-1 flex flex-col pb-24 overflow-y-auto no-scrollbar bg-[#f8fafc] font-['Outfit',_'Inter',_sans-serif]">
       {/* 頂部發光導航列 */}
@@ -570,123 +592,232 @@ export default function PerformanceBoard({ currentUser, stores }) {
               })}
             </div>
 
-            {/* 3. 24 指標分類 Tab 頁籤 */}
-            <div className="bg-white rounded-[32px] p-2.5 shadow-sm border border-slate-100 flex items-center justify-between overflow-x-auto gap-1.5 no-scrollbar sticky top-[68px] z-10 shrink-0">
-              {Object.keys(TABS_CONFIG).map((tabId) => {
-                const tab = TABS_CONFIG[tabId];
-                const isActive = activeTab === tabId;
-                return (
+            {/* 3. 六大高質感項目大類入口卡片 (Grid Layout) */}
+            {currentSubPage === null ? (
+              <div className="space-y-4 pt-1">
+                <div className="flex items-center space-x-1.5 px-1">
+                  <div className="w-1.5 h-4 bg-rose-500 rounded-full"></div>
+                  <h3 className="text-xs font-black text-slate-800 tracking-wide">
+                    六大核心營運戰情室
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {Object.keys(TABS_CONFIG).map((tabId) => {
+                    const tab = TABS_CONFIG[tabId];
+                    const avgProgress = getCategoryAvgProgress(tab.keys, tabId);
+                    const status = getStatusLight(avgProgress + '%');
+                    
+                    // 精美漸層配色設定
+                    const colors = {
+                      finance: 'from-amber-500 to-orange-600 shadow-orange-500/10 hover:shadow-orange-500/25',
+                      hardware: 'from-blue-500 to-indigo-600 shadow-blue-500/10 hover:shadow-blue-500/25',
+                      wearable: 'from-purple-500 to-fuchsia-600 shadow-purple-500/10 hover:shadow-purple-500/25',
+                      accessory: 'from-emerald-500 to-teal-600 shadow-emerald-500/10 hover:shadow-emerald-500/25',
+                      social: 'from-rose-500 to-pink-600 shadow-rose-500/10 hover:shadow-rose-500/25',
+                      health: 'from-teal-600 to-cyan-700 shadow-teal-600/10 hover:shadow-teal-600/25'
+                    }[tabId] || 'from-slate-500 to-slate-600';
+
+                    return (
+                      <button
+                        key={tabId}
+                        onClick={() => setCurrentSubPage(tabId)}
+                        className={`w-full text-left rounded-[32px] p-6 text-white bg-gradient-to-br ${colors} border border-white/10 hover:-translate-y-1.5 active:scale-98 transition-all duration-300 relative overflow-hidden group shadow-lg flex flex-col justify-between min-h-[148px]`}
+                      >
+                        {/* 背景微光裝飾 */}
+                        <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/5 blur-xl group-hover:scale-125 transition-transform duration-500"></div>
+                        
+                        <div className="w-full flex justify-between items-start z-10">
+                          <div className="flex items-center space-x-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white">
+                              {tab.icon}
+                            </div>
+                            <span className="text-xs font-black tracking-wide">{tab.title}</span>
+                          </div>
+                          
+                          {/* 進度大字與狀態燈 */}
+                          <div className="flex items-center space-x-1.5">
+                            <span className="text-lg font-black font-mono">{avgProgress}%</span>
+                            <span 
+                              className={`w-2 h-2 rounded-full border border-white/20 ${
+                                status.light === 'green' ? 'bg-emerald-400' : status.light === 'yellow' ? 'bg-amber-300' : 'bg-rose-400'
+                              } animate-pulse`}
+                            />
+                          </div>
+                        </div>
+
+                        {/* 中段進度條 */}
+                        <div className="w-full mt-4 z-10">
+                          <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-white rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(avgProgress, 100)}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between items-center text-[7.5px] text-white/80 font-bold mt-1.5">
+                            <span>整體進度</span>
+                            <span>{status.text}</span>
+                          </div>
+                        </div>
+
+                        {/* 底部指標清單 */}
+                        <div className="w-full mt-3.5 pt-2.5 border-t border-white/10 flex items-center justify-between z-10">
+                          <span className="text-[7.5px] text-white/70 truncate max-w-[85%] font-bold">
+                            包含: {tab.keys.map(k => k.replace('\n', '')).join('、')}
+                          </span>
+                          <ChevronRight size={12} className="text-white/70 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* 返回總覽導航列 */}
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
                   <button
-                    key={tabId}
-                    onClick={() => setActiveTab(tabId)}
-                    className={`flex items-center space-x-1 px-3 py-2 text-[10px] font-black rounded-2xl transition-all border-none shrink-0 ${
-                      isActive 
-                        ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20 active:scale-95' 
-                        : 'bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100/70'
-                    }`}
+                    onClick={() => setCurrentSubPage(null)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-150 text-slate-700 font-extrabold text-[10px] active:scale-95 transition-all border-none"
                   >
-                    {tab.icon}
-                    <span>{tab.title}</span>
+                    ← 返回業績總覽
                   </button>
-                );
-              })}
-            </div>
+                  <span className="text-[10px] font-black text-slate-500 flex items-center gap-1.5">
+                    {TABS_CONFIG[currentSubPage].title} 專屬戰情室
+                  </span>
+                </div>
 
-            {/* 4. Tab 內容卡片 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 animate-fade-in">
-              {TABS_CONFIG[activeTab].keys.map((key) => {
-                const metric = summary[key] || { target: 0, accumulated: 0, achievement: '0%', currentAchievement: '0%' };
-                const isHealthTab = activeTab === 'health';
-                
-                // 計算狀態與燈號 (體質分頁與一般指標分頁做不同處理)
-                const rateStr = isHealthTab ? metric.accumulated + '%' : metric.currentAchievement || '0%';
-                const status = getStatusLight(rateStr);
-                const unit = TABS_CONFIG[activeTab].units[key] || '';
-                const colorClass = TABS_CONFIG[activeTab].colors[key] || 'text-slate-600';
+                {/* 指標卡片 */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {TABS_CONFIG[currentSubPage].keys.map((key) => {
+                    const metric = summary[key] || { target: 0, accumulated: 0, achievement: '0%', currentAchievement: '0%' };
+                    const isHealthTab = currentSubPage === 'health';
+                    
+                    const rateStr = isHealthTab ? metric.accumulated + '%' : metric.currentAchievement || '0%';
+                    const status = getStatusLight(rateStr);
+                    const unit = TABS_CONFIG[currentSubPage].units[key] || '';
+                    const colorClass = TABS_CONFIG[currentSubPage].colors[key] || 'text-slate-600';
 
-                return (
-                  <div 
-                    key={key} 
-                    className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between min-h-[128px] hover:shadow-md transition-all duration-300 relative group"
-                  >
-                    {/* 指標頂部列 */}
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 group-hover:scale-105 transition-transform">
-                          <Target size={14} className={colorClass} />
+                    return (
+                      <div 
+                        key={key} 
+                        className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between min-h-[128px] hover:shadow-md transition-all duration-300 relative group"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 group-hover:scale-105 transition-transform">
+                              <Target size={14} className={colorClass} />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-black text-slate-700 leading-tight">
+                                {key.replace('\n', ' ')}
+                              </span>
+                              <span className="text-[7.5px] text-slate-400 font-bold mt-0.5">
+                                目標: {isHealthTab ? '達成標準' : Number(metric.target || 0).toLocaleString()} {unit}
+                              </span>
+                            </div>
+                          </div>
+
+                          <span 
+                            className={`w-2.5 h-2.5 rounded-full border border-white shadow-[0_0_6px_rgba(0,0,0,0.05)] ${
+                              status.light === 'green' 
+                                ? 'bg-emerald-500 shadow-emerald-500/40' 
+                                : status.light === 'yellow' 
+                                ? 'bg-amber-500 shadow-amber-500/40' 
+                                : 'bg-rose-500 shadow-rose-500/40'
+                            } animate-pulse`}
+                            title={status.text}
+                          />
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-slate-700 leading-tight">
-                            {key.replace('\n', ' ')}
-                          </span>
-                          <span className="text-[7.5px] text-slate-400 font-bold mt-0.5">
-                            目標: {isHealthTab ? '達成標準' : Number(metric.target || 0).toLocaleString()} {unit}
-                          </span>
-                        </div>
-                      </div>
 
-                      {/* 迷你呼吸燈 */}
-                      <span 
-                        className={`w-2.5 h-2.5 rounded-full border border-white shadow-[0_0_6px_rgba(0,0,0,0.05)] ${
-                          status.light === 'green' 
-                            ? 'bg-emerald-500 shadow-emerald-500/40' 
-                            : status.light === 'yellow' 
-                            ? 'bg-amber-500 shadow-amber-500/40' 
-                            : 'bg-rose-500 shadow-rose-500/40'
-                        } animate-pulse`}
-                        title={status.text}
-                      ></span>
-                    </div>
+                        <div className="mt-3 space-y-1">
+                          <div className="flex items-baseline space-x-0.5">
+                            <span className="text-xl font-black text-slate-800 font-mono tracking-tight">
+                              {isHealthTab ? (Number(metric.accumulated) || 0).toLocaleString() : Number(metric.accumulated || 0).toLocaleString()}
+                            </span>
+                            <span className="text-[8px] text-slate-400 font-bold">{unit}</span>
+                          </div>
 
-                    {/* 指標中段數值 */}
-                    <div className="mt-3 space-y-1">
-                      <div className="flex items-baseline space-x-0.5">
-                        <span className="text-xl font-black text-slate-800 font-mono tracking-tight">
-                          {isHealthTab ? (Number(metric.accumulated) || 0).toLocaleString() : Number(metric.accumulated || 0).toLocaleString()}
-                        </span>
-                        <span className="text-[8px] text-slate-400 font-bold">{unit}</span>
-                      </div>
-
-                      {/* 動態日需求量 / 達成率 */}
-                      <div className="flex justify-between items-center text-[8.5px] font-bold mt-1 text-slate-400">
-                        {isHealthTab ? (
-                          <span>燈號指標: {status.text}</span>
-                        ) : (
-                          <span>今日日需求: <strong className="text-slate-600 font-black">{calculateDailyRequirement(metric.target, metric.accumulated)}</strong></span>
-                        )}
-                        <div className="flex items-center space-x-1">
-                          <span className="text-[7.5px] text-slate-350">目前達成:</span>
-                          <span className={`font-mono font-black ${
-                            status.light === 'green' ? 'text-emerald-600' : status.light === 'yellow' ? 'text-amber-500' : 'text-rose-500'
-                          }`}>
-                            {isHealthTab ? metric.accumulated + '%' : metric.currentAchievement || '0%'}
-                          </span>
+                          <div className="flex justify-between items-center text-[8.5px] font-bold mt-1 text-slate-400">
+                            {isHealthTab ? (
+                              <span>燈號指標: {status.text}</span>
+                            ) : (
+                              <span>今日日需求: <strong className="text-slate-600 font-black">{calculateDailyRequirement(metric.target, metric.accumulated)}</strong></span>
+                            )}
+                            <div className="flex items-center space-x-1">
+                              <span className="text-[7.5px] text-slate-350">目前達成:</span>
+                              <span className={`font-mono font-black ${
+                                status.light === 'green' ? 'text-emerald-600' : status.light === 'yellow' ? 'text-amber-500' : 'text-rose-500'
+                              }`}>
+                                {isHealthTab ? metric.accumulated + '%' : metric.currentAchievement || '0%'}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
 
-            {/* 5. SVG 趨勢折線圖 (毛利 & 配件) */}
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center space-x-1.5 px-1">
-                <div className="w-1.5 h-4 bg-rose-500 rounded-full"></div>
-                <h3 className="text-xs font-black text-slate-800 tracking-wide">
-                  本月毛利日累計趨勢 (元)
-                </h3>
+                {/* 專屬趨勢折線圖 */}
+                <div className="space-y-4 pt-2">
+                  {currentSubPage === 'finance' && (
+                    <>
+                      <div className="flex items-center space-x-1.5 px-1">
+                        <div className="w-1.5 h-4 bg-rose-500 rounded-full"></div>
+                        <h3 className="text-xs font-black text-slate-800 tracking-wide">
+                          本月毛利日累計趨勢 (元)
+                        </h3>
+                      </div>
+                      {renderLineChart(perfData?.daily, 'grossProfit', '#f43f5e')}
+
+                      <div className="flex items-center space-x-1.5 px-1 pt-2">
+                        <div className="w-1.5 h-4 bg-sky-500 rounded-full"></div>
+                        <h3 className="text-xs font-black text-slate-800 tracking-wide">
+                          本月配件日累計趨勢 (元)
+                        </h3>
+                      </div>
+                      {renderLineChart(perfData?.daily, 'accessories', '#0284c7')}
+                    </>
+                  )}
+
+                  {currentSubPage === 'hardware' && (
+                    <>
+                      <div className="flex items-center space-x-1.5 px-1">
+                        <div className="w-1.5 h-4 bg-rose-500 rounded-full"></div>
+                        <h3 className="text-xs font-black text-slate-800 tracking-wide">
+                          本月蘋果手機銷量日趨勢 (台)
+                        </h3>
+                      </div>
+                      {renderLineChart(perfData?.daily, '蘋果手機', '#f43f5e')}
+                    </>
+                  )}
+
+                  {currentSubPage === 'accessory' && (
+                    <>
+                      <div className="flex items-center space-x-1.5 px-1">
+                        <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
+                        <h3 className="text-xs font-black text-slate-800 tracking-wide">
+                          本月門號日開通趨勢 (門)
+                        </h3>
+                      </div>
+                      {renderLineChart(perfData?.daily, '門號', '#10b981')}
+                    </>
+                  )}
+
+                  {currentSubPage === 'social' && (
+                    <>
+                      <div className="flex items-center space-x-1.5 px-1">
+                        <div className="w-1.5 h-4 bg-green-500 rounded-full"></div>
+                        <h3 className="text-xs font-black text-slate-800 tracking-wide">
+                          本月 Google 評論日趨勢 (個)
+                        </h3>
+                      </div>
+                      {renderLineChart(perfData?.daily, 'GOOGLE 評論', '#22c55e')}
+                    </>
+                  )}
+                </div>
               </div>
-              {renderLineChart(perfData?.daily, 'grossProfit', '#f43f5e')}
-
-              <div className="flex items-center space-x-1.5 px-1 pt-2">
-                <div className="w-1.5 h-4 bg-sky-500 rounded-full"></div>
-                <h3 className="text-xs font-black text-slate-800 tracking-wide">
-                  本月配件日累計趨勢 (元)
-                </h3>
-              </div>
-              {renderLineChart(perfData?.daily, 'accessories', '#0284c7')}
-            </div>
+            )}
           </div>
         )}
       </div>
