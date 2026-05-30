@@ -2,6 +2,16 @@ import React, { useState } from 'react';
 import { Settings as SettingsIcon, X, Key, LogOut } from 'lucide-react';
 
 export default function Settings({ currentUser, setCurrentUser, onClose, onLogout, users, onUpdateUsers }) {
+  const [avatarGroup, setAvatarGroup] = useState(() => {
+    return localStorage.getItem('manie_avatar_group') || 'random';
+  });
+
+  const handleAvatarGroupChange = (group) => {
+    setAvatarGroup(group);
+    localStorage.setItem('manie_avatar_group', group);
+    window.dispatchEvent(new Event('manie_group_changed'));
+  };
+
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -117,6 +127,36 @@ export default function Settings({ currentUser, setCurrentUser, onClose, onLogou
               儲存新密碼
             </button>
           </form>
+        </div>
+
+        {/* 吉祥物外觀設定 */}
+        <div className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100">
+          <div className="flex items-center space-x-2 text-rose-600 font-extrabold text-sm mb-4">
+            <span className="material-symbols-outlined text-[18px] text-rose-500 select-none">face</span>
+            <span>吉祥物智慧助理 (manie) 款式設定</span>
+          </div>
+
+          <div className="space-y-2">
+            {[
+              { id: 'random', title: '🎲 隨機更換 (經典 2D / 3D 公仔混搭)', desc: '每次點擊或重新載入時，將隨機呈現不同外觀樣式' },
+              { id: 'classic', title: '🌸 經典 2D 款', desc: '固定使用經典的 2D 去背小粉紅插圖款式' },
+              { id: 'figurine', title: '🧸 3D 公仔款', desc: '固定使用高質感的 3D 立體去背公仔款式' }
+            ].map(opt => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => handleAvatarGroupChange(opt.id)}
+                className={`w-full text-left p-3.5 rounded-2xl transition-all border flex flex-col gap-1 active:scale-99 ${
+                  avatarGroup === opt.id
+                    ? 'bg-rose-50/50 border-rose-200 text-rose-700 shadow-sm shadow-rose-500/5'
+                    : 'bg-white border-slate-150 hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <span className="text-xs font-black">{opt.title}</span>
+                <span className="text-[10px] text-slate-400 font-medium">{opt.desc}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* 登出當前帳號 */}

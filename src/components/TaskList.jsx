@@ -560,7 +560,7 @@ export default function TaskList({
               {/* 右側貓咪吉祥物背景 */}
               <div className="relative w-16 h-16 rounded-full bg-pink-100/50 border border-pink-200/30 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                 <div className="absolute bottom-[-8px]">
-                  <ManieIcon pose="tablet" className="w-16 h-12 scale-110" />
+                  <ManieIcon pose="tablet" group="auto" className="w-16 h-12 scale-110" />
                 </div>
               </div>
             </div>

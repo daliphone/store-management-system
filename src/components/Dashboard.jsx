@@ -267,11 +267,12 @@ export default function Dashboard({
 
   const pendingTasksCount = filteredTasks.filter(t => !t.completed).length;
 
-  // manie 點擊互動：切換金句與姿勢表情
+  // manie 點擊互動：切換金句與姿勢表情，並隨機更換 2D/3D 公仔組數
   const handleManieClick = () => {
     setIsBouncing(true);
     setTimeout(() => setIsBouncing(false), 500);
 
+    // 切換每日金句 (僅在金句頁籤生效)
     if (activeSubTab === 'quote') {
       let nextIndex = quoteIndex;
       if (SALES_QUOTES.length > 1) {
@@ -280,10 +281,17 @@ export default function Dashboard({
         }
       }
       setQuoteIndex(nextIndex);
-      
-      const poses = ['welcome', 'thinking', 'idle', 'gold'];
-      const randomPose = poses[Math.floor(Math.random() * poses.length)];
-      setManiePose(randomPose);
+    }
+    
+    // 隨機切換姿勢表情 (選用相容 3D 公仔的 1-9 號表情)
+    const poses = ['welcome', 'idle', 'sleep', 'cheer', 'gift', 'smile', 'sweat', 'fun', 'great'];
+    const randomPose = poses[Math.floor(Math.random() * poses.length)];
+    setManiePose(randomPose);
+
+    // 隨機更換組別：如果設定為 random，點擊時會拋出事件讓全站吉祥物隨機更換
+    const settingGroup = localStorage.getItem('manie_avatar_group') || 'random';
+    if (settingGroup === 'random') {
+      window.dispatchEvent(new Event('manie_group_changed'));
     }
   };
 

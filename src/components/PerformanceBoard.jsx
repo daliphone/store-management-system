@@ -24,6 +24,22 @@ export default function PerformanceBoard({ currentUser, stores }) {
   // 版面視角切換：'portal' 為卡片戰情入口，'tab' 為原本的快捷標籤頁籤模式
   const [viewMode, setViewMode] = useState('tab');
 
+  // 業績看板吉祥物點擊動態
+  const [manieClickPose, setManieClickPose] = useState(null);
+  const [isBouncing, setIsBouncing] = useState(false);
+
+  const handleManieClick = () => {
+    setIsBouncing(true);
+    setTimeout(() => setIsBouncing(false), 500);
+    const poses = ['welcome', 'idle', 'sleep', 'cheer', 'gift', 'smile', 'sweat', 'fun', 'great'];
+    const randomPose = poses[Math.floor(Math.random() * poses.length)];
+    setManieClickPose(randomPose);
+    const settingGroup = localStorage.getItem('manie_avatar_group') || 'random';
+    if (settingGroup === 'random') {
+      window.dispatchEvent(new Event('manie_group_changed'));
+    }
+  };
+
   // 門市列表與編號對照
   const STORE_CODE_MAP = {
     '2': '文賢店',
@@ -118,7 +134,36 @@ export default function PerformanceBoard({ currentUser, stores }) {
       setSelectedSheetName(currentUser?.sheetName || currentUser?.name || selectedStore);
     }
     setCurrentSubPage(null);
+    window.isPerformanceSubPageOpen = false;
   }, [selectedStore, currentUser]);
+
+  // 監聽手機端的返回鍵 (Browser Back / Gesture Back) 導覽優化
+  useEffect(() => {
+    const handlePopState = (e) => {
+      if (currentSubPage !== null) {
+        setCurrentSubPage(null);
+        window.isPerformanceSubPageOpen = false;
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [currentSubPage]);
+
+  const handleEnterSubPage = (subPageId) => {
+    setCurrentSubPage(subPageId);
+    window.isPerformanceSubPageOpen = true;
+    window.history.pushState({ isSubPage: true }, "");
+  };
+
+  const handleBackToOverview = () => {
+    setCurrentSubPage(null);
+    window.isPerformanceSubPageOpen = false;
+    if (window.history.state?.isSubPage) {
+      window.history.back();
+    }
+  };
 
   const loadPerf = async () => {
     setLoading(true);
@@ -496,6 +541,16 @@ export default function PerformanceBoard({ currentUser, stores }) {
 
     const charName = selectedSheetName === selectedStore ? `${selectedStore}冒險團` : selectedSheetName;
 
+    // 依據同仁名字的雜湊值，隨機分配 2D 經典款或 3D 立體公仔款！
+    let avatarGroup = 'classic';
+    if (charName) {
+      let hash = 0;
+      for (let i = 0; i < charName.length; i++) {
+        hash = charName.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      avatarGroup = Math.abs(hash) % 2 === 0 ? 'classic' : 'figurine';
+    }
+
     return {
       charName,
       exp,
@@ -509,7 +564,8 @@ export default function PerformanceBoard({ currentUser, stores }) {
       points,
       characterAvatar,
       diff,
-      maniePose
+      maniePose,
+      avatarGroup
     };
   };
 
@@ -526,12 +582,12 @@ export default function PerformanceBoard({ currentUser, stores }) {
           </div>
           <div>
             <h1 className="text-sm font-black text-slate-800 tracking-wide">業績與戰情看板</h1>
-            <p className="text-[8px] text-slate-400 font-extrabold">馬尼 (Money) 門市管理系統</p>
+            <p className="text-[10px] text-slate-400 font-extrabold">馬尼 (Money) 門市管理系統</p>
           </div>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-[10px] px-4 py-2 rounded-2xl active:scale-95 transition-all flex items-center gap-1.5 shadow-md shadow-rose-500/25 border-none"
+          className="bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-xs px-4 py-2 rounded-2xl active:scale-95 transition-all flex items-center gap-1.5 shadow-md shadow-rose-500/25 border-none"
         >
           <Plus size={14} />
           <span>登錄今日業績</span>
@@ -543,18 +599,24 @@ export default function PerformanceBoard({ currentUser, stores }) {
         <div className="space-y-3.5 select-none">
           {/* 上半部：Manie 互動氣泡對話框 */}
           <div className="bg-gradient-to-br from-pink-50/70 to-rose-50/70 border border-pink-100 rounded-[28px] p-4 flex items-center space-x-4 shadow-sm">
-            {/* 動態表情去背圖 */}
-            <div className="w-20 h-20 shrink-0 flex items-center justify-center relative bg-white/50 rounded-full shadow-inner border border-white/60 overflow-hidden p-1">
-              <ManieIcon pose={rpg.maniePose} className="w-16 h-16" />
+            {/* 動態表情去背圖 (支援點擊彈跳互動與款式切換) */}
+            <div 
+              onClick={handleManieClick}
+              className={`w-20 h-20 shrink-0 flex items-center justify-center relative bg-white/50 rounded-full shadow-inner border border-white/60 overflow-hidden p-1 cursor-pointer transition-all duration-300 ${
+                isBouncing ? 'scale-110 -translate-y-1' : 'hover:scale-105 active:scale-95'
+              }`}
+              title="點我互動！"
+            >
+              <ManieIcon pose={manieClickPose || rpg.maniePose} group="auto" className="w-16 h-16" />
             </div>
             
             {/* 氣泡對話框 */}
             <div className="flex-1 bg-white border border-pink-100/80 rounded-2xl p-3 shadow-inner relative min-h-[70px] flex flex-col justify-center">
               <div className="absolute left-[-6px] top-7 w-3 h-3 bg-white border-l border-b border-pink-100/80 rotate-45"></div>
-              <p className="text-[11px] text-slate-700 font-extrabold leading-relaxed">
+              <p className="text-xs text-slate-700 font-extrabold leading-relaxed">
                 {rpg.dialogText}
               </p>
-              <div className="text-[7.5px] text-slate-400 font-bold text-right mt-1.5 flex items-center justify-end gap-1">
+              <div className="text-[10px] text-slate-400 font-bold text-right mt-1.5 flex items-center justify-end gap-1">
                 <span>本月已過 {timeProgress.percent}%</span>
                 <span>·</span>
                 <span>剩餘 {timeProgress.remainingDays} 天</span>
@@ -576,16 +638,16 @@ export default function PerformanceBoard({ currentUser, stores }) {
                 <div>
                   <div className="flex items-center space-x-2">
                     <span className="text-sm font-black tracking-wide">{rpg.charName}</span>
-                    <span className="text-[8.5px] bg-white/20 px-2 py-0.5 rounded-full font-black tracking-wider border border-white/10">
+                    <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-black tracking-wider border border-white/10">
                       {rpg.titleText}
                     </span>
                   </div>
-                  <p className="text-[7.5px] text-white/70 font-bold mt-0.5">歸屬分店：{selectedStore}</p>
+                  <p className="text-[10px] text-white/70 font-bold mt-0.5">歸屬分店：{selectedStore}</p>
                 </div>
               </div>
               
               {/* 等級標籤 */}
-              <div className="bg-white text-rose-600 font-extrabold text-[10px] px-3.5 py-1 rounded-xl shadow-md border-none font-mono">
+              <div className="bg-white text-rose-600 font-extrabold text-xs px-3.5 py-1 rounded-xl shadow-md border-none font-mono">
                 Lv.{rpg.level}
               </div>
             </div>
@@ -604,23 +666,23 @@ export default function PerformanceBoard({ currentUser, stores }) {
                   title={`本月時間基線: ${timeProgress.percent}%`}
                 ></div>
               </div>
-              <div className="flex justify-between text-[8px] font-black font-mono text-white/90">
+              <div className="flex justify-between text-[10px] font-black font-mono text-white/90">
                 <span>{rpg.exp} / {rpg.nextLevelExp} 升下一級</span>
                 <span>本月毛利達成率：{grossProfitMetric.achievement}</span>
               </div>
             </div>
 
             {/* 最下方今日進度與本月點數 */}
-            <div className="mt-4 pt-3 border-t border-white/15 flex justify-between items-center text-[10px] font-black text-white/90 font-mono">
+            <div className="mt-4 pt-3 border-t border-white/15 flex justify-between items-center text-xs font-black text-white/90 font-mono">
               <div className="flex items-center space-x-1">
                 <span>今日任務進度</span>
-                <span className="bg-white/20 text-white px-2 py-0.5 rounded-md text-[8.5px] font-black">
+                <span className="bg-white/20 text-white px-2 py-0.5 rounded-md text-[10px] font-black">
                   {rpg.completedTasks} / {rpg.totalTasks}
                 </span>
               </div>
               <div className="flex items-center space-x-1">
                 <span>本月冒險積分</span>
-                <span className="bg-yellow-400 text-slate-900 px-2 py-0.5 rounded-md text-[8.5px] font-bold shadow-sm">
+                <span className="bg-yellow-400 text-slate-900 px-2 py-0.5 rounded-md text-[10px] font-bold shadow-sm">
                   {rpg.points.toLocaleString()} 點
                 </span>
               </div>
@@ -631,7 +693,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
         {/* 篩選控制器 */}
         <div className="bg-white p-4 rounded-[32px] border border-slate-100 shadow-sm space-y-3">
           <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-            <span className="text-[10px] font-black text-slate-400 flex items-center gap-1">
+            <span className="text-xs font-black text-slate-400 flex items-center gap-1">
               <Sparkles size={12} className="text-rose-500" />
               戰情維度篩選
             </span>
@@ -641,7 +703,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
                 <button
                   type="button"
                   onClick={() => setViewMode('portal')}
-                  className={`flex items-center gap-1 px-2 py-1 text-[8px] font-black rounded-lg transition-all border-none ${
+                  className={`flex items-center gap-1 px-2.5 py-1 text-xs font-black rounded-lg transition-all border-none ${
                     viewMode === 'portal'
                       ? 'bg-white shadow-sm text-slate-800'
                       : 'text-slate-400 hover:text-slate-600 bg-transparent'
@@ -653,7 +715,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
                 <button
                   type="button"
                   onClick={() => setViewMode('tab')}
-                  className={`flex items-center gap-1 px-2 py-1 text-[8px] font-black rounded-lg transition-all border-none ${
+                  className={`flex items-center gap-1 px-2.5 py-1 text-xs font-black rounded-lg transition-all border-none ${
                     viewMode === 'tab'
                       ? 'bg-white shadow-sm text-slate-800'
                       : 'text-slate-400 hover:text-slate-600 bg-transparent'
@@ -673,7 +735,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
           <div className="grid grid-cols-2 gap-3">
             {/* 分店選擇 */}
             <div>
-              <label className="block text-[8px] font-black text-slate-400 mb-1">分店</label>
+              <label className="block text-xs font-black text-slate-400 mb-1">分店</label>
               {availableStores.length > 1 ? (
                 <select
                   value={selectedStore}
@@ -693,7 +755,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
 
             {/* 人員選擇 */}
             <div>
-              <label className="block text-[8px] font-black text-slate-400 mb-1">人員/總表</label>
+              <label className="block text-xs font-black text-slate-400 mb-1">人員/總表</label>
               {currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR' || currentUser.role === 'STORE_MANAGER' ? (
                 <select
                   value={selectedSheetName}
@@ -711,7 +773,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
                   {storePeople.length > 0 && selectedSheetName !== selectedStore && (
                     <button
                       onClick={() => setSelectedSheetName(selectedSheetName === currentUser.sheetName ? selectedStore : (currentUser.sheetName || selectedStore))}
-                      className="text-[9px] text-rose-500 font-extrabold border-none bg-transparent hover:text-rose-600"
+                      className="text-xs text-rose-500 font-extrabold border-none bg-transparent hover:text-rose-600"
                     >
                       切換總表
                     </button>
@@ -761,17 +823,17 @@ export default function PerformanceBoard({ currentUser, stores }) {
                     
                     <div className="flex justify-between items-start mb-4">
                       <div className="space-y-0.5">
-                        <span className="text-[9px] text-white/70 font-bold tracking-wider">{m.name}</span>
+                        <span className="text-xs text-white/80 font-bold tracking-wider">{m.name}</span>
                         <div className="flex items-baseline space-x-1">
-                          <span className="text-2xl font-black font-mono tracking-tight">
+                          <span className="text-3xl font-black font-mono tracking-tight">
                             {Number(m.accumulated || 0).toLocaleString()}
                           </span>
-                          <span className="text-[9px] text-white/70">/ {Number(m.target || 0).toLocaleString()} 元</span>
+                          <span className="text-xs text-white/75">/ {Number(m.target || 0).toLocaleString()} 元</span>
                         </div>
                       </div>
 
                       {/* 預警呼吸燈號 */}
-                      <span className={`text-[8px] font-black px-2.5 py-1 rounded-full border flex items-center gap-1.5 shadow-sm bg-white backdrop-blur-md ${m.status.colorClass}`}>
+                      <span className={`text-xs font-black px-2.5 py-1 rounded-full border flex items-center gap-1.5 shadow-sm bg-white backdrop-blur-md ${m.status.colorClass}`}>
                         <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
                         {m.status.text}
                       </span>
@@ -792,7 +854,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
                           title={`本月進度: ${timeProgress.percent}%`}
                         ></div>
                       </div>
-                      <div className="flex justify-between text-[8px] text-white/80 font-bold font-mono">
+                      <div className="flex justify-between text-xs text-white/95 font-bold font-mono">
                         <span>達成率: {m.achievement}</span>
                         <span>月底預估: {summary[isFirst ? '毛利' : '配件營收']?.achievement || '0%'}</span>
                       </div>
@@ -832,7 +894,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
                       return (
                         <button
                           key={tabId}
-                          onClick={() => setCurrentSubPage(tabId)}
+                          onClick={() => handleEnterSubPage(tabId)}
                           className={`w-full text-left rounded-[32px] p-6 text-white bg-gradient-to-br ${colors} border border-white/10 hover:-translate-y-1.5 active:scale-98 transition-all duration-300 relative overflow-hidden group shadow-lg flex flex-col justify-between min-h-[148px]`}
                         >
                           {/* 背景微光裝飾 */}
@@ -865,7 +927,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
                                 style={{ width: `${Math.min(avgProgress, 100)}%` }}
                               />
                             </div>
-                            <div className="flex justify-between items-center text-[7.5px] text-white/80 font-bold mt-1.5">
+                            <div className="flex justify-between items-center text-xs text-white/90 font-bold mt-1.5">
                               <span>整體進度</span>
                               <span>{status.text}</span>
                             </div>
@@ -873,7 +935,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
 
                           {/* 底部指標清單 */}
                           <div className="w-full mt-3.5 pt-2.5 border-t border-white/10 flex items-center justify-between z-10">
-                            <span className="text-[7.5px] text-white/70 truncate max-w-[85%] font-bold">
+                            <span className="text-xs text-white/80 truncate max-w-[85%] font-bold">
                               包含: {tab.keys.map(k => k.replace('\n', '')).join('、')}
                             </span>
                             <ChevronRight size={12} className="text-white/70 group-hover:translate-x-1 transition-transform" />
@@ -888,7 +950,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
                   {/* 返回總覽導航列 */}
                   <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
                     <button
-                      onClick={() => setCurrentSubPage(null)}
+                      onClick={() => handleBackToOverview()}
                       className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-150 text-slate-700 font-extrabold text-[10px] active:scale-95 transition-all border-none"
                     >
                       ← 返回業績總覽
@@ -920,10 +982,10 @@ export default function PerformanceBoard({ currentUser, stores }) {
                                 <Target size={14} className={colorClass} />
                               </div>
                               <div className="flex flex-col">
-                                <span className="text-[10px] font-black text-slate-700 leading-tight">
+                                <span className="text-sm font-black text-slate-700 leading-tight">
                                   {key.replace('\n', ' ')}
                                 </span>
-                                <span className="text-[7.5px] text-slate-400 font-bold mt-0.5">
+                                <span className="text-xs text-slate-400 font-bold mt-0.5">
                                   目標: {isHealthTab ? '達成標準' : Number(metric.target || 0).toLocaleString()} {unit}
                                 </span>
                               </div>
@@ -946,18 +1008,18 @@ export default function PerformanceBoard({ currentUser, stores }) {
                               <span className="text-xl font-black text-slate-800 font-mono tracking-tight">
                                 {isHealthTab ? (Number(metric.accumulated) || 0).toLocaleString() : Number(metric.accumulated || 0).toLocaleString()}
                               </span>
-                              <span className="text-[8px] text-slate-400 font-bold">{unit}</span>
+                              <span className="text-xs text-slate-400 font-bold">{unit}</span>
                             </div>
 
-                            <div className="flex justify-between items-center text-[8.5px] font-bold mt-1 text-slate-400">
+                            <div className="flex justify-between items-center text-xs font-bold mt-1 text-slate-400">
                               {isHealthTab ? (
                                 <span>燈號指標: {status.text}</span>
                               ) : (
                                 <span>今日日需求: <strong className="text-slate-600 font-black">{calculateDailyRequirement(metric.target, metric.accumulated)}</strong></span>
                               )}
                               <div className="flex items-center space-x-1">
-                                <span className="text-[7.5px] text-slate-350">目前達成:</span>
-                                <span className={`font-mono font-black ${
+                                <span className="text-xs text-slate-400">目前達成:</span>
+                                <span className={`text-xs font-mono font-black ${
                                   status.light === 'green' ? 'text-emerald-600' : status.light === 'yellow' ? 'text-amber-500' : 'text-rose-500'
                                 }`}>
                                   {isHealthTab ? metric.accumulated + '%' : metric.currentAchievement || '0%'}
@@ -1042,7 +1104,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
                       <button
                         key={tabId}
                         onClick={() => setActiveTab(tabId)}
-                        className={`flex items-center space-x-1 px-3 py-2 text-[10px] font-black rounded-2xl transition-all border-none shrink-0 ${
+                        className={`flex items-center space-x-1 px-3 py-2 text-xs font-black rounded-2xl transition-all border-none shrink-0 ${
                           isActive 
                             ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20 active:scale-95' 
                             : 'bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100/70'
@@ -1077,10 +1139,10 @@ export default function PerformanceBoard({ currentUser, stores }) {
                               <Target size={14} className={colorClass} />
                             </div>
                             <div className="flex flex-col">
-                              <span className="text-[10px] font-black text-slate-700 leading-tight">
+                              <span className="text-sm font-black text-slate-700 leading-tight">
                                 {key.replace('\n', ' ')}
                               </span>
-                              <span className="text-[7.5px] text-slate-400 font-bold mt-0.5">
+                              <span className="text-xs text-slate-400 font-bold mt-0.5">
                                 目標: {isHealthTab ? '達成標準' : Number(metric.target || 0).toLocaleString()} {unit}
                               </span>
                             </div>
@@ -1103,18 +1165,18 @@ export default function PerformanceBoard({ currentUser, stores }) {
                             <span className="text-xl font-black text-slate-800 font-mono tracking-tight">
                               {isHealthTab ? (Number(metric.accumulated) || 0).toLocaleString() : Number(metric.accumulated || 0).toLocaleString()}
                             </span>
-                            <span className="text-[8px] text-slate-400 font-bold">{unit}</span>
+                            <span className="text-xs text-slate-400 font-bold">{unit}</span>
                           </div>
 
-                          <div className="flex justify-between items-center text-[8.5px] font-bold mt-1 text-slate-400">
+                          <div className="flex justify-between items-center text-xs font-bold mt-1 text-slate-400">
                             {isHealthTab ? (
                               <span>燈號指標: {status.text}</span>
                             ) : (
                               <span>今日日需求: <strong className="text-slate-600 font-black">{calculateDailyRequirement(metric.target, metric.accumulated)}</strong></span>
                             )}
                             <div className="flex items-center space-x-1">
-                              <span className="text-[7.5px] text-slate-350">目前達成:</span>
-                              <span className={`font-mono font-black ${
+                              <span className="text-xs text-slate-400">目前達成:</span>
+                              <span className={`text-xs font-mono font-black ${
                                 status.light === 'green' ? 'text-emerald-600' : status.light === 'yellow' ? 'text-amber-500' : 'text-rose-500'
                               }`}>
                                 {isHealthTab ? metric.accumulated + '%' : metric.currentAchievement || '0%'}

@@ -210,6 +210,26 @@ export default function App() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
 
+  // 統一的 Tab 切換與歷史記錄處理，確保手機返回功能回上一頁
+  const handleTabChange = (newTab) => {
+    if (newTab === activeTab) return;
+    
+    if (newTab === 'home') {
+      if (window.history.state?.tab) {
+        window.history.back();
+      } else {
+        setActiveTab('home');
+      }
+    } else {
+      if (activeTab !== 'home') {
+        window.history.replaceState({ tab: newTab }, '');
+      } else {
+        window.history.pushState({ tab: newTab }, '');
+      }
+      setActiveTab(newTab);
+    }
+  };
+
   // 記錄當前在 history state 中的 popup 數量
   const [historyPopupCount, setHistoryPopupCount] = useState(0);
 
@@ -239,6 +259,13 @@ export default function App() {
         setAddOrderOpen(false);
       } else if (settingsOpen) {
         setSettingsOpen(false);
+      } else if (activeTab !== 'home') {
+        if (window.isPerformanceSubPageOpen) {
+          // 這是用來關閉業績看板子分頁的返回事件，App 層級不作反應，僅重設標記
+          window.isPerformanceSubPageOpen = false;
+        } else {
+          setActiveTab('home');
+        }
       }
       const remainingPopups = [addOrderOpen, isEditing, selectedOrder !== null, settingsOpen].filter(Boolean).length - 1;
       setHistoryPopupCount(Math.max(0, remainingPopups));
@@ -246,7 +273,7 @@ export default function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [isEditing, selectedOrder, addOrderOpen, settingsOpen]);
+  }, [isEditing, selectedOrder, addOrderOpen, settingsOpen, activeTab]);
 
   // 偵測本地端登入快取
   useEffect(() => {
@@ -515,7 +542,7 @@ export default function App() {
             tasks={tasks}
             currentUser={currentUser}
             onOpenSettings={() => setSettingsOpen(true)}
-            setActiveTab={setActiveTab}
+            setActiveTab={handleTabChange}
             setOrderStatusFilter={setOrderStatusFilter}
             onLogout={handleLogout}
             stores={stores}
@@ -633,7 +660,7 @@ export default function App() {
       {renderContent()}
 
       {/* 底部導航欄 */}
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} />
+      <BottomNav activeTab={activeTab} setActiveTab={handleTabChange} currentUser={currentUser} />
 
       {/* 新增訂單 Modal/Page */}
       {addOrderOpen && (
