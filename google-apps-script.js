@@ -1771,16 +1771,23 @@ function getPerformanceFolder(parentFolderId, yyyymm) {
   }
 }
 
-// 取得分店的試算表檔案 (模糊搜尋檔名包含 storeName)
+// 取得分店的試算表檔案 (模糊搜尋檔名包含 storeName，並支援去除 "店" 字以進行高容錯匹配)
 function getStoreSpreadsheet(folder, storeName) {
   try {
+    var shortName = storeName;
+    if (storeName && storeName.length > 2 && storeName.substring(storeName.length - 1) === "店") {
+      shortName = storeName.substring(0, storeName.length - 1);
+    }
+    
     var files = folder.getFiles();
     while (files.hasNext()) {
       var file = files.next();
       var name = file.getName();
-      // 確保是 Google Sheets 且檔名包含店名 (如 "東門店")
-      if (name.indexOf(storeName) !== -1 && file.getMimeType() === MimeType.GOOGLE_SHEETS) {
-        return SpreadsheetApp.open(file);
+      // 確保是 Google Sheets 且檔名包含店名 (如 "東門店" 或 "東門")
+      if (file.getMimeType() === MimeType.GOOGLE_SHEETS) {
+        if (name.indexOf(storeName) !== -1 || name.indexOf(shortName) !== -1) {
+          return SpreadsheetApp.open(file);
+        }
       }
     }
     return null;
@@ -1788,6 +1795,57 @@ function getStoreSpreadsheet(folder, storeName) {
     Logger.log("取得試算表失敗: " + e.toString());
     return null;
   }
+}
+
+// 取得試算表中的分頁 (支援名稱精準匹配與多級模糊容錯搜尋，防範分頁未改名或拼寫錯誤)
+function getSheetWithTolerance(spreadsheet, sheetName, storeName) {
+  if (!spreadsheet) return null;
+  
+  // 1. 精準搜尋
+  var sheet = spreadsheet.getSheetByName(sheetName);
+  if (sheet) return sheet;
+  
+  // 2. 準備短店名與短分頁名 (例如 "歸仁店" -> "歸仁")
+  var shortStoreName = storeName;
+  if (storeName && storeName.length > 2 && storeName.substring(storeName.length - 1) === "店") {
+    shortStoreName = storeName.substring(0, storeName.length - 1);
+  }
+  
+  var shortSheetName = sheetName;
+  if (sheetName && sheetName.length > 2 && sheetName.substring(sheetName.length - 1) === "店") {
+    shortSheetName = sheetName.substring(0, sheetName.length - 1);
+  }
+
+  var sheets = spreadsheet.getSheets();
+  
+  // 3. 第一階段模糊搜尋：名稱包含 sheetName 或 storeName 的短名
+  for (var i = 0; i < sheets.length; i++) {
+    var name = sheets[i].getName();
+    if (name.indexOf(sheetName) !== -1 || 
+        name.indexOf(shortSheetName) !== -1 || 
+        (shortStoreName && name.indexOf(shortStoreName) !== -1)) {
+      return sheets[i];
+    }
+  }
+  
+  // 4. 第二階段備用搜尋：若找總表卻找不到，搜尋包含 "總表"、"指標" 或是 "東門店" (原模板名) 的分頁
+  if (sheetName === storeName) {
+    var backupKeywords = ["總表", "主表", "業績表", "東門店", "指標"];
+    for (var k = 0; k < backupKeywords.length; k++) {
+      for (var i = 0; i < sheets.length; i++) {
+        if (sheets[i].getName().indexOf(backupKeywords[k]) !== -1) {
+          return sheets[i];
+        }
+      }
+    }
+  }
+  
+  // 5. 最後防線：直接回傳第一個分頁 (99% 的情況第一個分頁就是總表)
+  if (sheets.length > 0) {
+    return sheets[0];
+  }
+  
+  return null;
 }
 
 // 定位第一欄符合特定內容的 row index (1-indexed)
@@ -1841,8 +1899,8 @@ function handleGetStorePerformance(storeName, sheetName, role) {
       return { status: 'error', message: '系統偵測到分店 【' + storeName + '】 的業績日報表檔案尚未建立，請聯絡管理員。' };
     }
     
-    // 4. 獲取對應的分頁
-    var sheet = spreadsheet.getSheetByName(sheetName);
+    // 4. 獲取對應的分頁 (採用高容錯模糊搜尋機制)
+    var sheet = getSheetWithTolerance(spreadsheet, sheetName, storeName);
     if (!sheet) {
       return { status: 'error', message: '系統偵測到分頁 【' + sheetName + '】 尚未建立，請聯絡管理員先至業績表建立同仁分頁。' };
     }
@@ -1967,8 +2025,8 @@ function handleSubmitDailyPerformance(input) {
       return { status: 'error', message: '系統偵測到分店 【' + storeName + '】 的業績日報表檔案尚未建立，請聯絡管理員。' };
     }
     
-    // 3. 獲取對應的分頁
-    var sheet = spreadsheet.getSheetByName(sheetName);
+    // 3. 獲取對應的分頁 (採用高容錯模糊搜尋機制)
+    var sheet = getSheetWithTolerance(spreadsheet, sheetName, storeName);
     if (!sheet) {
       return { status: 'error', message: '系統偵測到分頁 【' + sheetName + '】 尚未建立，請聯絡管理員先至業績表建立同仁分頁。' };
     }
