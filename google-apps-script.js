@@ -1,7 +1,7 @@
 /**
  * 門市店務管理系統 - Google Apps Script (GAS) 同步指令碼
  * 
- * 目前版本：v1.3.0 - 24 指標全動態模糊匹配容錯版 (更新日期: 2026-05-30)
+ * 目前版本：v1.3.1 - 移除無效 setHeader 修正 GAS 崩潰版 (更新日期: 2026-05-30)
  * 
  * 部署說明：
  * 1. 開啟您的 Google 試算表。
@@ -695,13 +695,11 @@ function doGet(e) {
   } else if (action === 'getStorePerformance') {
     var result = handleGetStorePerformance(e.parameter.storeName, e.parameter.sheetName, e.parameter.role);
     return ContentService.createTextOutput(JSON.stringify(result))
-      .setMimeType(ContentService.MimeType.JSON)
-      .setHeader("Access-Control-Allow-Origin", "*");
+      .setMimeType(ContentService.MimeType.JSON);
   }
   
   return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '未知的 Action' }))
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeader("Access-Control-Allow-Origin", "*");
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function doPost(e) {
@@ -739,8 +737,7 @@ function doPost(e) {
   }
   
   return ContentService.createTextOutput(JSON.stringify(result))
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeader("Access-Control-Allow-Origin", "*");
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 // 取得所有訂單與任務
@@ -817,8 +814,7 @@ function handleReadAll() {
   }
   
   return ContentService.createTextOutput(JSON.stringify({ status: 'success', orders: orders, tasks: tasks, customers: customers }))
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeader("Access-Control-Allow-Origin", "*");
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 // 新增訂單 (寫入試算表動態逾期公式，並記錄到 OrderStatus 與 ECommerceDetails)
@@ -1188,8 +1184,7 @@ function handleGetLineConfig() {
   }
   
   return ContentService.createTextOutput(JSON.stringify({ status: 'success', config: config }))
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeader("Access-Control-Allow-Origin", "*");
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 // 儲存 LINE 設定並更新觸發器
@@ -1465,8 +1460,7 @@ function handleGetECommerceRates() {
   var sheet = ss.getSheetByName(SHEET_ECOMMERCE_RATES);
   if (!sheet) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '找不到 ECommerceRates 工作表' }))
-      .setMimeType(ContentService.MimeType.JSON)
-      .setHeader("Access-Control-Allow-Origin", "*");
+      .setMimeType(ContentService.MimeType.JSON);
   }
   
   var data = sheet.getDataRange().getValues();
@@ -1504,8 +1498,7 @@ function handleGetECommerceRates() {
   }
   
   return ContentService.createTextOutput(JSON.stringify({ status: 'success', rates: rates }))
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeader("Access-Control-Allow-Origin", "*");
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 // 寫入詳細扣費明細到 ECommerceDetails 工作表
