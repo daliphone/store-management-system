@@ -1,7 +1,7 @@
 /**
  * 門市店務管理系統 - Google Apps Script (GAS) 同步指令碼
  * 
- * 目前版本：v1.3.1 - 移除無效 setHeader 修正 GAS 崩潰版 (更新日期: 2026-05-30)
+ * 目前版本：v1.3.2 - 修正來客數抓取 Row 8 (T8) 累計實績版 (更新日期: 2026-05-30)
  * 
  * 部署說明：
  * 1. 開啟您的 Google 試算表。
@@ -1968,7 +1968,14 @@ function handleGetStorePerformance(storeName, sheetName, role) {
         summary[key].target = Number(values[rowTarget][colIdx]) || 0;
       }
       if (rowAccumulated !== -1) {
-        summary[key].accumulated = Number(values[rowAccumulated][colIdx]) || 0;
+        var accVal = values[rowAccumulated][colIdx];
+        // 針對「來客數」進行特別處理：如果它是來客數，且 rowAccumulated 這一格是字串 "日平均" 或非數字，
+        // 則代表它的累計實績是寫在當日應達行 (Row 8，在 values 陣列中為 rowAccumulated - 1)
+        if (key === "來客數" && (accVal === "日平均" || isNaN(Number(accVal)))) {
+          summary[key].accumulated = Number(values[rowAccumulated - 1][colIdx]) || 0;
+        } else {
+          summary[key].accumulated = Number(accVal) || 0;
+        }
       }
       if (rowAchievement !== -1) {
         summary[key].achievement = formatPercent(values[rowAchievement][colIdx]);
