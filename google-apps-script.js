@@ -1793,6 +1793,7 @@ function formatPercent(val) {
 }
 
 // 讀取分店與人員的業績數據
+// 讀取分店與人員的業績數據
 function handleGetStorePerformance(storeName, sheetName, role) {
   try {
     if (!storeName || !sheetName) {
@@ -1828,65 +1829,77 @@ function handleGetStorePerformance(storeName, sheetName, role) {
     var lastColumn = sheet.getLastColumn();
     var values = sheet.getRange(1, 1, lastRow, lastColumn).getValues();
     
-    // 6. 定位關鍵行
-    var rowTarget = -1;
-    var rowAccumulated = -1;
-    var rowAchievement = -1;
-    var dailyData = [];
+    // 6. 全動態定位關鍵行 (以防試算表結構被微調)
+    var headerRowIdx = -1;      // 業績項目名稱行
+    var rowTarget = -1;         // 目標分配行
+    var rowAccumulated = -1;    // 當月累計行
+    var rowAchievement = -1;    // 預估達成行 (第11行)
+    var rowCurrentAchievement = -1; // 目前達成行 (第12行)
     
     for (var i = 0; i < values.length; i++) {
       var firstCell = values[i][0] ? values[i][0].toString().trim() : '';
-      if (firstCell === '目標分配') {
+      if (firstCell === '業績項目') {
+        headerRowIdx = i;
+      } else if (firstCell === '目標分配') {
         rowTarget = i;
       } else if (firstCell === '當月累計') {
         rowAccumulated = i;
-      } else if (firstCell === '目前達成') {
+      } else if (firstCell === '預估達成') {
         rowAchievement = i;
-      } else {
-        var dayNum = parseInt(firstCell);
-        if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
-          dailyData.push({
-            day: dayNum,
-            grossProfit: Number(values[i][1]) || 0, // 毛利在第二欄
-            insurance: Number(values[i][2]) || 0,    // 保險營收在第三欄
-            subscription: Number(values[i][3]) || 0, // 門號在第四欄
-            accessories: Number(values[i][4]) || 0,  // 配件營收在第五欄
-            customerCount: Number(values[i][19]) || 0 // 來客數在第二十欄
-          });
-        }
+      } else if (firstCell === '目前達成') {
+        rowCurrentAchievement = i;
       }
     }
     
-    var summary = {
-      grossProfit: { target: 0, accumulated: 0, achievement: "0%" },
-      insurance: { target: 0, accumulated: 0, achievement: "0%" },
-      subscription: { target: 0, accumulated: 0, achievement: "0%" },
-      accessories: { target: 0, accumulated: 0, achievement: "0%" },
-      customerCount: { target: 0, accumulated: 0, achievement: "0%" }
-    };
-    
-    if (rowTarget !== -1) {
-      summary.grossProfit.target = Number(values[rowTarget][1]) || 0;
-      summary.insurance.target = Number(values[rowTarget][2]) || 0;
-      summary.subscription.target = Number(values[rowTarget][3]) || 0;
-      summary.accessories.target = Number(values[rowTarget][4]) || 0;
-      summary.customerCount.target = Number(values[rowTarget][19]) || 0;
+    // 若找不到 Header 列，預設為 index 2 (第 3 行) 作為備用防呆
+    if (headerRowIdx === -1) {
+      headerRowIdx = 2; 
     }
     
-    if (rowAccumulated !== -1) {
-      summary.grossProfit.accumulated = Number(values[rowAccumulated][1]) || 0;
-      summary.insurance.accumulated = Number(values[rowAccumulated][2]) || 0;
-      summary.subscription.accumulated = Number(values[rowAccumulated][3]) || 0;
-      summary.accessories.accumulated = Number(values[rowAccumulated][4]) || 0;
-      summary.customerCount.accumulated = Number(values[rowAccumulated][19]) || 0;
+    // 7. 動態建立欄位映射
+    var headers = values[headerRowIdx];
+    var headerMap = {}; // { colIndex: "項目名稱" }
+    for (var col = 1; col < headers.length; col++) {
+      var colName = headers[col] ? headers[col].toString().trim() : '';
+      if (colName && colName !== '--->勿動') {
+        headerMap[col] = colName;
+      }
     }
     
-    if (rowAchievement !== -1) {
-      summary.grossProfit.achievement = formatPercent(values[rowAchievement][1]);
-      summary.insurance.achievement = formatPercent(values[rowAchievement][2]);
-      summary.subscription.achievement = formatPercent(values[rowAchievement][3]);
-      summary.accessories.achievement = formatPercent(values[rowAchievement][4]);
-      summary.customerCount.achievement = formatPercent(values[rowAchievement][19]);
+    // 8. 讀取每日數據 (1 ~ 31 號)
+    var dailyData = [];
+    for (var i = 0; i < values.length; i++) {
+      var firstCell = values[i][0] ? values[i][0].toString().trim() : '';
+      var dayNum = parseInt(firstCell);
+      if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
+        var dayObj = { day: dayNum };
+        // 遍歷所有動態項目並寫入
+        for (var colIdx in headerMap) {
+          var key = headerMap[colIdx];
+          dayObj[key] = Number(values[i][colIdx]) || 0;
+        }
+        dailyData.push(dayObj);
+      }
+    }
+    
+    // 9. 動態包裝 summary (目標、累計、達成率)
+    var summary = {};
+    for (var colIdx in headerMap) {
+      var key = headerMap[colIdx];
+      summary[key] = { target: 0, accumulated: 0, achievement: "0%", currentAchievement: "0%" };
+      
+      if (rowTarget !== -1) {
+        summary[key].target = Number(values[rowTarget][colIdx]) || 0;
+      }
+      if (rowAccumulated !== -1) {
+        summary[key].accumulated = Number(values[rowAccumulated][colIdx]) || 0;
+      }
+      if (rowAchievement !== -1) {
+        summary[key].achievement = formatPercent(values[rowAchievement][colIdx]);
+      }
+      if (rowCurrentAchievement !== -1) {
+        summary[key].currentAchievement = formatPercent(values[rowCurrentAchievement][colIdx]);
+      }
     }
     
     return {
@@ -1948,23 +1961,70 @@ function handleSubmitDailyPerformance(input) {
     var rowRange = sheet.getRange(targetRowIndex, 1, 1, lastColumn);
     var rowValues = rowRange.getValues()[0];
     
-    // 修改前端有傳入的欄位，其餘保留原樣
-    if (input.grossProfit !== undefined) rowValues[1] = Number(input.grossProfit) || 0; // 毛利
-    if (input.insurance !== undefined) rowValues[2] = Number(input.insurance) || 0;    // 保險營收
-    if (input.subscription !== undefined) rowValues[3] = Number(input.subscription) || 0; // 門號
-    if (input.accessories !== undefined) rowValues[4] = Number(input.accessories) || 0;  // 配件營收
-    if (input.customerCount !== undefined) rowValues[19] = Number(input.customerCount) || 0; // 來客數
+    // 6. 動態讀取業績項目名稱列 (以 Row 3 為主搜尋名稱，進行對齊)
+    var headerRowIndex = 3; // 預設 Row 3
+    var totalRows = sheet.getLastRow();
+    var searchLimit = Math.min(10, totalRows);
+    var checkHeaders = sheet.getRange(1, 1, searchLimit, 1).getValues();
+    for (var r = 0; r < checkHeaders.length; r++) {
+      if (checkHeaders[r][0] && checkHeaders[r][0].toString().trim() === '業績項目') {
+        headerRowIndex = r + 1; // 1-based index
+        break;
+      }
+    }
     
-    // 寫回
+    var headerValues = sheet.getRange(headerRowIndex, 1, 1, lastColumn).getValues()[0];
+    var headerMap = {}; // { "項目名稱": colIndex }
+    for (var col = 1; col < headerValues.length; col++) {
+      var colName = headerValues[col] ? headerValues[col].toString().trim() : '';
+      if (colName && colName !== '--->勿動') {
+        headerMap[colName] = col;
+      }
+    }
+    
+    // 7. 英文屬性與中文項目名稱映射 (向下相容舊版前端傳送的參數)
+    var oldKeysMap = {
+      grossProfit: "毛利",
+      insurance: "保險營收",
+      subscription: "門號",
+      accessories: "配件營收",
+      customerCount: "來客數"
+    };
+    
+    // 檢查 input 底下是否有 metrics 物件，或是直接傳入屬性
+    var metrics = input.metrics || input;
+    
+    // 8. 遍歷項目進行動態賦值
+    for (var colName in headerMap) {
+      var colIdx = headerMap[colName];
+      var val = metrics[colName];
+      
+      // 若找不到中文鍵，則嘗試舊版英文鍵
+      if (val === undefined) {
+        for (var oldKey in oldKeysMap) {
+          if (oldKeysMap[oldKey] === colName && metrics[oldKey] !== undefined) {
+            val = metrics[oldKey];
+            break;
+          }
+        }
+      }
+      
+      // 僅在前端有傳入該值時進行修改，避免覆蓋 Sheets 裡的無關數據
+      if (val !== undefined) {
+        rowValues[colIdx] = Number(val) || 0;
+      }
+    }
+    
+    // 9. 寫回
     rowRange.setValues([rowValues]);
     
-    // 6. 寫入系統操作稽核日誌
+    // 10. 寫入系統操作稽核日誌
     handleWriteLog(
       input.operator || 'system',
       input.operatorRole || 'STAFF',
       '登錄業績',
       '業績模組',
-      '登錄分店: ' + storeName + ', 同仁: ' + sheetName + ', 日期: ' + dateStr + ', 毛利: ' + (input.grossProfit || 0) + ', 配件: ' + (input.accessories || 0)
+      '登錄分店: ' + storeName + ', 同仁: ' + sheetName + ', 日期: ' + dateStr + ', 毛利: ' + (metrics.grossProfit || metrics['毛利'] || 0) + ', 配件: ' + (metrics.accessories || metrics['配件營收'] || 0)
     );
     
     return { status: 'success', message: '業績登錄成功！' };
