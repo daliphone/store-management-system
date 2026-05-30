@@ -585,14 +585,20 @@ export const submitDailyPerformance = async (inputData) => {
       // 更新 daily 資料中的該天
       let updatedDaily = localData.daily || [];
       const existingIdx = updatedDaily.findIndex(d => d.day === dayNum);
+      // 動態更新本地快取的日數據，優先使用 metrics 物件
       const newDayObj = {
         day: dayNum,
-        grossProfit: Number(inputData.grossProfit) || 0,
-        insurance: Number(inputData.insurance) || 0,
-        subscription: Number(inputData.subscription) || 0,
-        accessories: Number(inputData.accessories) || 0,
-        customerCount: Number(inputData.customerCount) || 0
+        ...(inputData.metrics || {})
       };
+      
+      // 向下相容舊前端直接傳入屬性的格式
+      if (!inputData.metrics) {
+        newDayObj.grossProfit = Number(inputData.grossProfit) || 0;
+        newDayObj.insurance = Number(inputData.insurance) || 0;
+        newDayObj.subscription = Number(inputData.subscription) || 0;
+        newDayObj.accessories = Number(inputData.accessories) || 0;
+        newDayObj.customerCount = Number(inputData.customerCount) || 0;
+      }
       
       if (existingIdx !== -1) {
         updatedDaily[existingIdx] = newDayObj;
