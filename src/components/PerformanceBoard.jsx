@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Award, Calendar, Coins, Smartphone, Users as UsersIcon, ShieldCheck, HelpCircle, ChevronRight, BarChart3, Plus, RefreshCw, AlertCircle } from 'lucide-react';
+import { 
+  TrendingUp, Award, Calendar, Coins, Smartphone, 
+  Users as UsersIcon, ShieldCheck, HelpCircle, BarChart3, 
+  Plus, RefreshCw, AlertCircle, ChevronRight, Sparkles, 
+  Target, Info, Flame, Heart, Star, Award as AwardIcon
+} from 'lucide-react';
 import { getStorePerformance } from '../services/googleSheetsService';
 import { USERS } from '../mockData';
 import PerformanceForm from './PerformanceForm';
@@ -9,6 +14,9 @@ export default function PerformanceBoard({ currentUser, stores }) {
   const [perfData, setPerfData] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [showForm, setShowForm] = useState(false);
+
+  // 當前選中的項目大類 Tab ('finance', 'hardware', 'wearable', 'accessory', 'social', 'health')
+  const [activeTab, setActiveTab] = useState('finance');
 
   // 門市列表與編號對照
   const STORE_CODE_MAP = {
@@ -63,7 +71,6 @@ export default function PerformanceBoard({ currentUser, stores }) {
   const storePeople = getStorePeople(selectedStore);
 
   const [selectedSheetName, setSelectedSheetName] = useState(() => {
-    // 一般同仁預設是自己的暱稱，管理員或店長預設看該店總表 (同店名)
     const isManager = currentUser && (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR' || currentUser.role === 'STORE_MANAGER');
     if (isManager) {
       return selectedStore; // 總表分頁名稱與店名相同
@@ -104,26 +111,73 @@ export default function PerformanceBoard({ currentUser, stores }) {
     loadPerf();
   }, [selectedStore, selectedSheetName]);
 
-  // 生成 SVG 折線圖
+  // 1. 動態計算當前時間進度 % 
+  const getTimeProgress = () => {
+    const today = new Date();
+    const currentDay = today.getDate();
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const percent = (currentDay / daysInMonth) * 100;
+    return {
+      currentDay,
+      daysInMonth,
+      remainingDays: daysInMonth - currentDay,
+      percent: Math.round(percent * 10) / 10 // 四捨五入到小數第一位
+    };
+  };
+
+  const timeProgress = getTimeProgress();
+
+  // 2. 動態判定紅綠燈狀態
+  const getStatusLight = (achievementStr) => {
+    const rate = parseFloat(achievementStr) || 0;
+    const diff = rate - timeProgress.percent;
+    if (diff >= 0) {
+      return { light: 'green', text: '業績領先', colorClass: 'bg-emerald-500 text-emerald-50 text-emerald-600 border-emerald-100' };
+    } else if (diff >= -12) {
+      return { light: 'yellow', text: '持續保持', colorClass: 'bg-amber-500 text-amber-50 text-amber-600 border-amber-100' };
+    } else {
+      return { light: 'red', text: '需加速衝刺', colorClass: 'bg-rose-500 text-white text-rose-600 border-rose-100' };
+    }
+  };
+
+  // 3. 計算動態今日日需求 (剩餘目標/剩餘天數)
+  const calculateDailyRequirement = (target, accumulated) => {
+    const remainingTarget = target - accumulated;
+    if (remainingTarget <= 0) return '已達標 🎉';
+    const remainingDays = timeProgress.remainingDays <= 0 ? 1 : timeProgress.remainingDays;
+    const req = Math.ceil(remainingTarget / remainingDays);
+    return req.toLocaleString();
+  };
+
+  // 生成 SVG 趨勢折線圖
   const renderLineChart = (dailyList, keyName, color = '#f43f5e') => {
     if (!dailyList || dailyList.length === 0) return null;
     
     // 過濾有值的資料
     const validData = dailyList.filter(d => d[keyName] > 0 || d.day <= new Date().getDate());
-    if (validData.length === 0) return <div className="text-[10px] text-slate-400 text-center py-4 font-bold">目前暫無每日數據</div>;
+    const allZero = validData.every(d => d[keyName] === 0);
 
-    const maxVal = Math.max(...validData.map(d => d[keyName]), 100);
+    if (allZero) {
+      return (
+        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm text-center space-y-2">
+          <Info size={20} className="text-slate-350 mx-auto" />
+          <div className="text-[10px] text-slate-400 font-bold">當月每日實際數據尚未寫入</div>
+        </div>
+      );
+    }
+
+    const maxVal = Math.max(...validData.map(d => d[keyName] || 0), 100);
     const minVal = 0;
     const range = maxVal - minVal;
 
     const width = 360;
-    const height = 120;
+    const height = 130;
     const padding = 20;
 
     const points = validData.map((d, idx) => {
       const x = padding + (idx / (validData.length - 1 || 1)) * (width - padding * 2);
-      const y = height - padding - ((d[keyName] - minVal) / range) * (height - padding * 2);
-      return { x, y, day: d.day, val: d[keyName] };
+      const y = height - padding - (((d[keyName] || 0) - minVal) / range) * (height - padding * 2);
+      return { x, y, day: d.day, val: d[keyName] || 0 };
     });
 
     const pathD = points.reduce((acc, p, idx) => {
@@ -144,8 +198,8 @@ export default function PerformanceBoard({ currentUser, stores }) {
             const val = Math.round(maxVal - ratio * range);
             return (
               <g key={i}>
-                <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="4 4" />
-                <text x={padding - 5} y={y + 3} textAnchor="end" className="text-[8px] fill-slate-400 font-mono font-bold">{val.toLocaleString()}</text>
+                <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="#f8fafc" strokeWidth="1" strokeDasharray="4 4" />
+                <text x={padding - 5} y={y + 3} textAnchor="end" className="text-[7.5px] fill-slate-400 font-mono font-bold">{val.toLocaleString()}</text>
               </g>
             );
           })}
@@ -155,7 +209,7 @@ export default function PerformanceBoard({ currentUser, stores }) {
             <path
               d={fillD}
               fill={`url(#gradient-${keyName})`}
-              opacity="0.15"
+              opacity="0.12"
             />
           )}
 
@@ -164,20 +218,20 @@ export default function PerformanceBoard({ currentUser, stores }) {
             d={pathD}
             fill="none"
             stroke={color}
-            strokeWidth="2.5"
+            strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"
+            className="drop-shadow-[0_2px_8px_rgba(244,63,94,0.2)]"
           />
 
           {/* 節點 */}
           {points.map((p, idx) => {
-            // 只渲染部分點的文字，防擠
             const showText = idx === 0 || idx === points.length - 1 || p.day === new Date().getDate();
             return (
               <g key={idx}>
-                <circle cx={p.x} cy={p.y} r="3.5" fill="#white" stroke={color} strokeWidth="2" />
+                <circle cx={p.x} cy={p.y} r="3.5" fill="white" stroke={color} strokeWidth="2.5" />
                 {showText && (
-                  <text x={p.x} y={p.y - 8} textAnchor="middle" className="text-[8px] font-black font-mono fill-slate-700">
+                  <text x={p.x} y={p.y - 8} textAnchor="middle" className="text-[7.5px] font-black font-mono fill-slate-700 bg-white">
                     {p.day}日:{p.val.toLocaleString()}
                   </text>
                 )}
@@ -197,79 +251,155 @@ export default function PerformanceBoard({ currentUser, stores }) {
     );
   };
 
-  const getMetricIcon = (key) => {
-    switch (key) {
-      case 'grossProfit': return <Coins className="text-amber-500" size={18} />;
-      case 'accessories': return <Smartphone className="text-sky-500" size={18} />;
-      case 'customerCount': return <UsersIcon className="text-indigo-500" size={18} />;
-      case 'insurance': return <ShieldCheck className="text-emerald-500" size={18} />;
-      case 'subscription': return <HelpCircle className="text-rose-400" size={18} />;
-      default: return null;
+  // 24 指標項目分類配置 (對應前端的 Tabs 頁籤)
+  const TABS_CONFIG = {
+    finance: {
+      title: '💰 財務來客',
+      icon: <Coins size={14} />,
+      keys: ['毛利', '配件營收', '來客數'],
+      units: { '毛利': '元', '配件營收': '元', '來客數': '人' },
+      colors: { '毛利': 'text-amber-500', '配件營收': 'text-sky-500', '來客數': 'text-indigo-500' }
+    },
+    hardware: {
+      title: '📱 手機硬體',
+      icon: <Smartphone size={14} />,
+      keys: ['蘋果手機', 'VIVO手機', '庫存手機', 'Garmini'],
+      units: { '蘋果手機': '台', 'VIVO手機': '台', '庫存手機': '台', 'Garmini': '台' },
+      colors: { '蘋果手機': 'text-rose-500', 'VIVO手機': 'text-blue-500', '庫存手機': 'text-purple-500', 'Garmini': 'text-teal-500' }
+    },
+    wearable: {
+      title: '⌚ 穿戴平板',
+      icon: <Star size={14} />,
+      keys: ['蘋果平板+手錶', '華為穿戴(點數)', 'iPhone組合銷售'],
+      units: { '蘋果平板+手錶': '件', '華為穿戴(點數)': '點', 'iPhone組合銷售': '套' },
+      colors: { '蘋果平板+手錶': 'text-rose-400', '華為穿戴(點數)': 'text-amber-600', 'iPhone組合銷售': 'text-violet-500' }
+    },
+    accessory: {
+      title: '⚡ 配件專案',
+      icon: <Gift size={14} />,
+      keys: ['保險營收', '門號', '中嘉寬頻', '橙艾玻璃貼\n(13,14,15,16系列)', 'GPLUS GP-S10吸塵器', 'LiTV開通數'],
+      units: { '保險營收': '元', '門號': '門', '中嘉寬頻': '件', '橙艾玻璃貼\n(13,14,15,16系列)': '片', 'GPLUS GP-S10吸塵器': '台', 'LiTV開通數': '件' },
+      colors: { '保險營收': 'text-emerald-500', '門號': 'text-rose-500', '中嘉寬頻': 'text-orange-500', '橙艾玻璃貼\n(13,14,15,16系列)': 'text-teal-600', 'GPLUS GP-S10吸塵器': 'text-yellow-600', 'LiTV開通數': 'text-sky-600' }
+    },
+    social: {
+      title: '🎯 行銷社群',
+      icon: <UsersIcon size={14} />,
+      keys: ['GOOGLE 評論', '社群會員數', '生活圈'],
+      units: { 'GOOGLE 評論': '個', '社群會員數': '人', '生活圈': '人' },
+      colors: { 'GOOGLE 評論': 'text-green-500', '社群會員數': 'text-cyan-500', '生活圈': 'text-indigo-400' }
+    },
+    health: {
+      title: '🟢 體質指標',
+      icon: <Award size={14} />,
+      keys: ['遠傳升續率', '遠傳平續率', '遠傳續約累積GAP', '綜合指標'],
+      units: { '遠傳升續率': '%', '遠傳平續率': '%', '遠傳續約累積GAP': '元', '綜合指標': '%' },
+      colors: { '遠傳升續率': 'text-emerald-600', '遠傳平續率': 'text-teal-600', '遠傳續約累積GAP': 'text-pink-600', '綜合指標': 'text-indigo-600' }
     }
-  };
-
-  const getMetricLabel = (key) => {
-    switch (key) {
-      case 'grossProfit': return '當月毛利';
-      case 'accessories': return '配件營收';
-      case 'customerCount': return '實質來客';
-      case 'insurance': return '手機保險';
-      case 'subscription': return '門號開通';
-      default: return '';
-    }
-  };
-
-  const getMetricUnit = (key) => {
-    return key === 'customerCount' ? '人' : key === 'subscription' ? '件' : '元';
   };
 
   // 當期主要統計
   const summary = perfData?.summary || {};
-  const grossProfitRate = summary.grossProfit?.achievement || '0%';
+
+  // 取得毛利與配件這兩個最核心指標的達成率（首頁重點字卡使用）
+  const getCoreMetricState = (name, titleName) => {
+    const metric = summary[name] || { target: 0, accumulated: 0, achievement: '0%' };
+    const status = getStatusLight(metric.achievement);
+    return {
+      name: titleName,
+      accumulated: metric.accumulated,
+      target: metric.target,
+      achievement: metric.achievement,
+      status
+    };
+  };
+
+  const mainMetrics = [
+    getCoreMetricState('毛利', '💰 當月毛利實績'),
+    getCoreMetricState('配件營收', '⚡ 當月配件實績')
+  ];
 
   return (
-    <div className="flex-1 flex flex-col pb-20 overflow-y-auto no-scrollbar bg-slate-50 font-['Outfit',_'Inter',_sans-serif]">
-      {/* 頂部導航列 */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3.5 flex items-center justify-between sticky top-0 z-20 shadow-sm">
-        <div className="flex items-center space-x-1.5 text-rose-500">
-          <BarChart3 size={20} />
-          <h1 className="text-base font-black text-slate-800 tracking-wide">業績與目標看板</h1>
+    <div className="flex-1 flex flex-col pb-24 overflow-y-auto no-scrollbar bg-[#f8fafc] font-['Outfit',_'Inter',_sans-serif]">
+      {/* 頂部發光導航列 */}
+      <div className="bg-white/80 backdrop-blur-md border-b border-slate-100 px-5 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm shrink-0">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500 shadow-inner-sm">
+            <BarChart3 size={18} />
+          </div>
+          <div>
+            <h1 className="text-sm font-black text-slate-800 tracking-wide">業績與戰情看板</h1>
+            <p className="text-[8px] text-slate-400 font-extrabold">馬尼 (Money) 門市管理系統</p>
+          </div>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="bg-rose-500 text-white font-extrabold text-[11px] px-3.5 py-1.8 rounded-xl active:scale-95 transition-all flex items-center gap-1 shadow-md border-none"
+          className="bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-[10px] px-4 py-2 rounded-2xl active:scale-95 transition-all flex items-center gap-1.5 shadow-md shadow-rose-500/25 border-none"
         >
           <Plus size={14} />
           <span>登錄今日業績</span>
         </button>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4 max-w-[600px] mx-auto w-full">
+        {/* 1. 時間進度基線卡片 (Time Baseline Card) */}
+        <div className="bg-slate-900 rounded-[32px] p-5 text-white shadow-xl relative overflow-hidden border border-slate-800">
+          <div className="absolute right-3 top-3 opacity-15">
+            <Flame size={48} className="text-rose-500 animate-pulse" />
+          </div>
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center space-x-2">
+              <Calendar size={15} className="text-rose-400" />
+              <span className="text-[11px] font-black tracking-wide text-slate-200">
+                本月時間進度基線
+              </span>
+            </div>
+            <span className="text-[9px] bg-slate-800 text-slate-300 font-bold px-2 py-0.5 rounded-full border border-slate-700">
+              剩餘 {timeProgress.remainingDays} 天
+            </span>
+          </div>
+
+          <div className="flex items-baseline space-x-1.5 mb-2.5">
+            <span className="text-3xl font-black font-mono tracking-tight text-white">{timeProgress.percent}%</span>
+            <span className="text-[10px] text-slate-400 font-bold">已過 ({timeProgress.currentDay} / {timeProgress.daysInMonth} 天)</span>
+          </div>
+
+          {/* 基線進度條 */}
+          <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700/50">
+            <div 
+              className="h-full bg-gradient-to-r from-rose-500 to-pink-500 rounded-full shadow-[0_0_8px_rgba(244,63,94,0.4)]" 
+              style={{ width: `${timeProgress.percent}%` }}
+            ></div>
+          </div>
+        </div>
+
         {/* 篩選控制器 */}
-        <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-3">
+        <div className="bg-white p-4 rounded-[32px] border border-slate-100 shadow-sm space-y-3">
           <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-            <span className="text-[10px] font-black text-slate-400">請選擇篩選維度</span>
-            <button onClick={loadPerf} className="p-1 text-slate-400 hover:text-slate-600 transition-colors">
-              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+            <span className="text-[10px] font-black text-slate-400 flex items-center gap-1">
+              <Sparkles size={12} className="text-rose-500" />
+              戰情維度篩選
+            </span>
+            <button onClick={loadPerf} className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-all active:scale-90">
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             </button>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             {/* 分店選擇 */}
             <div>
-              <label className="block text-[9px] font-black text-slate-400 mb-1">分店</label>
+              <label className="block text-[8px] font-black text-slate-400 mb-1">分店</label>
               {availableStores.length > 1 ? (
                 <select
                   value={selectedStore}
                   onChange={(e) => setSelectedStore(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-black text-slate-700 focus:outline-none focus:border-rose-500 transition-all"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-rose-500 focus:bg-white transition-all"
                 >
                   {availableStores.map(s => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
               ) : (
-                <div className="bg-slate-50 border border-slate-150 rounded-xl px-2.5 py-2 text-xs font-black text-slate-500 select-none">
+                <div className="bg-slate-50 border border-slate-150 rounded-2xl px-3 py-2 text-xs font-black text-slate-500 select-none">
                   {selectedStore}
                 </div>
               )}
@@ -277,12 +407,12 @@ export default function PerformanceBoard({ currentUser, stores }) {
 
             {/* 人員選擇 */}
             <div>
-              <label className="block text-[9px] font-black text-slate-400 mb-1">人員/總表</label>
+              <label className="block text-[8px] font-black text-slate-400 mb-1">人員/總表</label>
               {currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'AUDITOR' || currentUser.role === 'STORE_MANAGER' ? (
                 <select
                   value={selectedSheetName}
                   onChange={(e) => setSelectedSheetName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-black text-slate-700 focus:outline-none focus:border-rose-500 transition-all"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-rose-500 focus:bg-white transition-all"
                 >
                   <option value={selectedStore}>📊 {selectedStore}總表</option>
                   {storePeople.map(p => (
@@ -290,12 +420,12 @@ export default function PerformanceBoard({ currentUser, stores }) {
                   ))}
                 </select>
               ) : (
-                <div className="bg-slate-50 border border-slate-150 rounded-xl px-2.5 py-2 text-xs font-black text-slate-500 select-none flex items-center justify-between">
+                <div className="bg-slate-50 border border-slate-150 rounded-2xl px-3 py-2 text-xs font-black text-slate-500 select-none flex items-center justify-between">
                   <span>{selectedSheetName === selectedStore ? `📊 ${selectedStore}總表` : `👤 ${selectedSheetName}`}</span>
                   {storePeople.length > 0 && selectedSheetName !== selectedStore && (
                     <button
                       onClick={() => setSelectedSheetName(selectedSheetName === currentUser.sheetName ? selectedStore : (currentUser.sheetName || selectedStore))}
-                      className="text-[9px] text-rose-500 font-extrabold"
+                      className="text-[9px] text-rose-500 font-extrabold border-none bg-transparent hover:text-rose-600"
                     >
                       切換總表
                     </button>
@@ -308,81 +438,77 @@ export default function PerformanceBoard({ currentUser, stores }) {
 
         {/* 骨架屏載入狀態 */}
         {loading && (
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center justify-center space-y-3 min-h-[250px]">
-            <Loader2 size={32} className="text-rose-500 animate-spin" />
-            <span className="text-xs font-black text-slate-500">正在獲取 Google Apps Script 業績報表...</span>
+          <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm flex flex-col items-center justify-center space-y-4 min-h-[300px]">
+            <Loader2 size={36} className="text-rose-500 animate-spin" />
+            <span className="text-xs font-black text-slate-500">正在動態載入馬尼 (Money) 業績報表...</span>
           </div>
         )}
 
         {/* 錯誤提示 */}
         {!loading && errorMsg && (
-          <div className="bg-rose-50 border border-rose-100 rounded-3xl p-6 shadow-sm text-center space-y-2">
-            <AlertCircle size={28} className="text-rose-500 mx-auto" />
-            <h3 className="text-xs font-black text-rose-600">讀取異常</h3>
+          <div className="bg-rose-50 border border-rose-100 rounded-[32px] p-8 shadow-sm text-center space-y-3">
+            <AlertCircle size={32} className="text-rose-500 mx-auto" />
+            <h3 className="text-xs font-black text-rose-600">業績讀取異常</h3>
             <p className="text-[10px] text-slate-400 font-bold leading-relaxed">{errorMsg}</p>
           </div>
         )}
 
         {/* 業績數據呈現 */}
         {!loading && !errorMsg && perfData && (
-          <div className="space-y-4">
-            {/* 毛利大圓環 / 達成率進度條 */}
-            <div className="bg-gradient-to-br from-rose-500 to-pink-600 rounded-[32px] p-6 text-white shadow-lg space-y-4 relative overflow-hidden">
-              {/* 背景斜紋裝飾 */}
-              <div className="absolute right-[-20px] bottom-[-20px] text-[120px] font-black text-white/5 font-mono select-none pointer-events-none">
-                %
-              </div>
-
-              <div className="flex justify-between items-center">
-                <div className="space-y-0.5">
-                  <span className="text-[10px] text-white/80 font-bold block">月度毛利達成進度</span>
-                  <div className="flex items-baseline space-x-1">
-                    <span className="text-2xl font-black font-mono">{(summary.grossProfit?.accumulated || 0).toLocaleString()}</span>
-                    <span className="text-[10px] text-white/80">/ {(summary.grossProfit?.target || 0).toLocaleString()} 元</span>
-                  </div>
-                </div>
-                <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md flex flex-col items-center justify-center border border-white/20">
-                  <span className="text-xs font-black font-mono">{grossProfitRate}</span>
-                  <span className="text-[8px] text-white/70 font-bold">達成率</span>
-                </div>
-              </div>
-
-              {/* 進度條 */}
-              <div className="space-y-1">
-                <div className="w-full h-2.5 bg-white/20 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-white rounded-full transition-all duration-500" 
-                    style={{ width: `${Math.min(parseInt(grossProfitRate) || 0, 100)}%` }}
-                  ></div>
-                </div>
-                <div className="flex justify-between text-[9px] text-white/80 font-bold font-mono">
-                  <span>0%</span>
-                  <span>目標: 100%</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 核心指標卡片 (2x2 Grid + 底部單卡) */}
-            <div className="grid grid-cols-2 gap-3">
-              {['accessories', 'customerCount', 'insurance', 'subscription'].map((key) => {
-                const metric = summary[key] || { target: 0, accumulated: 0, achievement: '0%' };
+          <div className="space-y-5">
+            {/* 2. 雙大字發光卡片區 (毛利 & 配件) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {mainMetrics.map((m, idx) => {
+                const isFirst = idx === 0;
+                const percentInt = parseInt(m.achievement) || 0;
                 return (
-                  <div key={key} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between h-28">
-                    <div className="flex items-center space-x-1.5">
-                      <div className="w-7 h-7 rounded-xl bg-slate-50 flex items-center justify-center">
-                        {getMetricIcon(key)}
+                  <div 
+                    key={m.name} 
+                    className={`rounded-[32px] p-6 text-white shadow-lg relative overflow-hidden border ${
+                      isFirst 
+                        ? 'bg-gradient-to-br from-rose-500 to-pink-600 border-rose-400/20 shadow-rose-500/15' 
+                        : 'bg-gradient-to-br from-sky-500 to-indigo-600 border-sky-400/20 shadow-sky-500/15'
+                    }`}
+                  >
+                    {/* 背景發光圓圈裝飾 */}
+                    <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/5 blur-xl pointer-events-none"></div>
+                    
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] text-white/70 font-bold tracking-wider">{m.name}</span>
+                        <div className="flex items-baseline space-x-1">
+                          <span className="text-2xl font-black font-mono tracking-tight">
+                            {Number(m.accumulated || 0).toLocaleString()}
+                          </span>
+                          <span className="text-[9px] text-white/70">/ {Number(m.target || 0).toLocaleString()} 元</span>
+                        </div>
                       </div>
-                      <span className="text-[10px] font-black text-slate-500">{getMetricLabel(key)}</span>
+
+                      {/* 預警呼吸燈號 */}
+                      <span className={`text-[8px] font-black px-2.5 py-1 rounded-full border flex items-center gap-1.5 shadow-sm bg-white backdrop-blur-md ${m.status.colorClass}`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+                        {m.status.text}
+                      </span>
                     </div>
 
-                    <div className="space-y-1">
-                      <div className="flex items-baseline space-x-0.5">
-                        <span className="text-lg font-black text-slate-800 font-mono">{Number(metric.accumulated || 0).toLocaleString()}</span>
-                        <span className="text-[9px] text-slate-400 font-bold">{getMetricUnit(key)}</span>
+                    {/* 發光進度條 (內置時間虛線) */}
+                    <div className="space-y-1.5 relative">
+                      <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden relative">
+                        {/* 達成率進度 */}
+                        <div 
+                          className="h-full bg-white rounded-full transition-all duration-700 relative" 
+                          style={{ width: `${Math.min(percentInt, 100)}%` }}
+                        ></div>
+                        {/* 時間進度指示虛線 */}
+                        <div 
+                          className="absolute top-0 bottom-0 w-[2px] bg-yellow-300 shadow-[0_0_4px_#fde047]"
+                          style={{ left: `${timeProgress.percent}%` }}
+                          title={`本月進度: ${timeProgress.percent}%`}
+                        ></div>
                       </div>
-                      <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold">
-                        <span>目標: {Number(metric.target || 0).toLocaleString()}</span>
-                        <span className="text-rose-500 font-black font-mono">{metric.achievement || '0%'}</span>
+                      <div className="flex justify-between text-[8px] text-white/80 font-bold font-mono">
+                        <span>達成率: {m.achievement}</span>
+                        <span>月底預估: {summary[isFirst ? '毛利' : '配件營收']?.achievement || '0%'}</span>
                       </div>
                     </div>
                   </div>
@@ -390,18 +516,121 @@ export default function PerformanceBoard({ currentUser, stores }) {
               })}
             </div>
 
-            {/* 折線趨勢圖 (毛利 & 配件) */}
-            <div className="space-y-3">
-              <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 px-1">
-                <TrendingUp size={14} className="text-rose-500" />
-                本月毛利日趨勢
-              </h3>
+            {/* 3. 24 指標分類 Tab 頁籤 */}
+            <div className="bg-white rounded-[32px] p-2.5 shadow-sm border border-slate-100 flex items-center justify-between overflow-x-auto gap-1.5 no-scrollbar sticky top-[68px] z-10 shrink-0">
+              {Object.keys(TABS_CONFIG).map((tabId) => {
+                const tab = TABS_CONFIG[tabId];
+                const isActive = activeTab === tabId;
+                return (
+                  <button
+                    key={tabId}
+                    onClick={() => setActiveTab(tabId)}
+                    className={`flex items-center space-x-1 px-3 py-2 text-[10px] font-black rounded-2xl transition-all border-none shrink-0 ${
+                      isActive 
+                        ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20 active:scale-95' 
+                        : 'bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100/70'
+                    }`}
+                  >
+                    {tab.icon}
+                    <span>{tab.title}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 4. Tab 內容卡片 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 animate-fade-in">
+              {TABS_CONFIG[activeTab].keys.map((key) => {
+                const metric = summary[key] || { target: 0, accumulated: 0, achievement: '0%', currentAchievement: '0%' };
+                const isHealthTab = activeTab === 'health';
+                
+                // 計算狀態與燈號 (體質分頁與一般指標分頁做不同處理)
+                const rateStr = isHealthTab ? metric.accumulated + '%' : metric.currentAchievement || '0%';
+                const status = getStatusLight(rateStr);
+                const unit = TABS_CONFIG[activeTab].units[key] || '';
+                const colorClass = TABS_CONFIG[activeTab].colors[key] || 'text-slate-600';
+
+                return (
+                  <div 
+                    key={key} 
+                    className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between min-h-[128px] hover:shadow-md transition-all duration-300 relative group"
+                  >
+                    {/* 指標頂部列 */}
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 group-hover:scale-105 transition-transform">
+                          <Target size={14} className={colorClass} />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black text-slate-700 leading-tight">
+                            {key.replace('\n', ' ')}
+                          </span>
+                          <span className="text-[7.5px] text-slate-400 font-bold mt-0.5">
+                            目標: {isHealthTab ? '達成標準' : Number(metric.target || 0).toLocaleString()} {unit}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 迷你呼吸燈 */}
+                      <span 
+                        className={`w-2.5 h-2.5 rounded-full border border-white shadow-[0_0_6px_rgba(0,0,0,0.05)] ${
+                          status.light === 'green' 
+                            ? 'bg-emerald-500 shadow-emerald-500/40' 
+                            : status.light === 'yellow' 
+                            ? 'bg-amber-500 shadow-amber-500/40' 
+                            : 'bg-rose-500 shadow-rose-500/40'
+                        } animate-pulse`}
+                        title={status.text}
+                      ></span>
+                    </div>
+
+                    {/* 指標中段數值 */}
+                    <div className="mt-3 space-y-1">
+                      <div className="flex items-baseline space-x-0.5">
+                        <span className="text-xl font-black text-slate-800 font-mono tracking-tight">
+                          {isHealthTab ? (Number(metric.accumulated) || 0).toLocaleString() : Number(metric.accumulated || 0).toLocaleString()}
+                        </span>
+                        <span className="text-[8px] text-slate-400 font-bold">{unit}</span>
+                      </div>
+
+                      {/* 動態日需求量 / 達成率 */}
+                      <div className="flex justify-between items-center text-[8.5px] font-bold mt-1 text-slate-400">
+                        {isHealthTab ? (
+                          <span>燈號指標: {status.text}</span>
+                        ) : (
+                          <span>今日日需求: <strong className="text-slate-600 font-black">{calculateDailyRequirement(metric.target, metric.accumulated)}</strong></span>
+                        )}
+                        <div className="flex items-center space-x-1">
+                          <span className="text-[7.5px] text-slate-350">目前達成:</span>
+                          <span className={`font-mono font-black ${
+                            status.light === 'green' ? 'text-emerald-600' : status.light === 'yellow' ? 'text-amber-500' : 'text-rose-500'
+                          }`}>
+                            {isHealthTab ? metric.accumulated + '%' : metric.currentAchievement || '0%'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 5. SVG 趨勢折線圖 (毛利 & 配件) */}
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center space-x-1.5 px-1">
+                <div className="w-1.5 h-4 bg-rose-500 rounded-full"></div>
+                <h3 className="text-xs font-black text-slate-800 tracking-wide">
+                  本月毛利日累計趨勢 (元)
+                </h3>
+              </div>
               {renderLineChart(perfData?.daily, 'grossProfit', '#f43f5e')}
 
-              <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 px-1 pt-1">
-                <Smartphone size={14} className="text-sky-500" />
-                本月配件日趨勢
-              </h3>
+              <div className="flex items-center space-x-1.5 px-1 pt-2">
+                <div className="w-1.5 h-4 bg-sky-500 rounded-full"></div>
+                <h3 className="text-xs font-black text-slate-800 tracking-wide">
+                  本月配件日累計趨勢 (元)
+                </h3>
+              </div>
               {renderLineChart(perfData?.daily, 'accessories', '#0284c7')}
             </div>
           </div>
