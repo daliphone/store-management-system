@@ -723,12 +723,24 @@ const initLocalPetData = (sheetName) => {
 // 輔助函數：取得本地模擬數位寵物資料
 const getLocalPetData = (sheetName) => {
   const data = localStorage.getItem(`store_mgmt_pet_${sheetName}`);
-  if (!data) return initLocalPetData(sheetName);
-  try {
-    return JSON.parse(data);
-  } catch (e) {
-    return initLocalPetData(sheetName);
+  let petData;
+  if (!data) {
+    petData = initLocalPetData(sheetName);
+  } else {
+    try {
+      petData = JSON.parse(data);
+    } catch (e) {
+      petData = initLocalPetData(sheetName);
+    }
   }
+
+  // 管理者防呆：強制保證管理者的初始 M幣 不低於 1000 點 (避免消費扣款後又被強制補滿)
+  const isManager = (sheetName === '士賢' || sheetName === '哈蜜' || sheetName === '文和' || sheetName === '小潔' || sheetName === '韻涵');
+  if (isManager && petData.mCoins <= 100) {
+    petData.mCoins = 1000;
+    saveLocalPetData(sheetName, petData);
+  }
+  return petData;
 };
 
 // 輔助函數：儲存本地模擬數位寵物資料
@@ -829,20 +841,52 @@ export const useInventoryItem = async (sheetName, itemId, isEquipAction) => {
       return { status: 'error', message: '背包內無此道具' };
     }
     
+    let message = undefined;
+    let rolledItemId = undefined;
     if (item.type === 'consumable') {
       local.inventory[invItemIdx].count -= 1;
       if (item.effect.hp) {
         local.pet.hp = Math.min(100, local.pet.hp + item.effect.hp);
+        message = `🎉 使用了【${item.name}】，寵物回復了 ${item.effect.hp} 點 HP！`;
       }
       if (item.effect.cleanse) {
         local.pet.hp = Math.min(100, local.pet.hp + 50);
         local.pet.cleanVal = 100;
+        message = `🎉 使用了【${item.name}】，寵物回復了 50 點 HP，且淨化值已全滿！`;
       }
       if (item.effect.clean_val) {
         local.pet.cleanVal = Math.min(100, local.pet.cleanVal + item.effect.clean_val);
+        message = `🎉 使用了【${item.name}】，寵物回復了 ${item.effect.clean_val} 點淨化值！`;
       }
       if (item.effect.evo_time_reduce) {
         local.pet.nextEvolutionTime = Math.max(Date.now(), local.pet.nextEvolutionTime - item.effect.evo_time_reduce);
+        message = `🎉 使用了【${item.name}】，進化倒數縮短了 ${item.effect.evo_time_reduce / (3600 * 1000)} 小時！`;
+      }
+      if (item.effect.random_item) {
+        const poolType = item.effect.random_item;
+        let pool = [];
+        if (poolType === 'normal') {
+          pool = [
+            'item_potion_hp_small', 'item_potion_hp_medium', 'item_toy_ball', 'item_pet_food',
+            'item_buff_scroll', 'item_potion_hp_large', 'item_cleanse',
+            'item_equip_badge', 'item_equip_mug', 'item_equip_shoes', 'item_equip_mouse', 'item_equip_5g'
+          ];
+        } else {
+          pool = [
+            'item_equip_ticket', 'item_equip_uniform', 'item_equip_watch', 'item_equip_crown',
+            'item_equip_key', 'item_equip_shield', 'item_equip_glasses', 'item_evo_stone'
+          ];
+        }
+        const rolledId = pool[Math.floor(Math.random() * pool.length)];
+        rolledItemId = rolledId;
+        const rolledItem = config[rolledId];
+        const rItemIdx = local.inventory.findIndex(i => i.itemId === rolledId);
+        if (rItemIdx === -1) {
+          local.inventory.push({ itemId: rolledId, count: 1, isEquipped: false });
+        } else {
+          local.inventory[rItemIdx].count += 1;
+        }
+        message = `🎉 開啟【${item.name}】，隨機獲得了道具【${rolledItem.name}】！`;
       }
     } else if (item.type === 'equip') {
       local.inventory[invItemIdx].isEquipped = isEquipAction;
@@ -866,7 +910,7 @@ export const useInventoryItem = async (sheetName, itemId, isEquipAction) => {
     }
     
     saveLocalPetData(sheetName, local);
-    return { ...local, status: 'success', source: 'LocalStorage' };
+    return { ...local, status: 'success', message, rolledItemId, source: 'LocalStorage' };
   }
   
   try {

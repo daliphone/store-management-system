@@ -1,7 +1,7 @@
 /**
  * 門市店務管理系統 - Google Apps Script (GAS) 同步指令碼
  * 
- * 目前版本：v1.3.2 - 修正來客數抓取 Row 8 (T8) 累計實績版 (更新日期: 2026-05-30)
+ * 目前版本：v3.0.0 - 門市調貨看板、盲盒隨機開箱、道具入手華麗特效與小潔管理員版 (更新日期: 2026-05-31)
  * 
  * 部署說明：
  * 1. 開啟您的 Google 試算表。
@@ -736,7 +736,10 @@ function ensureSheetsExist() {
   var statusSheet = ss.getSheetByName(SHEET_ORDER_STATUS);
   var customerSheet = ss.getSheetByName(SHEET_CUSTOMERS);
   var logSheet = ss.getSheetByName(SHEET_SYSTEM_LOGS);
-  if (!orderSheet || !taskSheet || !statusSheet || !customerSheet || !logSheet) {
+  var petAttrSheet = ss.getSheetByName(SHEET_PET_ATTRIBUTES);
+  var petDataSheet = ss.getSheetByName(SHEET_PET_DATA);
+  var petInvSheet = ss.getSheetByName(SHEET_PET_INVENTORY);
+  if (!orderSheet || !taskSheet || !statusSheet || !customerSheet || !logSheet || !petAttrSheet || !petDataSheet || !petInvSheet) {
     initializeSystemSheets();
   }
 }
@@ -2316,6 +2319,7 @@ var STORE_ITEMS = {
 
 // 輔助函數：在工作表的特定欄位尋找符合的值
 function findRowInSheet(sheet, colIndex, searchValue) {
+  if (!sheet) return -1;
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return -1;
   var range = sheet.getRange(1, colIndex, lastRow, 1);
@@ -2418,6 +2422,13 @@ function handleGetPetStats(sheetName, storeName) {
   // 1. 取得基礎屬性與 M幣
   var attrRowIdx = findRowInSheet(attrSheet, 1, sheetName);
   var coins = 100;
+  
+  // 管理者先給 1000 M幣 防呆
+  var isManager = (storeName === '全分店' || sheetName === '士賢' || sheetName === '哈蜜' || sheetName === '文和' || sheetName === '小潔' || sheetName === '韻涵');
+  if (isManager) {
+    coins = 1000;
+  }
+  
   var baseStr = 10, baseCon = 10, baseIntel = 10, basePer = 10;
   
   if (attrRowIdx === -1) {
@@ -2429,6 +2440,12 @@ function handleGetPetStats(sheetName, storeName) {
     baseIntel = Number(attrVals[3]) || 10;
     basePer = Number(attrVals[4]) || 10;
     coins = Number(attrVals[5]) || 0;
+    
+    // 若管理者為預設初始 M幣(100)或更低，自動幫他補足至 1000 點 (避免每次消費後又被重設)
+    if (isManager && coins <= 100) {
+      coins = 1000;
+      attrSheet.getRange(attrRowIdx, 6).setValue(1000);
+    }
   }
   
   // 2. 取得背包
@@ -2596,6 +2613,8 @@ function handleBuyStoreItem(sheetName, itemId) {
 function handleUseInventoryItem(sheetName, itemId, isEquipAction) {
   if (!sheetName || !itemId) return { status: 'error', message: '缺少同仁姓名或道具ID' };
   
+  var rolledId = null; // 儲存盲盒產出的隨機道具 ID
+  
   var item = STORE_ITEMS[itemId];
   if (!item) return { status: 'error', message: '找不到該道具配置' };
   
@@ -2663,6 +2682,42 @@ function handleUseInventoryItem(sheetName, itemId, isEquipAction) {
       effectMsg = "進化倒數縮短了 " + (reduce / (3600 * 1000)) + " 小時";
     }
     
+    if (item.effect.random_item) {
+      var poolType = item.effect.random_item;
+      var pool = [];
+      if (poolType === 'normal') {
+        pool = [
+          'item_potion_hp_small', 'item_potion_hp_medium', 'item_toy_ball', 'item_pet_food',
+          'item_buff_scroll', 'item_potion_hp_large', 'item_cleanse',
+          'item_equip_badge', 'item_equip_mug', 'item_equip_shoes', 'item_equip_mouse', 'item_equip_5g'
+        ];
+      } else {
+        pool = [
+          'item_equip_ticket', 'item_equip_uniform', 'item_equip_watch', 'item_equip_crown',
+          'item_equip_key', 'item_equip_shield', 'item_equip_glasses', 'item_evo_stone'
+        ];
+      }
+      rolledId = pool[Math.floor(Math.random() * pool.length)];
+      var rolledItem = STORE_ITEMS[rolledId];
+      
+      var rolledRowIdx = -1;
+      for (var j = 1; j < invData.length; j++) {
+        if (invData[j][0] === sheetName && invData[j][1] === rolledId) {
+          rolledRowIdx = j + 1;
+          break;
+        }
+      }
+      
+      if (rolledRowIdx === -1) {
+        invSheet.appendRow([sheetName, rolledId, 1, '否']);
+      } else {
+        var rCount = Number(invSheet.getRange(rolledRowIdx, 3).getValue()) || 0;
+        invSheet.getRange(rolledRowIdx, 3).setValue(rCount + 1);
+      }
+      
+      effectMsg = "開啟" + item.name + "，隨機獲得了道具【" + rolledItem.name + "】！";
+    }
+    
     dataSheet.getRange(petRowIdx, 13).setValue(Date.now());
     
     handleWriteLog(
@@ -2685,7 +2740,14 @@ function handleUseInventoryItem(sheetName, itemId, isEquipAction) {
     );
   }
   
-  return handleGetPetStats(sheetName);
+  var stats = handleGetPetStats(sheetName);
+  if (effectMsg) {
+    stats.message = effectMsg;
+  }
+  if (item.effect.random_item && rolledId) {
+    stats.rolledItemId = rolledId;
+  }
+  return stats;
 }
 
 // 判定進化

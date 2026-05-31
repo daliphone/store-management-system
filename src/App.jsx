@@ -145,9 +145,8 @@ export default function App() {
   const [petStats, setPetStats] = useState(null);
   const [mCoins, setMCoins] = useState(100);
 
-  // 取得/重新整理寵物資料的函數，供全局呼叫
   const refreshPetStats = async () => {
-    if (!currentUser || currentUser.store === '全分店') return;
+    if (!currentUser) return;
     try {
       const stats = await getPetStats(currentUser.name, currentUser.store);
       if (stats && stats.status === 'success') {
@@ -610,6 +609,9 @@ export default function App() {
             setTasksStoreFilter={setTasksStoreFilter}
             petStats={petStats}
             mCoins={mCoins}
+            orders={orders}
+            onUpdateOrderStatus={handleUpdateOrderStatus}
+            onViewDetails={(order) => setSelectedOrder(order)}
           />
         );
       case 'performance':

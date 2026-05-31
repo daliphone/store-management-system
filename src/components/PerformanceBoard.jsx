@@ -22,6 +22,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
   const [storeTab, setStoreTab] = useState('shop'); // 'shop' 或 'inventory'
   const [actionLoading, setActionLoading] = useState(false);
   const [showPetRoom, setShowPetRoom] = useState(true);
+  const [acquiredItem, setAcquiredItem] = useState(null);
 
   // 數位寵物相關資料解構與預設值
   const pet = petStats?.pet || {
@@ -220,6 +221,18 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
     try {
       const result = await buyStoreItem(currentUser.name, itemId);
       if (result.status === 'success') {
+        const config = getStoreItemsConfig();
+        const item = config[itemId];
+        if (item) {
+          setAcquiredItem({
+            name: item.name,
+            desc: item.desc,
+            type: item.type,
+            stats: item.stats,
+            itemId: itemId,
+            titleText: '🛒 購買成功！'
+          });
+        }
         if (refreshPetStats) await refreshPetStats();
       } else {
         alert(result.message || '購買失敗');
@@ -237,6 +250,23 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
     try {
       const result = await useInventoryItem(currentUser.name, itemId, isEquip);
       if (result.status === 'success') {
+        const config = getStoreItemsConfig();
+        const rolledItemId = result.rolledItemId;
+        if (rolledItemId) {
+          const item = config[rolledItemId];
+          if (item) {
+            setAcquiredItem({
+              name: item.name,
+              desc: item.desc,
+              type: item.type,
+              stats: item.stats,
+              itemId: rolledItemId,
+              titleText: '🎁 盲盒開箱成功！'
+            });
+          }
+        } else if (result.message && !isEquip) {
+          alert(result.message);
+        }
         if (refreshPetStats) await refreshPetStats();
       } else {
         alert(result.message || '操作失敗');
@@ -741,21 +771,21 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
                   <div>
                     <div className="flex items-center space-x-2">
                       <div className="flex items-center space-x-1 group/name cursor-pointer select-none" onClick={handleRename} title="點擊為寵物命名">
-                        <span className="text-sm font-black tracking-wide text-slate-800 hover:underline decoration-slate-400 decoration-dashed">{pet.name}</span>
-                        <span className="text-[10px] opacity-70 group-hover/name:opacity-100 transition-opacity">🖊️</span>
+                        <span className="text-base font-black tracking-wide text-slate-800 hover:underline decoration-slate-400 decoration-dashed">{pet.name}</span>
+                        <span className="text-xs opacity-75 group-hover/name:opacity-100 transition-opacity">🖊️</span>
                       </div>
-                      <span className="text-[9px] bg-slate-200/60 text-slate-600 px-2 py-0.5 rounded-full font-black tracking-wider border border-slate-300/30">
+                      <span className="text-xs bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded-full font-black tracking-wider border border-slate-300/30 scale-95">
                         {pet.level === 1 ? "數據卵" : pet.level === 2 ? "萌芽體" : pet.level === 3 ? "幼生體" : pet.level === 4 ? "雛形體" : pet.level === 5 ? "成熟體" : pet.level === 6 ? "完全體" : "究極體"} (Stage {pet.level})
                       </span>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-bold mt-0.5">同仁夥伴：{pet.sheetName}</p>
+                    <p className="text-xs text-slate-600 font-extrabold mt-0.5">同仁夥伴：{pet.sheetName}</p>
                   </div>
                 </div>
 
                 {/* 道具商店按鈕 */}
                 <button
                   onClick={() => setStoreOpen(true)}
-                  className="bg-white hover:bg-slate-50 shadow-sm text-slate-700 font-extrabold text-[10px] px-3.5 py-1.5 rounded-xl border border-slate-200/70 active:scale-95 transition-all flex items-center gap-1.5"
+                  className="bg-white hover:bg-slate-50 shadow-sm text-slate-850 font-extrabold text-xs px-3.5 py-1.5 rounded-xl border border-slate-200/70 active:scale-95 transition-all flex items-center gap-1.5"
                 >
                   <Coins size={12} className="text-yellow-500 animate-spin" style={{ animationDuration: '3s' }} />
                   <span>🪙 {coins} | 商店背包</span>
@@ -766,7 +796,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
               <div className="space-y-2.5">
                 {/* HP 條 */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[9px] font-black text-slate-700">
+                  <div className="flex justify-between text-xs font-black text-slate-800">
                     <span>❤️ 生命值 HP</span>
                     <span>{pet.hp} / 100</span>
                   </div>
@@ -782,7 +812,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
 
                 {/* XP 經驗值條 */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[9px] font-black text-slate-700">
+                  <div className="flex justify-between text-xs font-black text-slate-800">
                     <span>✨ 經驗值 XP</span>
                     <span>{pet.xp} / {Math.round(100 * Math.pow(pet.level, 1.5))}</span>
                   </div>
@@ -798,19 +828,19 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
               {/* 四大屬性面板 */}
               <div className="grid grid-cols-4 gap-2 mt-4 pt-3.5 border-t border-slate-200/50">
                 <div className="bg-white/60 rounded-xl p-1.5 text-center border border-slate-200/40 shadow-xs">
-                  <div className="text-[9px] text-slate-500 font-black">STR 力量</div>
+                  <div className="text-[10px] text-slate-600 font-black">STR 力量</div>
                   <div className="text-xs font-black font-mono mt-0.5 text-amber-600">⚔️ {finalAttributes.STR}</div>
                 </div>
                 <div className="bg-white/60 rounded-xl p-1.5 text-center border border-slate-200/40 shadow-xs">
-                  <div className="text-[9px] text-slate-500 font-black">CON 體質</div>
+                  <div className="text-[10px] text-slate-600 font-black">CON 體質</div>
                   <div className="text-xs font-black font-mono mt-0.5 text-sky-600">🛡️ {finalAttributes.CON}</div>
                 </div>
                 <div className="bg-white/60 rounded-xl p-1.5 text-center border border-slate-200/40 shadow-xs">
-                  <div className="text-[9px] text-slate-500 font-black">INT 智力</div>
+                  <div className="text-[10px] text-slate-600 font-black">INT 智力</div>
                   <div className="text-xs font-black font-mono mt-0.5 text-emerald-600">🎓 {finalAttributes.INT}</div>
                 </div>
                 <div className="bg-white/60 rounded-xl p-1.5 text-center border border-slate-200/40 shadow-xs">
-                  <div className="text-[9px] text-slate-500 font-black">PER 感知</div>
+                  <div className="text-[10px] text-slate-600 font-black">PER 感知</div>
                   <div className="text-xs font-black font-mono mt-0.5 text-purple-600">🔍 {finalAttributes.PER}</div>
                 </div>
               </div>
@@ -1477,7 +1507,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
                 </div>
                 <div>
                   <h2 className="text-sm font-black text-slate-800">馬尼道具鋪 & 背包</h2>
-                  <p className="text-[9px] text-slate-400 font-extrabold">培育積分與裝備強化</p>
+                  <p className="text-xs text-slate-550 font-extrabold">培育積分與裝備強化</p>
                 </div>
               </div>
               <button
@@ -1517,7 +1547,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
 
               <div className="bg-yellow-50 border border-yellow-100 rounded-xl px-3 py-1 flex items-center gap-1.5">
                 <span className="text-xs text-yellow-600">🪙</span>
-                <span className="text-xs font-mono font-black text-yellow-700">{coins} <span className="text-[9px] font-bold text-yellow-600/80">M幣</span></span>
+                <span className="text-xs font-mono font-black text-yellow-700">{coins} <span className="text-xs font-bold text-yellow-600/80">M幣</span></span>
               </div>
             </div>
 
@@ -1526,7 +1556,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
               {actionLoading && (
                 <div className="absolute inset-0 bg-white/70 backdrop-blur-xs flex flex-col items-center justify-center z-10 space-y-2">
                   <Loader2 className="text-rose-500 animate-spin" size={28} />
-                  <span className="text-[10px] font-black text-slate-500">同步至 Google Sheets 中...</span>
+                  <span className="text-xs font-black text-slate-650">同步至 Google Sheets 中...</span>
                 </div>
               )}
 
@@ -1535,7 +1565,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
                 <div className="space-y-4">
                   {/* 消耗品區 */}
                   <div className="space-y-2">
-                    <h3 className="text-[10px] font-black text-slate-400 tracking-wider flex items-center gap-1">
+                    <h3 className="text-xs font-black text-slate-500 tracking-wider flex items-center gap-1">
                       🧪 消耗性補給品 ({Object.values(getStoreItemsConfig()).filter(i => i.type === 'consumable').length}款)
                     </h3>
                     <div className="grid grid-cols-1 gap-2.5">
@@ -1547,15 +1577,15 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
                               <div className="flex items-center space-x-1.5">
                                 <span className="text-xs font-black text-slate-800">{item.name}</span>
                                 {item.price >= 100 && (
-                                  <span className="text-[8px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-black border border-amber-200">珍貴</span>
+                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-black border border-amber-200">珍貴</span>
                                 )}
                               </div>
-                              <p className="text-[9px] text-slate-400 font-bold leading-relaxed">{item.desc}</p>
+                              <p className="text-xs text-slate-500 font-bold leading-relaxed">{item.desc}</p>
                             </div>
                             <button
                               onClick={() => handleBuy(item.id)}
                               disabled={coins < item.price || actionLoading}
-                              className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-xl border transition-all active:scale-95 flex items-center gap-1 ${
+                              className={`shrink-0 text-xs font-black px-3 py-1.5 rounded-xl border transition-all active:scale-95 flex items-center gap-1 ${
                                 coins >= item.price
                                   ? 'bg-yellow-400 hover:bg-yellow-500 text-slate-900 border-none shadow-sm'
                                   : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
@@ -1570,7 +1600,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
 
                   {/* 裝備區 */}
                   <div className="space-y-2 pt-2">
-                    <h3 className="text-[10px] font-black text-slate-400 tracking-wider flex items-center gap-1">
+                    <h3 className="text-xs font-black text-slate-500 tracking-wider flex items-center gap-1">
                       🛡️ 屬性強化裝備 ({Object.values(getStoreItemsConfig()).filter(i => i.type === 'equip').length}款)
                     </h3>
                     <div className="grid grid-cols-1 gap-2.5">
@@ -1581,16 +1611,16 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
                             <div className="space-y-1 pr-2 flex-1">
                               <div className="flex items-center space-x-1.5">
                                 <span className="text-xs font-black text-slate-800">{item.name}</span>
-                                <span className="text-[8px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-black border border-blue-100">
+                                <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-black border border-blue-100">
                                   {Object.entries(item.stats).map(([k, v]) => `${k}+${v}`).join(', ')}
                                 </span>
                               </div>
-                              <p className="text-[9px] text-slate-400 font-bold leading-relaxed">{item.desc}</p>
+                              <p className="text-xs text-slate-500 font-bold leading-relaxed">{item.desc}</p>
                             </div>
                             <button
                               onClick={() => handleBuy(item.id)}
                               disabled={coins < item.price || actionLoading}
-                              className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-xl border transition-all active:scale-95 flex items-center gap-1 ${
+                              className={`shrink-0 text-xs font-black px-3 py-1.5 rounded-xl border transition-all active:scale-95 flex items-center gap-1 ${
                                 coins >= item.price
                                   ? 'bg-yellow-400 hover:bg-yellow-500 text-slate-900 border-none shadow-sm'
                                   : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
@@ -1609,8 +1639,8 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
                   {(!petStats?.inventory || petStats.inventory.filter(i => i.count > 0 || i.isEquipped).length === 0) ? (
                     <div className="py-12 text-center space-y-2">
                       <div className="text-3xl">🎒</div>
-                      <div className="text-xs font-black text-slate-400">您的背包空空如也</div>
-                      <p className="text-[9px] text-slate-350 font-bold">前往道具商品頁面，使用 M幣 購買道具吧！</p>
+                      <div className="text-sm font-black text-slate-500">您的背包空空如也</div>
+                      <p className="text-xs text-slate-550 font-bold">前往道具商品頁面，使用 M幣 購買道具吧！</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 gap-2.5">
@@ -1626,7 +1656,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
                                 <div className="flex items-center space-x-1.5">
                                   <span className="text-xs font-black text-slate-800">{item.name}</span>
                                   {item.type === 'equip' ? (
-                                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-black border ${
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black border ${
                                       invItem.isEquipped
                                         ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                                         : 'bg-slate-100 text-slate-500 border-slate-200'
@@ -1634,12 +1664,12 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
                                       {invItem.isEquipped ? '已穿戴' : '未穿戴'}
                                     </span>
                                   ) : (
-                                    <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-black border border-slate-200">
+                                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-black border border-slate-200">
                                       數量: {invItem.count}
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[9px] text-slate-400 font-bold leading-relaxed">{item.desc}</p>
+                                <p className="text-xs text-slate-500 font-bold leading-relaxed">{item.desc}</p>
                               </div>
 
                               <div className="shrink-0 flex items-center space-x-2">
@@ -1647,7 +1677,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
                                   <button
                                     onClick={() => handleUse(item.id, false)}
                                     disabled={invItem.count <= 0 || actionLoading}
-                                    className="bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-black px-3.5 py-1.5 rounded-xl border-none shadow-sm active:scale-95 transition-all"
+                                    className="bg-rose-500 hover:bg-rose-600 text-white text-xs font-black px-3.5 py-1.5 rounded-xl border-none shadow-sm active:scale-95 transition-all"
                                   >
                                     使用
                                   </button>
@@ -1655,7 +1685,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
                                   <button
                                     onClick={() => handleUse(item.id, !invItem.isEquipped)}
                                     disabled={actionLoading}
-                                    className={`text-[10px] font-black px-3.5 py-1.5 rounded-xl border transition-all active:scale-95 ${
+                                    className={`text-xs font-black px-3.5 py-1.5 rounded-xl border transition-all active:scale-95 ${
                                       invItem.isEquipped
                                         ? 'bg-slate-200 hover:bg-slate-350 text-slate-700 border-none'
                                         : 'bg-emerald-500 hover:bg-emerald-600 text-white border-none shadow-sm'
@@ -1673,6 +1703,75 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🎁 獲得道具/開箱入手華麗特效 Modal */}
+      {acquiredItem && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-fade-in select-none">
+          {/* 金色粒子/光芒射線背景 */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[conic-gradient(from_0deg,transparent_0%,rgba(245,158,11,0.18)_15%,transparent_30%,rgba(245,158,11,0.18)_45%,transparent_60%,rgba(245,158,11,0.18)_75%,transparent_90%)] animate-spin-slow rounded-full opacity-60"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-gradient-to-r from-amber-500/10 to-yellow-500/10 rounded-full blur-3xl animate-pulse"></div>
+          </div>
+
+          {/* 特效卡片主體 */}
+          <div className="relative bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-2 border-amber-400/40 rounded-[36px] p-8 max-w-sm w-full text-center shadow-[0_0_80px_rgba(245,158,11,0.35)] animate-scale-up overflow-hidden">
+            
+            {/* 卡片流光邊框 */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 via-yellow-300 to-amber-500 animate-shimmer"></div>
+
+            {/* 標題 */}
+            <span className="text-[11px] font-black tracking-[0.25em] text-amber-400 uppercase bg-amber-500/10 px-3.5 py-1.5 rounded-full border border-amber-500/20 inline-block mb-2">
+              {acquiredItem.titleText || '🎉 恭喜獲得'}
+            </span>
+            
+            {/* 圓形發光道具展示 */}
+            <div className="w-28 h-28 mx-auto my-6 rounded-full bg-gradient-to-br from-amber-500/20 via-yellow-500/10 to-transparent flex items-center justify-center border-2 border-amber-400 shadow-[0_0_40px_rgba(245,158,11,0.4)] animate-bounce-subtle relative group">
+              <div className="absolute inset-1.5 rounded-full border border-amber-400/30 border-dashed animate-spin-slow"></div>
+              {/* 根據道具類型顯示大圖標/Emoji */}
+              <span className="text-5xl drop-shadow-md select-none">
+                {acquiredItem.itemId.includes('potion') ? '🧪' : 
+                 acquiredItem.itemId.includes('cleanse') ? '🧼' : 
+                 acquiredItem.itemId.includes('scroll') ? '📜' :
+                 acquiredItem.itemId.includes('stone') ? '💎' :
+                 acquiredItem.itemId.includes('watch') ? '⌚' :
+                 acquiredItem.itemId.includes('glasses') ? '👓' :
+                 acquiredItem.itemId.includes('key') ? '🔑' :
+                 acquiredItem.itemId.includes('crown') ? '👑' : 
+                 acquiredItem.type === 'equip' ? '🛡️' : '🎁'}
+              </span>
+            </div>
+
+            {/* 道具名稱 */}
+            <h3 className="text-2xl font-black text-white tracking-wide drop-shadow-sm font-['Outfit']">
+              {acquiredItem.name}
+            </h3>
+
+            {/* 屬性加成數值 (如果是裝備) */}
+            {acquiredItem.stats && Object.keys(acquiredItem.stats).length > 0 && (
+              <div className="mt-2.5 flex justify-center gap-1.5 flex-wrap">
+                {Object.entries(acquiredItem.stats).map(([stat, val]) => (
+                  <span key={stat} className="text-xs bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-extrabold px-3 py-1 rounded-lg">
+                    💪 {stat} +{val}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* 道具描述 */}
+            <p className="text-xs text-slate-450 font-bold mt-4 leading-relaxed px-2">
+              {acquiredItem.desc || '請至同仁背包中查看或穿戴裝備，為寵物提供額外屬性加成。'}
+            </p>
+
+            {/* 確認收下按鈕 */}
+            <button
+              onClick={() => setAcquiredItem(null)}
+              className="w-full py-4 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-black rounded-2xl text-xs active:scale-95 transition-all shadow-[0_4px_25px_rgba(245,158,11,0.4)] tracking-widest mt-7 border border-yellow-300/30"
+            >
+              收下道具
+            </button>
           </div>
         </div>
       )}

@@ -84,28 +84,31 @@ export default function Dashboard({
     // 隨機選取金句
     setQuoteIndex(Math.floor(Math.random() * SALES_QUOTES.length));
 
-    // 隨機選取招呼語 (身分別採用部門或分店，格式為 XX門市同仁，今天.....)
-    const storeName = currentUser?.store || '門市';
-    const storeSuffix = (storeName.endsWith('部') || storeName.endsWith('處') || storeName.includes('門市')) ? '' : '門市';
-    const displayName = `${storeName}${storeSuffix}`;
+    // 隨機選取招呼語 (管理員直接稱呼管理員，其餘顯示為 XX門市同仁)
+    const isManager = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'AUDITOR' || currentUser?.store === '全分店';
+    const displayName = isManager ? '管理員' : (() => {
+      const storeName = currentUser?.store || '門市';
+      const storeSuffix = (storeName.endsWith('部') || storeName.endsWith('處') || storeName.includes('門市')) ? '' : '門市';
+      return `${storeName}${storeSuffix}同仁`;
+    })();
     
     const greetings = [
-      `${displayName}同仁，今天也是業績長紅、活力滿滿的一天！💪`,
-      `${displayName}同仁，今天讓我們以最熱情的笑容迎接每位客人吧！✨`,
-      `${displayName}同仁，今天出單順利、事事順心，一起加油！🚀`,
-      `${displayName}同仁，今天手氣超旺，主力搭配銷售大有斬獲！🏆`,
-      `${displayName}同仁，今天細心服務、顧客滿意，創造美好的一天！🌟`,
-      `${displayName}同仁，今天也是元氣滿滿，讓我們一起突破目標！🔥`,
-      `${displayName}同仁，關關難過關關過，今天也要保持愉快的心情喔！🌈`,
-      `${displayName}同仁，多一點貼心，多一點貼切，今天業績一定飛高高！📈`,
-      `${displayName}同仁，今天也要把最溫馨的服務帶給每一位顧客！❤️`,
-      `${displayName}同仁，今天就讓我們攜手創造新的銷售紀錄吧！🎯`,
-      `${displayName}同仁，保持專注與熱情，今天肯定能收穫滿滿的成果！🌟`,
-      `${displayName}同仁，您就是門市最強的招財星，今天也祝您開單連連！💰`
+      `${displayName}，今天也是業績長紅、活力滿滿的一天！💪`,
+      `${displayName}，今天讓我們以最熱情的笑容迎接每位客人吧！✨`,
+      `${displayName}，今天出單順利、事事順心，一起加油！🚀`,
+      `${displayName}，今天手氣超旺，主力搭配銷售大有斬獲！🏆`,
+      `${displayName}，今天細心服務、顧客滿意，創造美好的一天！🌟`,
+      `${displayName}，今天也是元氣滿滿，讓我們一起突破目標！🔥`,
+      `${displayName}，關關難過關關過，今天也要保持愉快的心情喔！🌈`,
+      `${displayName}，多一點貼心，多一點貼切，今天業績一定飛高高！📈`,
+      `${displayName}，今天也要把最溫馨的服務帶給每一位顧客！❤️`,
+      `${displayName}，今天就讓我們攜手創造新的銷售紀錄吧！🎯`,
+      `${displayName}，保持專注與熱情，今天肯定能收穫滿滿的成果！🌟`,
+      `${displayName}，您就是門市最強的招財星，今天也祝您開單連連！💰`
     ];
     const randomIdx = Math.floor(Math.random() * greetings.length);
     setGreetingText(greetings[randomIdx]);
-  }, [currentUser?.store]);
+  }, [currentUser]);
 
   // 門市銷售激勵金句資料庫
   const SALES_QUOTES = [
