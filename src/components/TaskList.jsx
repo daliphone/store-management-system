@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Award, Plus, Trash2, Edit2, X, Camera, Check, AlertTriangle, Eye, Info, CheckSquare } from 'lucide-react';
+import { Settings, Award, Plus, Trash2, Edit2, X, Camera, Check, AlertTriangle, Eye, Info, CheckSquare, ClipboardCheck } from 'lucide-react';
 import Modal from './Modal';
 import ManieIcon from './ManieIcon';
 import { STORES } from '../mockData';
@@ -886,8 +886,8 @@ export default function TaskList({
           <div className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 py-4 flex items-center justify-between z-10 shadow-sm animate-fade-in">
             <div className="flex flex-col">
               <h1 className="text-xl font-black text-slate-900 tracking-wide font-['Outfit']">訂單調貨需求狀態</h1>
-              <div className="mt-1 flex items-center space-x-1 text-[#BE185D] font-extrabold text-xs">
-                <span className="material-symbols-outlined text-[16px] fill-1 text-[#BE185D] mr-0.5">assignment_turned_in</span>
+              <div className="mt-1 flex items-center space-x-1.5 text-[#BE185D] font-extrabold text-xs">
+                <ClipboardCheck size={14} className="text-[#BE185D] mr-0.5 shrink-0" />
                 <span>全分店即時客需追蹤</span>
               </div>
             </div>

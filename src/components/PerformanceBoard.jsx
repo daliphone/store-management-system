@@ -1491,7 +1491,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
         />
       )}
 
-      {/* 道具商店與同仁背包抽屜 */}
+      {/* 道具商店與寵物道具包包抽屜 */}
       {storeOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/60 backdrop-blur-xs animate-fade-in">
           {/* 點擊背景關閉 */}
@@ -1541,7 +1541,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
                       : 'text-slate-400 hover:text-slate-600 bg-transparent'
                   }`}
                 >
-                  🎒 同仁背包
+                  🎒 寵物道具包包
                 </button>
               </div>
 
@@ -1762,7 +1762,7 @@ export default function PerformanceBoard({ currentUser, stores, petStats, mCoins
 
             {/* 道具描述 */}
             <p className="text-xs text-slate-450 font-bold mt-4 leading-relaxed px-2">
-              {acquiredItem.desc || '請至同仁背包中查看或穿戴裝備，為寵物提供額外屬性加成。'}
+              {acquiredItem.desc || '請至寵物道具包包中查看或穿戴裝備，為寵物提供額外屬性加成。'}
             </p>
 
             {/* 確認收下按鈕 */}
